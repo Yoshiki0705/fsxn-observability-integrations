@@ -81,10 +81,16 @@ aws cloudformation deploy \
 
 - [前提条件・デプロイガイド (日本語)](docs/ja/prerequisites.md)
 - [Prerequisites & Deployment Guide (English)](docs/en/prerequisites.md)
+- [S3 AP 仕様・制約・トラブルシューティング (日本語)](docs/ja/s3ap-fsxn-specification.md)
+- [S3 AP Specification & Troubleshooting (English)](docs/en/s3ap-fsxn-specification.md)
 - [アーキテクチャ (日本語)](docs/ja/architecture.md)
 - [Architecture (English)](docs/en/architecture.md)
+- [イベントソースガイド (日本語)](docs/ja/event-sources.md)
+- [Event Sources Guide (English)](docs/en/event-sources.md)
 - [ベンダー比較 (日本語)](docs/ja/vendor-comparison.md)
 - [Vendor Comparison (English)](docs/en/vendor-comparison.md)
+- [デモシナリオ (日本語)](docs/ja/demo-scenarios.md)
+- [Demo Scenarios (English)](docs/en/demo-scenarios.md)
 
 ## Tech Stack / 技術スタック
 

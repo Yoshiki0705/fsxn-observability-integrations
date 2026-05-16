@@ -97,11 +97,71 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
 ## Non-Obvious Patterns
 
-### S3 Access Points for FSx ONTAP are NOT regular S3 buckets
+### ⚠️ CRITICAL: FSx ONTAP S3 Access Points — Network Constraints
 
-FSx ONTAP S3 Access Points provide dual-protocol (NFS/SMB + S3) access to the same data without copying. The Access Point ARN is used as the `Bucket` parameter in S3 API calls — this is intentional, not a mistake. IAM permissions must reference the Access Point ARN with `/object/*` suffix.
+**FSx ONTAP S3 Access Points are NOT accessible via S3 Gateway VPC Endpoint.**
 
-Reference: [AWS Blog — S3 Access Points for FSx](https://aws.amazon.com/blogs/storage/bridge-legacy-and-modern-applications-with-amazon-s3-access-points-for-amazon-fsx/) | [AWS Docs — Process files with Lambda](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/tutorial-process-files-with-lambda.html)
+This is the #1 source of deployment failures. FSx ONTAP S3 APs route through the FSx data plane, not the standard S3 data plane.
+
+| Lambda Placement | S3 AP Access | ONTAP REST API Access | Recommendation |
+|-----------------|-------------|----------------------|----------------|
+| **VPC 外 (no VPC config)** | ✅ Works | ❌ Requires VPC | Simplest for S3 AP only |
+| **VPC 内 + S3 Gateway EP** | ❌ TIMEOUT | ✅ Works | Do NOT use for S3 AP |
+| **VPC 内 + NAT Gateway** | ✅ Works | ✅ Works | Production recommended |
+| **VPC 内 + Interface EP** | ❌ TIMEOUT | ✅ Works | Do NOT use for S3 AP |
+
+**Root cause**: S3 Gateway VPC Endpoints only route traffic for the standard S3 service (`com.amazonaws.<region>.s3`). FSx ONTAP S3 Access Points use a different data path through the FSx service. Traffic to FSx S3 APs from within a VPC requires NAT Gateway or internet access.
+
+**Design pattern for this project**:
+- Lambda functions that ONLY read from S3 AP → Deploy **outside VPC** (simplest, lowest cost)
+- Lambda functions that need BOTH S3 AP + ONTAP REST API → Deploy **in VPC with NAT Gateway**
+- Lambda functions that ONLY call ONTAP REST API → Deploy **in VPC** (no NAT needed if using Interface VPC Endpoints for FSx)
+
+### S3 Access Points for FSx ONTAP — ARN and IAM
+
+FSx ONTAP S3 Access Points provide dual-protocol (NFS/SMB + S3) access to the same data without copying.
+
+**Correct ARN format**:
+```
+arn:aws:s3:{region}:{account-id}:accesspoint/{access-point-name}
+```
+
+**IAM policy resource format**:
+```yaml
+# For GetObject/PutObject on objects:
+Resource: arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap/object/*
+
+# For ListBucket on the access point itself:
+Resource: arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap
+```
+
+**boto3 usage** — Use the AP ARN as the `Bucket` parameter:
+```python
+s3_client.get_object(
+    Bucket="arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap",
+    Key="audit/svm-prod-01/2026/01/15/audit.json"
+)
+```
+
+**S3 AP Resource Policy**: In addition to IAM, the S3 Access Point itself must have a resource policy granting access to the Lambda execution role. Use `s3control put-access-point-policy`.
+
+### FSx ONTAP S3 AP — Unsupported S3 Features
+
+The following S3 features are NOT supported on FSx ONTAP S3 Access Points:
+
+| Feature | Status | Workaround |
+|---------|--------|-----------|
+| S3 Event Notifications / EventBridge | ❌ Not supported | Use polling (EventBridge Scheduler) or audit log bucket events |
+| GetBucketNotificationConfiguration | ❌ Not supported | N/A — this is why we use a separate S3 bucket for audit logs |
+| Object Lifecycle policies | ❌ Not supported | Implement custom cleanup Lambda |
+| Object Versioning | ❌ Not supported | Use DynamoDB for version tracking |
+| Presigned URLs | ❌ Not supported | Copy to standard S3 + presign |
+| SSE-KMS (custom keys) | ❌ SSE-FSX only | Use FSx volume-level KMS encryption |
+| PutObject > 5GB | ❌ 5GB limit | Multipart upload within 5GB |
+
+**Key implication for this project**: We use a **standard S3 bucket** as the audit log destination (which supports EventBridge notifications), NOT the FSx ONTAP S3 Access Point directly. The S3 AP is used for Lambda to read the logs from the bucket.
+
+Reference: [AWS Docs — S3 AP API Support](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html) | [AWS Blog — S3 Access Points for FSx](https://aws.amazon.com/blogs/storage/bridge-legacy-and-modern-applications-with-amazon-s3-access-points-for-amazon-fsx/)
 
 ### Audit log formats
 
