@@ -19,9 +19,8 @@ venv/
 *.swp
 *.swo
 
-# Kiro (IDE-specific hooks and local settings)
-.kiro/hooks/
-.kiro/settings/
+# Kiro (IDE-specific, not for public repo)
+.kiro/
 
 # OS
 .DS_Store
