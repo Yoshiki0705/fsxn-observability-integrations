@@ -1,0 +1,235 @@
+# AGENTS.md — FSxN Observability Integrations
+
+## Project Overview
+
+Serverless observability integrations shipping Amazon FSx for NetApp ONTAP audit logs to multiple vendors via S3 Access Points. CloudFormation (YAML) + Python 3.12 Lambda + TypeScript tooling. Multi-vendor pattern library with bilingual (ja/en) documentation.
+
+## Key Commands
+
+```bash
+# Install dependencies
+npm install
+
+# TypeScript typecheck
+npx tsc --noEmit
+
+# Lint
+npm run lint
+
+# Run all TypeScript tests
+npm test
+
+# Run Python tests for a specific vendor
+cd integrations/datadog && python -m pytest tests/ -v
+
+# Validate CloudFormation templates
+pip install cfn-lint
+cfn-lint integrations/*/template.yaml
+cfn-lint shared/templates/*.yaml
+
+# Deploy a vendor integration
+bash shared/scripts/deploy.sh <vendor> <stack-name> --region ap-northeast-1
+
+# Run full test suite
+bash shared/scripts/test.sh
+```
+
+## Project Structure
+
+```
+integrations/<vendor>/       # Vendor-specific implementations
+  ├── template.yaml          # CloudFormation (single self-contained stack)
+  ├── lambda/handler.py      # Python 3.12 Lambda function
+  ├── docs/{ja,en}/          # Bilingual setup guides
+  └── tests/                 # pytest unit tests
+
+shared/
+  ├── lambda-layers/         # Reusable Lambda Layers (log-parser, s3ap-reader)
+  ├── templates/             # Base CloudFormation templates (IAM, VPC, S3 AP)
+  └── scripts/               # deploy.sh, test.sh
+
+.kiro/steering/              # Kiro IDE steering files (do NOT modify without asking)
+```
+
+## Code Style
+
+### Python (Lambda functions)
+
+```python
+"""Module docstring: one-line summary.
+
+Extended description if needed.
+"""
+
+import json
+import logging
+from typing import Any
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+MAX_BATCH_SIZE_BYTES = 5 * 1024 * 1024  # Constants: UPPER_SNAKE_CASE
+
+
+def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
+    """Lambda entry point. Type hints required. Google-style docstrings."""
+    ...
+```
+
+- Python 3.12, PEP 8, type hints mandatory
+- Use `urllib3` for HTTP (included in Lambda runtime), not `requests`
+- Secrets from Secrets Manager, never environment variables for sensitive values
+- Exponential backoff for all vendor API calls (max 3 retries)
+- Batch processing respecting vendor size limits
+
+### TypeScript
+
+- Strict mode, named exports only
+- ESLint + Prettier formatting
+- `@aws-sdk/client-*` v3 (modular SDK)
+
+### CloudFormation (YAML)
+
+- 2-space indent
+- PascalCase resource logical IDs: `LambdaExecutionRole`, `DeadLetterQueue`
+- Stack name pattern: `fsxn-<vendor>-integration`
+- Always include: IAM least-privilege, DLQ, CloudWatch Alarms
+
+## Non-Obvious Patterns
+
+### S3 Access Points for FSx ONTAP are NOT regular S3 buckets
+
+FSx ONTAP S3 Access Points provide dual-protocol (NFS/SMB + S3) access to the same data without copying. The Access Point ARN is used as the `Bucket` parameter in S3 API calls — this is intentional, not a mistake. IAM permissions must reference the Access Point ARN with `/object/*` suffix.
+
+Reference: [AWS Blog — S3 Access Points for FSx](https://aws.amazon.com/blogs/storage/bridge-legacy-and-modern-applications-with-amazon-s3-access-points-for-amazon-fsx/) | [AWS Docs — Process files with Lambda](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/tutorial-process-files-with-lambda.html)
+
+### Audit log formats
+
+FSx ONTAP outputs audit logs in EVTX (Windows Event Log binary) or JSON format depending on SVM configuration. The `shared/lambda-layers/log-parser/` handles both. EVTX files start with magic bytes `ElfFile\x00`. JSON logs are newline-delimited.
+
+Reference: [AWS Docs — File access auditing](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html)
+
+### Vendor API key caching in Lambda
+
+API keys are fetched from Secrets Manager once per Lambda execution context (cold start) and cached in a module-level variable. This avoids per-invocation Secrets Manager calls. The `_api_key_cache` pattern is intentional — do not refactor into per-request fetching.
+
+### Bilingual documentation sync
+
+Japanese (`docs/ja/`) is the primary language. English (`docs/en/`) must mirror the same heading structure and content. When modifying docs, always update both languages. Code examples are identical across languages.
+
+## Vendor API Reference (Quick Lookup)
+
+| Vendor | Endpoint | Auth Header | Max Batch | Firehose |
+|--------|----------|-------------|-----------|----------|
+| Datadog | `https://http-intake.logs.{site}/api/v2/logs` | `DD-API-KEY: <key>` | 5MB / 1000 items | ✅ |
+| New Relic | `https://log-api.newrelic.com/log/v1` (US) | `Api-Key: <license>` | 1MB | ✅ |
+| Grafana/Loki | `https://<instance>.grafana.net/loki/api/v1/push` | Basic Auth (ID + token) | ~4MB recommended | ❌ |
+| Splunk | `https://<host>:8088/services/collector/event` | `Authorization: Splunk <token>` | No hard limit | ✅ (built-in) |
+| Elastic | `https://<cluster>/_bulk` | `Authorization: ApiKey <key>` | ~10MB recommended | ❌ |
+| Dynatrace | `https://<env>.live.dynatrace.com/api/v2/logs/ingest` | `Authorization: Api-Token <token>` | 1MB | ✅ |
+| Sumo Logic | `https://endpoint<N>.collection.sumologic.com/...` | Embedded in URL | 1MB | ❌ |
+| Honeycomb | `https://api.honeycomb.io/1/batch/<dataset>` | `X-Honeycomb-Team: <key>` | 5MB | ❌ |
+| OTel (OTLP) | `http://<collector>:4318/v1/logs` | Configurable | Configurable | ❌ |
+
+Sources: [Datadog Logs API](https://docs.datadoghq.com/api/latest/logs/) | [New Relic Log API](https://docs.newrelic.com/docs/enable-new-relic-logs-http-input/) | [Grafana Loki HTTP API](https://grafana.com/docs/loki/latest/reference/loki-http-api/) | [Splunk HEC](https://docs.splunk.com/Documentation/Splunk/9.4.0/Data/FormateventsforHTTPEventCollector) | [OpenTelemetry Lambda](https://github.com/open-telemetry/opentelemetry-lambda)
+
+## AWS Service Patterns
+
+### EventBridge for S3 object notifications
+
+Use EventBridge rules (not legacy S3 event notifications) for filtering flexibility. EventBridge supports content-based filtering on object key prefix, suffix, and size. Enable EventBridge notifications on the S3 bucket first.
+
+### Lambda Powertools (recommended for new integrations)
+
+[Powertools for AWS Lambda (Python)](https://aws.amazon.com/powertools-for-aws-lambda/) provides structured logging, tracing, and metrics out of the box. Consider adopting for new vendor integrations to standardize observability of the Lambda functions themselves.
+
+### Kinesis Data Firehose alternative path
+
+For high-volume logs (>1000 events/second sustained), prefer the Firehose path over direct Lambda-to-vendor delivery. Firehose provides automatic buffering, retry, and backpressure handling. Splunk and Datadog have built-in Firehose destinations.
+
+## Testing Rules
+
+- Write pytest unit tests for all Lambda handler logic
+- Mock all AWS service calls (boto3) and HTTP calls (urllib3)
+- Use `conftest.py` for shared fixtures (env vars, sample events)
+- Sample event data lives in `tests/test_data/`
+- Tests must be deterministic — no real API calls, no network dependencies
+- Run `python -m pytest tests/ -v` before marking any task complete
+
+## Boundaries
+
+### ✅ Allowed without asking
+- Read any file in the repository
+- Run lint, typecheck, tests
+- Create/modify files within `integrations/<vendor>/`
+- Create/modify files within `docs/`
+
+### ⚠️ Ask first
+- Modify `shared/` (affects all integrations)
+- Add or remove npm/pip dependencies
+- Change `.kiro/steering/` files
+- Modify `.github/workflows/`
+
+### 🚫 Never
+- Commit secrets, API keys, `.env` files, or PEM keys
+- Force push to main
+- Modify `.git/` directory
+- Delete `shared/lambda-layers/` or `shared/templates/`
+- Use `requests` library in Lambda (not in runtime, use `urllib3`)
+- Store secrets in Lambda environment variables (use Secrets Manager ARN only)
+
+## Key Files
+
+- `integrations/datadog/lambda/handler.py` — Reference implementation (fully working)
+- `integrations/datadog/template.yaml` — Reference CloudFormation template
+- `shared/lambda-layers/log-parser/python/fsxn_log_parser/parser.py` — EVTX/JSON parser
+- `shared/lambda-layers/s3ap-reader/python/s3ap_reader/reader.py` — S3 AP utility
+- `shared/templates/iam-base-roles.yaml` — IAM role pattern
+- `.kiro/steering/vendor-integration.md` — New vendor checklist
+
+## Deploying Prerequisites
+
+Before any vendor integration, deploy the prerequisites stack:
+
+```bash
+# 1. Deploy S3 bucket + Access Point + EventBridge
+aws cloudformation deploy \
+  --template-file shared/templates/prerequisites.yaml \
+  --stack-name fsxn-observability-prerequisites \
+  --parameter-overrides AuditLogBucketName=<unique-name> \
+  --capabilities CAPABILITY_IAM
+
+# 2. Enable FSx ONTAP audit logging
+bash shared/scripts/ontap-audit-setup.sh --endpoint <ip> --svm <name> --dry-run
+
+# 3. Deploy vendor stack using outputs from step 1
+```
+
+Two patterns exist:
+- **Pattern A (existing FSx ONTAP)**: Deploy prerequisites.yaml → enable audit → deploy vendor stack
+- **Pattern B (from scratch)**: Create FSx ONTAP → then Pattern A
+
+Full guide: `docs/ja/prerequisites.md` / `docs/en/prerequisites.md`
+
+## Adding a New Vendor Integration
+
+1. Create directory: `mkdir -p integrations/<vendor>/{lambda,docs/{ja,en},tests}`
+2. Copy reference: use `integrations/datadog/` as the template
+3. Implement `lambda/handler.py` with vendor-specific API formatting
+4. Create `template.yaml` following the CloudFormation structure in steering
+5. Write bilingual docs: `docs/ja/setup-guide.md` and `docs/en/setup-guide.md`
+6. Add pytest tests with mocked API responses
+7. Update root `README.md` vendor table (change 🚧 to ✅)
+8. Update `docs/{ja,en}/vendor-comparison.md`
+
+## Commit Convention
+
+```
+feat: add New Relic integration
+fix: handle empty EVTX files in log parser
+docs: update Datadog setup guide for AP1 region
+test: add batch splitting edge case tests
+chore: update cfn-lint to v1.x
+```
+
+Conventional Commits format. English only. Keep subject under 72 characters.

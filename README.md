@@ -50,21 +50,37 @@ cd fsxn-observability-integrations
 # 2. 依存関係インストール
 npm install
 
-# 3. ベンダー別ディレクトリへ移動（例: Datadog）
-cd integrations/datadog
-
-# 4. デプロイ
+# 3. 前提リソースのデプロイ（S3バケット + Access Point + EventBridge通知）
 aws cloudformation deploy \
-  --template-file template.yaml \
+  --template-file shared/templates/prerequisites.yaml \
+  --stack-name fsxn-observability-prerequisites \
+  --parameter-overrides \
+    AuditLogBucketName=my-fsxn-audit-logs \
+    AccessPointName=fsxn-audit-ap \
+  --capabilities CAPABILITY_IAM
+
+# 4. FSx ONTAP 監査ログ有効化（ドライラン）
+bash shared/scripts/ontap-audit-setup.sh \
+  --endpoint <management-ip> --svm <svm-name> --dry-run
+
+# 5. ベンダー統合のデプロイ（例: Datadog）
+aws cloudformation deploy \
+  --template-file integrations/datadog/template.yaml \
   --stack-name fsxn-datadog-integration \
   --parameter-overrides \
-    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit \
+    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
     DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:datadog-api-key \
+    DatadogSite=datadoghq.com \
+    S3BucketName=my-fsxn-audit-logs \
   --capabilities CAPABILITY_IAM
 ```
 
+> 📝 詳細な手順は [前提条件ガイド (日本語)](docs/ja/prerequisites.md) / [Prerequisites Guide (English)](docs/en/prerequisites.md) を参照してください。
+
 ## Documentation / ドキュメント
 
+- [前提条件・デプロイガイド (日本語)](docs/ja/prerequisites.md)
+- [Prerequisites & Deployment Guide (English)](docs/en/prerequisites.md)
 - [アーキテクチャ (日本語)](docs/ja/architecture.md)
 - [Architecture (English)](docs/en/architecture.md)
 - [ベンダー比較 (日本語)](docs/ja/vendor-comparison.md)

@@ -1,0 +1,247 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  FSxN Observability Integration - Prerequisites Stack
+  Creates S3 bucket for audit logs, S3 Access Point, and enables EventBridge notifications.
+  Deploy this BEFORE any vendor integration stack.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: fsxn-observability
+    Description: Project name used as prefix for resource naming
+
+  AuditLogBucketName:
+    Type: String
+    Description: >
+      Name for the S3 bucket that receives FSx ONTAP audit logs.
+      Must be globally unique.
+    AllowedPattern: '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
+
+  AccessPointName:
+    Type: String
+    Default: fsxn-audit-ap
+    Description: Name for the S3 Access Point
+
+  VpcId:
+    Type: String
+    Default: ''
+    Description: >
+      (Optional) VPC ID to restrict Access Point access.
+      Leave empty for internet-accessible Access Point.
+
+  RetentionDays:
+    Type: Number
+    Default: 90
+    MinValue: 1
+    MaxValue: 3650
+    Description: Number of days to retain audit logs before transitioning to Glacier
+
+  EnableGlacierTransition:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Enable automatic transition to Glacier after RetentionDays
+
+  KmsKeyArn:
+    Type: String
+    Default: ''
+    Description: >
+      (Optional) KMS key ARN for S3 bucket encryption.
+      Leave empty to use aws/s3 managed key.
+
+Conditions:
+  HasVpcRestriction: !Not [!Equals [!Ref VpcId, '']]
+  HasKmsKey: !Not [!Equals [!Ref KmsKeyArn, '']]
+  EnableGlacier: !Equals [!Ref EnableGlacierTransition, 'true']
+
+Resources:
+  # ============================================================
+  # S3 Bucket for FSx ONTAP Audit Logs
+  # ============================================================
+  AuditLogBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref AuditLogBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: !If [HasKmsKey, 'aws:kms', 'AES256']
+              KMSMasterKeyID: !If [HasKmsKey, !Ref KmsKeyArn, !Ref 'AWS::NoValue']
+            BucketKeyEnabled: true
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: TransitionToGlacier
+            Status: !If [EnableGlacier, 'Enabled', 'Disabled']
+            Transitions:
+              - StorageClass: GLACIER
+                TransitionInDays: !Ref RetentionDays
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+          - Id: AbortIncompleteMultipart
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+      # Enable EventBridge notifications
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Purpose
+          Value: fsxn-audit-logs
+
+  # Bucket policy: Allow FSx ONTAP service to write audit logs
+  AuditLogBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AuditLogBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Allow FSx service to write audit logs
+          - Sid: AllowFSxAuditLogDelivery
+            Effect: Allow
+            Principal:
+              Service: fsx.amazonaws.com
+            Action:
+              - s3:PutObject
+            Resource:
+              - !Sub '${AuditLogBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
+          # Allow S3 Access Point delegation
+          - Sid: DelegateAccessToAccessPoint
+            Effect: Allow
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt AuditLogBucket.Arn
+              - !Sub '${AuditLogBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                s3:DataAccessPointAccount: !Ref AWS::AccountId
+
+          # Deny unencrypted uploads
+          - Sid: DenyUnencryptedUploads
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource:
+              - !Sub '${AuditLogBucket.Arn}/*'
+            Condition:
+              StringNotEquals:
+                s3:x-amz-server-side-encryption:
+                  - AES256
+                  - aws:kms
+
+  # ============================================================
+  # S3 Access Point for Lambda read access
+  # ============================================================
+  AuditLogAccessPoint:
+    Type: AWS::S3::AccessPoint
+    Properties:
+      Bucket: !Ref AuditLogBucket
+      Name: !Ref AccessPointName
+      NetworkOrigin: !If [HasVpcRestriction, 'VPC', 'Internet']
+      VpcConfiguration: !If
+        - HasVpcRestriction
+        - VpcId: !Ref VpcId
+        - !Ref 'AWS::NoValue'
+      Policy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowLambdaReadAccess
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Sub 'arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}'
+              - !Sub 'arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}/object/*'
+
+  # ============================================================
+  # EventBridge: Ensure S3 events are routed (bucket-level config above)
+  # This rule catches ALL new objects — vendor stacks add their own filtered rules
+  # ============================================================
+  CatchAllEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${ProjectName}-s3-audit-log-events'
+      Description: >
+        Catches all new audit log objects. Individual vendor stacks
+        create their own filtered rules targeting their Lambda functions.
+      State: DISABLED
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - !Ref AuditLogBucketName
+
+  # ============================================================
+  # SNS Topic for operational alerts (shared across vendor stacks)
+  # ============================================================
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${ProjectName}-alerts'
+      KmsMasterKeyId: alias/aws/sns
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+Outputs:
+  AuditLogBucketName:
+    Description: Name of the S3 bucket for FSx ONTAP audit logs
+    Value: !Ref AuditLogBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketName'
+
+  AuditLogBucketArn:
+    Description: ARN of the S3 bucket
+    Value: !GetAtt AuditLogBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketArn'
+
+  AccessPointArn:
+    Description: ARN of the S3 Access Point (use this in vendor stack parameters)
+    Value: !Sub 'arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-AccessPointArn'
+
+  AccessPointAlias:
+    Description: Alias of the S3 Access Point
+    Value: !GetAtt AuditLogAccessPoint.Alias
+    Export:
+      Name: !Sub '${AWS::StackName}-AccessPointAlias'
+
+  AlertTopicArn:
+    Description: SNS Topic ARN for operational alerts
+    Value: !Ref AlertTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertTopicArn'
+
+  NextSteps:
+    Description: After deploying this stack, configure FSx ONTAP audit logging to target this bucket
+    Value: !Sub >
+      1. Configure FSx ONTAP audit logging: vserver audit create -destination s3://${AuditLogBucketName}/audit/
+      2. Deploy a vendor integration stack with S3AccessPointArn=arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}
