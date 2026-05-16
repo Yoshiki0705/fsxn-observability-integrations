@@ -71,12 +71,21 @@ aws cloudformation deploy \
 
 ### Datadog Sites
 
-| Site | Domain | Use Case |
-|------|--------|----------|
-| US1 | `datadoghq.com` | US East (default) |
-| US5 | `us5.datadoghq.com` | US West |
-| EU1 | `datadoghq.eu` | EU (Frankfurt) |
-| AP1 | `ap1.datadoghq.com` | Asia Pacific (Tokyo) |
+| Site | Domain | Use Case | Logs Intake Endpoint |
+|------|--------|----------|---------------------|
+| US1 | `datadoghq.com` | US East (default) | `http-intake.logs.datadoghq.com` |
+| US3 | `us3.datadoghq.com` | US (Azure integration) | `http-intake.logs.us3.datadoghq.com` |
+| US5 | `us5.datadoghq.com` | US West | `http-intake.logs.us5.datadoghq.com` |
+| EU1 | `datadoghq.eu` | EU (Frankfurt) | `http-intake.logs.datadoghq.eu` |
+| AP1 | `ap1.datadoghq.com` | Asia Pacific (Tokyo) | `http-intake.logs.ap1.datadoghq.com` |
+| AP2 | `ap2.datadoghq.com` | Asia Pacific (Sydney) | `http-intake.logs.ap2.datadoghq.com` |
+| US1-FED | `ddog-gov.com` | US Government (FedRAMP) | `http-intake.logs.ddog-gov.com` |
+
+> **Region selection guide**:
+> - APAC (Japan, Australia, etc.): `ap1.datadoghq.com` or `ap2.datadoghq.com`
+> - EMEA (Europe, Middle East, Africa): `datadoghq.eu`
+> - AMERICAS (North/South America): `datadoghq.com`, `us3.datadoghq.com`, `us5.datadoghq.com`
+> - US Government: `ddog-gov.com`
 
 ## Step 4: Datadog Configuration
 
@@ -169,6 +178,36 @@ aws logs tail /aws/lambda/fsxn-datadog-integration-shipper --follow
 
 3. **Verify API Key**: Confirm the Secrets Manager value is correct
 
+4. **Check timestamps**: Datadog uses the log's `date` field for indexing. If the log timestamp is too old (outside the retention window), it won't appear in search results. Use current timestamps when testing.
+
+5. **Verify Datadog site**: Ensure the Lambda environment variable `DATADOG_SITE` points to the correct site. For Japan region, use `ap1.datadoghq.com`.
+
+### Using VPC-Restricted S3 Access Points
+
+When the S3 Access Point is restricted to a VPC, Lambda must run in the same VPC. Add the following parameters during CloudFormation deployment:
+
+```bash
+aws cloudformation deploy \
+  --template-file template.yaml \
+  --stack-name fsxn-datadog-integration \
+  --parameter-overrides \
+    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
+    DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:datadog/fsxn-api-key-XXXXXX \
+    DatadogSite=ap1.datadoghq.com \
+    S3BucketName=your-fsxn-audit-bucket \
+    VpcEnabled=true \
+    VpcSubnetIds=subnet-xxx,subnet-yyy \
+    VpcSecurityGroupIds=sg-xxx \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region ap-northeast-1
+```
+
+> **Note**: Lambda in a VPC requires a NAT Gateway or VPC endpoint to access the Datadog API. A VPC endpoint for Secrets Manager (`com.amazonaws.ap-northeast-1.secretsmanager`) is also required.
+
+### Known Issue with gzip Compression
+
+Currently, gzip-compressed payloads may not be correctly indexed on the Datadog AP1 site (`ap1.datadoghq.com`). Lambda is configured to send uncompressed payloads. If payload size becomes an issue in high-volume environments, contact Datadog support regarding gzip support status.
+
 ### Rate Limiting Errors
 
 When Datadog API rate limits are hit, Lambda automatically retries with exponential backoff. If this occurs frequently, limit Lambda concurrency:
@@ -178,3 +217,21 @@ aws lambda put-function-concurrency \
   --function-name fsxn-datadog-integration-shipper \
   --reserved-concurrent-executions 5
 ```
+
+### Deploying Lambda Code
+
+The CloudFormation template deploys with placeholder code. To deploy the actual handler.py:
+
+```bash
+# Package Lambda code
+cd integrations/datadog/lambda
+zip function.zip handler.py
+
+# Update Lambda function code
+aws lambda update-function-code \
+  --function-name fsxn-datadog-integration-shipper \
+  --zip-file fileb://function.zip \
+  --region ap-northeast-1
+```
+
+> **Note**: For CI/CD pipelines, deploying via S3 bucket is recommended.

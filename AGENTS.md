@@ -1,4 +1,4 @@
-# AGENTS.md — FSxN Observability Integrations
+# AGENTS.md — FSx for ONTAP Observability Integrations
 
 ## Project Overview
 

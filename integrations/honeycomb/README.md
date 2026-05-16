@@ -1,4 +1,4 @@
-# FSxN Honeycomb Integration
+# FSx for ONTAP Honeycomb Integration
 
 ## Architecture
 

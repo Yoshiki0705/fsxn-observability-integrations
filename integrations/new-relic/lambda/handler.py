@@ -1,4 +1,4 @@
-"""FSxN audit log shipper for New Relic.
+"""FSx for ONTAP audit log shipper for New Relic.
 
 Reads audit logs from S3 Access Point, parses EVTX/JSON format,
 and ships to New Relic Log API v1.
@@ -59,7 +59,7 @@ def get_api_key() -> str:
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
-    """Lambda handler for FSxN audit log shipping to New Relic."""
+    """Lambda handler for FSx for ONTAP audit log shipping to New Relic."""
     logger.info("Processing event with %d records", len(event.get("Records", [])))
 
     api_key = get_api_key()

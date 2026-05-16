@@ -1,4 +1,4 @@
-# FSxN New Relic Integration
+# FSx for ONTAP New Relic Integration
 
 🌐 [日本語](docs/ja/setup-guide.md) | [English](docs/en/setup-guide.md)
 

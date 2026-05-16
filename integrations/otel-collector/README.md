@@ -1,4 +1,4 @@
-# FSxN OpenTelemetry Collector Integration
+# FSx for ONTAP OpenTelemetry Collector Integration
 
 🌐 [日本語](docs/ja/setup-guide.md) | [English](docs/en/setup-guide.md)
 

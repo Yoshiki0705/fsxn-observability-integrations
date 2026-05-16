@@ -1,4 +1,4 @@
-"""FSxN audit log shipper for Elastic (Elasticsearch Bulk API).
+"""FSx for ONTAP audit log shipper for Elastic (Elasticsearch Bulk API).
 
 Ships audit logs to Elasticsearch or Elastic Cloud using the _bulk API.
 """

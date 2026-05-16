@@ -1,4 +1,4 @@
-# FSxN Observability Integrations
+# FSx for ONTAP Observability Integrations
 
 🌐 [日本語](docs/ja/getting-started.md) | [English](docs/en/getting-started.md)
 

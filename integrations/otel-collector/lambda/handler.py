@@ -1,4 +1,4 @@
-"""FSxN audit log shipper via OpenTelemetry Protocol (OTLP).
+"""FSx for ONTAP audit log shipper via OpenTelemetry Protocol (OTLP).
 
 Vendor-neutral integration that ships logs to any OTLP-compatible backend.
 Supports OTLP/HTTP (port 4318) for maximum compatibility.

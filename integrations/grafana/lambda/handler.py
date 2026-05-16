@@ -1,4 +1,4 @@
-"""FSxN audit log shipper for Grafana Cloud (Loki Push API).
+"""FSx for ONTAP audit log shipper for Grafana Cloud (Loki Push API).
 
 Ships audit logs to Grafana Cloud Loki using the /loki/api/v1/push endpoint.
 Authentication via Basic Auth (Instance ID + API Key).

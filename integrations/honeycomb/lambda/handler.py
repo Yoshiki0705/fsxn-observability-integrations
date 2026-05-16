@@ -1,4 +1,4 @@
-"""FSxN audit log shipper for Honeycomb (Events API)."""
+"""FSx for ONTAP audit log shipper for Honeycomb (Events API)."""
 
 import gzip
 import json

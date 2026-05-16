@@ -14,13 +14,20 @@ Parameters:
 
   DatadogSite:
     Type: String
-    Default: datadoghq.com
+    Default: ap1.datadoghq.com
     AllowedValues:
       - datadoghq.com
+      - us3.datadoghq.com
       - us5.datadoghq.com
       - datadoghq.eu
       - ap1.datadoghq.com
-    Description: Datadog site (determines API endpoint region)
+      - ap2.datadoghq.com
+      - ddog-gov.com
+    Description: >-
+      Datadog site (determines API endpoint region).
+      US1=datadoghq.com, US3=us3.datadoghq.com, US5=us5.datadoghq.com,
+      EU1=datadoghq.eu, AP1(Tokyo)=ap1.datadoghq.com, AP2=ap2.datadoghq.com,
+      US1-FED=ddog-gov.com
 
   S3BucketName:
     Type: String
@@ -41,6 +48,19 @@ Parameters:
       - ERROR
     Description: Lambda function log level
 
+  Environment:
+    Type: String
+    Default: production
+    Description: Environment tag for Datadog logs (e.g., production, staging, development)
+
+  EnableGzip:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable gzip compression for log payloads (recommended for high-volume, but may have issues on some sites)
+
   LambdaMemorySize:
     Type: Number
     Default: 256
@@ -54,6 +74,27 @@ Parameters:
     MinValue: 30
     MaxValue: 900
     Description: Lambda function timeout in seconds
+
+  VpcEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable VPC configuration for Lambda (required when S3 Access Point is VPC-restricted)
+
+  VpcSubnetIds:
+    Type: CommaDelimitedList
+    Default: ''
+    Description: Comma-separated list of subnet IDs for Lambda VPC configuration (required if VpcEnabled=true)
+
+  VpcSecurityGroupIds:
+    Type: CommaDelimitedList
+    Default: ''
+    Description: Comma-separated list of security group IDs for Lambda VPC configuration (required if VpcEnabled=true)
+
+Conditions:
+  IsVpcEnabled: !Equals [!Ref VpcEnabled, 'true']
 
 Resources:
   # Dead Letter Queue
@@ -124,6 +165,20 @@ Resources:
                 Resource:
                   - !GetAtt DeadLetterQueue.Arn
 
+        - !If
+          - IsVpcEnabled
+          - PolicyName: VpcNetworkInterface
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - ec2:CreateNetworkInterface
+                    - ec2:DescribeNetworkInterfaces
+                    - ec2:DeleteNetworkInterface
+                  Resource: '*'
+          - !Ref AWS::NoValue
+
   # Lambda Function
   LogShipperFunction:
     Type: AWS::Lambda::Function
@@ -149,6 +204,13 @@ Resources:
           LOG_LEVEL: !Ref LogLevel
           DD_SOURCE: fsxn
           DD_SERVICE: ontap-audit
+          DD_ENV: !Ref Environment
+          ENABLE_GZIP: !Ref EnableGzip
+      VpcConfig: !If
+        - IsVpcEnabled
+        - SubnetIds: !Ref VpcSubnetIds
+          SecurityGroupIds: !Ref VpcSecurityGroupIds
+        - !Ref AWS::NoValue
       Tags:
         - Key: Project
           Value: fsxn-observability

@@ -1,4 +1,4 @@
-"""FSxN audit log shipper for Dynatrace (Log Ingest API v2)."""
+"""FSx for ONTAP audit log shipper for Dynatrace (Log Ingest API v2)."""
 
 import gzip
 import json

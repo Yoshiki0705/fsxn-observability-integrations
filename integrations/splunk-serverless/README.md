@@ -1,4 +1,4 @@
-# FSxN Splunk Serverless Integration
+# FSx for ONTAP Splunk Serverless Integration
 
 🌐 [日本語](docs/ja/setup-guide.md) | [English](docs/en/setup-guide.md)
 

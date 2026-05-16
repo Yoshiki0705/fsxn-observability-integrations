@@ -71,12 +71,21 @@ aws cloudformation deploy \
 
 ### Datadog サイト一覧
 
-| サイト | ドメイン | 用途 |
-|-------|---------|------|
-| US1 | `datadoghq.com` | 米国東部（デフォルト） |
-| US5 | `us5.datadoghq.com` | 米国西部 |
-| EU1 | `datadoghq.eu` | EU（フランクフルト） |
-| AP1 | `ap1.datadoghq.com` | アジア太平洋（東京） |
+| サイト | ドメイン | 用途 | Logs Intake エンドポイント |
+|-------|---------|------|--------------------------|
+| US1 | `datadoghq.com` | 米国東部（デフォルト） | `http-intake.logs.datadoghq.com` |
+| US3 | `us3.datadoghq.com` | 米国（Azure 連携） | `http-intake.logs.us3.datadoghq.com` |
+| US5 | `us5.datadoghq.com` | 米国西部 | `http-intake.logs.us5.datadoghq.com` |
+| EU1 | `datadoghq.eu` | EU（フランクフルト） | `http-intake.logs.datadoghq.eu` |
+| AP1 | `ap1.datadoghq.com` | アジア太平洋（東京） | `http-intake.logs.ap1.datadoghq.com` |
+| AP2 | `ap2.datadoghq.com` | アジア太平洋（シドニー） | `http-intake.logs.ap2.datadoghq.com` |
+| US1-FED | `ddog-gov.com` | 米国政府（FedRAMP） | `http-intake.logs.ddog-gov.com` |
+
+> **リージョン選択の目安**:
+> - APAC（日本、オーストラリア等）: `ap1.datadoghq.com` または `ap2.datadoghq.com`
+> - EMEA（欧州、中東、アフリカ）: `datadoghq.eu`
+> - AMERICAS（北米、南米）: `datadoghq.com`、`us3.datadoghq.com`、`us5.datadoghq.com`
+> - 米国政府機関: `ddog-gov.com`
 
 ## Step 4: Datadog 側の設定
 
@@ -169,6 +178,36 @@ aws logs tail /aws/lambda/fsxn-datadog-integration-shipper --follow
 
 3. **API Key 確認**: Secrets Manager の値が正しいか確認
 
+4. **タイムスタンプの確認**: Datadog はログの `date` フィールドを使ってインデックスします。ログのタイムスタンプが古すぎる（retention window 外）場合、検索結果に表示されません。テスト時は現在時刻に近いタイムスタンプを使用してください。
+
+5. **Datadog サイトの確認**: Lambda の環境変数 `DATADOG_SITE` が正しいサイトを指しているか確認してください。日本リージョンの場合は `ap1.datadoghq.com` を使用します。
+
+### VPC 制限付き S3 Access Point を使用する場合
+
+S3 Access Point が VPC に制限されている場合、Lambda も同じ VPC 内で実行する必要があります。CloudFormation デプロイ時に以下のパラメータを追加してください:
+
+```bash
+aws cloudformation deploy \
+  --template-file template.yaml \
+  --stack-name fsxn-datadog-integration \
+  --parameter-overrides \
+    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
+    DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:datadog/fsxn-api-key-XXXXXX \
+    DatadogSite=ap1.datadoghq.com \
+    S3BucketName=your-fsxn-audit-bucket \
+    VpcEnabled=true \
+    VpcSubnetIds=subnet-xxx,subnet-yyy \
+    VpcSecurityGroupIds=sg-xxx \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region ap-northeast-1
+```
+
+> **注意**: VPC 内の Lambda から Datadog API にアクセスするには、NAT Gateway または VPC エンドポイントが必要です。Secrets Manager へのアクセスにも VPC エンドポイント（`com.amazonaws.ap-northeast-1.secretsmanager`）が必要です。
+
+### gzip 圧縮に関する既知の問題
+
+現在、Datadog AP1 サイト（`ap1.datadoghq.com`）で gzip 圧縮ペイロードが正しくインデックスされない事象が確認されています。Lambda は非圧縮で送信するよう設定されています。大量ログ環境でペイロードサイズが問題になる場合は、Datadog サポートに gzip 対応状況を確認してください。
+
 ### レート制限エラー
 
 Datadog API のレート制限に達した場合、Lambda は自動的に exponential backoff でリトライします。頻繁に発生する場合は Lambda の同時実行数を制限してください。
@@ -178,3 +217,21 @@ aws lambda put-function-concurrency \
   --function-name fsxn-datadog-integration-shipper \
   --reserved-concurrent-executions 5
 ```
+
+### Lambda コードのデプロイ
+
+CloudFormation テンプレートはプレースホルダーコードでデプロイされます。実際の handler.py をデプロイするには:
+
+```bash
+# Lambda コードをパッケージング
+cd integrations/datadog/lambda
+zip function.zip handler.py
+
+# Lambda 関数コードを更新
+aws lambda update-function-code \
+  --function-name fsxn-datadog-integration-shipper \
+  --zip-file fileb://function.zip \
+  --region ap-northeast-1
+```
+
+> **注意**: CI/CD パイプラインでは S3 バケット経由でのデプロイを推奨します。

@@ -1,4 +1,4 @@
-"""FSxN audit log shipper for Splunk via HTTP Event Collector (HEC).
+"""FSx for ONTAP audit log shipper for Splunk via HTTP Event Collector (HEC).
 
 Serverless alternative to the EC2-based syslog-ng + Universal Forwarder pattern.
 Ships audit logs directly to Splunk HEC endpoint from Lambda.
@@ -61,7 +61,7 @@ def get_hec_token() -> str:
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
-    """Lambda handler for FSxN audit log shipping to Splunk HEC."""
+    """Lambda handler for FSx for ONTAP audit log shipping to Splunk HEC."""
     logger.info("Processing event")
 
     hec_token = get_hec_token()

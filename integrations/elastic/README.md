@@ -1,4 +1,4 @@
-# FSxN Elastic Integration
+# FSx for ONTAP Elastic Integration
 
 ## Architecture
 

@@ -1,4 +1,4 @@
-# FSxN Dynatrace Integration
+# FSx for ONTAP Dynatrace Integration
 
 🚧 **Status: Planned**
 

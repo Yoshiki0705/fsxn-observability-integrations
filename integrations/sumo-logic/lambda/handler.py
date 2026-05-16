@@ -1,4 +1,4 @@
-"""FSxN audit log shipper for Sumo Logic (HTTP Source)."""
+"""FSx for ONTAP audit log shipper for Sumo Logic (HTTP Source)."""
 
 import gzip
 import json

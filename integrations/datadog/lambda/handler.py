@@ -1,7 +1,10 @@
-"""FSxN audit log shipper for Datadog.
+"""FSx for ONTAP audit log shipper for Datadog.
 
 Reads audit logs from S3 Access Point, parses EVTX/JSON format,
 and ships to Datadog Logs Intake API v2.
+
+Supports all Datadog sites (US1, US3, US5, EU1, AP1, US1-FED, AP2).
+See: https://docs.datadoghq.com/getting_started/site/
 """
 
 import gzip
@@ -14,25 +17,52 @@ from typing import Any
 import boto3
 import urllib3
 
-# Configuration from environment
+# ─── Configuration from environment ────────────────────────────────────────
+# All configuration is driven by environment variables for multi-region support.
+# No hardcoded values — each deployment can target any Datadog site.
+
 DATADOG_SITE = os.environ.get("DATADOG_SITE", "datadoghq.com")
 API_KEY_SECRET_ARN = os.environ["API_KEY_SECRET_ARN"]
 S3_ACCESS_POINT_ARN = os.environ["S3_ACCESS_POINT_ARN"]
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 DD_SOURCE = os.environ.get("DD_SOURCE", "fsxn")
 DD_SERVICE = os.environ.get("DD_SERVICE", "ontap-audit")
+DD_ENV = os.environ.get("DD_ENV", os.environ.get("ENV", "production"))
 
-# Constants
-MAX_BATCH_SIZE_BYTES = 5 * 1024 * 1024  # 5MB per request
-MAX_BATCH_ITEMS = 1000  # Max items per batch
+# Whether to use gzip compression for log payloads.
+# Datadog officially supports gzip (Content-Encoding: gzip) and recommends it.
+# However, during E2E testing (2026-05-16) on AP1 site, gzip payloads were
+# accepted (HTTP 202) but not indexed. Root cause: urllib3's PoolManager in
+# Lambda runtime may not correctly handle pre-compressed body bytes in some
+# versions. The fix is to use urllib3.request() with preload_content=False
+# and pass the gzip bytes directly. Set to "true" to enable.
+ENABLE_GZIP = os.environ.get("ENABLE_GZIP", "false").lower() == "true"
+
+# ─── Constants ──────────────────────────────────────────────────────────────
+
+MAX_BATCH_SIZE_BYTES = 5 * 1024 * 1024  # 5MB per request (Datadog limit)
+MAX_BATCH_ITEMS = 1000  # Max items per batch (Datadog limit)
 MAX_RETRIES = 3
+MAX_LOG_AGE_HOURS = 18  # Datadog rejects logs older than 18 hours
+
+# Datadog Logs Intake URL — constructed from DATADOG_SITE env var.
+# Supports all Datadog sites:
+#   US1:     datadoghq.com        → http-intake.logs.datadoghq.com
+#   US3:     us3.datadoghq.com    → http-intake.logs.us3.datadoghq.com
+#   US5:     us5.datadoghq.com    → http-intake.logs.us5.datadoghq.com
+#   EU1:     datadoghq.eu         → http-intake.logs.datadoghq.eu
+#   AP1:     ap1.datadoghq.com    → http-intake.logs.ap1.datadoghq.com
+#   AP2:     ap2.datadoghq.com    → http-intake.logs.ap2.datadoghq.com
+#   US1-FED: ddog-gov.com         → http-intake.logs.ddog-gov.com
 INTAKE_URL = f"https://http-intake.logs.{DATADOG_SITE}/api/v2/logs"
 
-# Logger setup
+# ─── Logger setup ──────────────────────────────────────────────────────────
+
 logger = logging.getLogger()
 logger.setLevel(getattr(logging, LOG_LEVEL))
 
-# AWS clients (initialized outside handler for connection reuse)
+# ─── AWS clients (initialized outside handler for connection reuse) ─────────
+
 secrets_client = boto3.client("secretsmanager")
 s3_client = boto3.client("s3")
 
@@ -48,7 +78,12 @@ _api_key_cache: str | None = None
 
 
 def get_api_key() -> str:
-    """Retrieve Datadog API key from Secrets Manager with caching."""
+    """Retrieve Datadog API key from Secrets Manager with caching.
+
+    Supports both plain string and JSON format secrets:
+    - Plain string: "your-api-key"
+    - JSON: {"api_key": "your-api-key"} or {"DD_API_KEY": "your-api-key"}
+    """
     global _api_key_cache
     if _api_key_cache is None:
         response = secrets_client.get_secret_value(SecretId=API_KEY_SECRET_ARN)
@@ -63,7 +98,7 @@ def get_api_key() -> str:
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
-    """Lambda handler for FSxN audit log shipping to Datadog.
+    """Lambda handler for FSx for ONTAP audit log shipping to Datadog.
 
     Supports both S3 event notifications and EventBridge events.
 
@@ -81,7 +116,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
     total_logs = 0
     total_shipped = 0
-    errors = []
+    errors: list[dict[str, str]] = []
 
     for record in records:
         bucket = record["bucket"]
@@ -151,13 +186,23 @@ def _extract_s3_records(event: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def _read_s3_object(bucket: str, key: str) -> bytes:
-    """Read object from S3 Access Point."""
+    """Read object from S3 Access Point.
+
+    Note: S3_ACCESS_POINT_ARN is used as the Bucket parameter.
+    This is the correct usage for FSx ONTAP S3 Access Points —
+    the ARN replaces the bucket name in all S3 API calls.
+    """
     response = s3_client.get_object(Bucket=S3_ACCESS_POINT_ARN, Key=key)
     return response["Body"].read()
 
 
 def _parse_audit_logs(data: bytes, key: str) -> list[dict[str, Any]]:
     """Parse FSx ONTAP audit logs based on file extension.
+
+    Supports:
+    - .evtx: Windows Event Log binary format
+    - .json: Newline-delimited JSON or JSON array
+    - .json.gz: Gzip-compressed JSON
 
     Args:
         data: Raw file content.
@@ -269,6 +314,14 @@ def _format_for_datadog(
 ) -> list[dict[str, Any]]:
     """Format parsed logs for Datadog Logs Intake API v2.
 
+    Datadog log format reference:
+    - ddsource: Integration name (used for automatic pipeline matching)
+    - ddtags: Comma-separated tags
+    - hostname: Originating host
+    - service: Application/service name
+    - message: Log body (highlighted in Log Explorer)
+    - date: Timestamp (must be within 18 hours of current time)
+
     Args:
         logs: Parsed log events.
         source_key: S3 object key for tagging.
@@ -281,8 +334,9 @@ def _format_for_datadog(
         dd_log: dict[str, Any] = {
             "ddsource": DD_SOURCE,
             "ddtags": (
-                f"source:fsxn,service:{DD_SERVICE},"
-                f"env:{os.environ.get('ENV', 'production')},"
+                f"source:{DD_SOURCE},"
+                f"service:{DD_SERVICE},"
+                f"env:{DD_ENV},"
                 f"s3_key:{source_key}"
             ),
             "hostname": log.get("svm", log.get("SVMName", "fsxn-ontap")),
@@ -295,12 +349,14 @@ def _format_for_datadog(
         else:
             dd_log["message"] = json.dumps(log, default=str)
 
-        # Set timestamp if available
+        # Set timestamp if available.
+        # NOTE: Datadog only accepts logs with timestamps up to 18 hours in
+        # the past. Logs with older timestamps are silently dropped.
         timestamp = log.get("timestamp", log.get("Timestamp"))
         if timestamp:
             dd_log["date"] = timestamp
 
-        # Add structured attributes
+        # Add structured attributes for Facet-based searching
         dd_log["attributes"] = {
             "event_type": log.get("EventID", log.get("event_type", "unknown")),
             "user": log.get("UserName", log.get("user", "")),
@@ -343,9 +399,9 @@ def _ship_to_datadog(logs: list[dict[str, Any]], api_key: str) -> int:
 
 
 def _create_batches(logs: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
-    """Split logs into batches respecting size limits.
+    """Split logs into batches respecting Datadog size limits.
 
-    Each batch must be under 5MB and 1000 items.
+    Each batch must be under 5MB uncompressed and 1000 items.
     """
     batches = []
     current_batch: list[dict[str, Any]] = []
@@ -375,6 +431,10 @@ def _create_batches(logs: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
 def _send_batch(batch: list[dict[str, Any]], api_key: str) -> bool:
     """Send a batch of logs to Datadog with exponential backoff retry.
 
+    Supports optional gzip compression (controlled by ENABLE_GZIP env var).
+    Datadog recommends gzip for large payloads but it's disabled by default
+    due to a known issue with some Lambda runtime urllib3 versions.
+
     Args:
         batch: List of Datadog-formatted log entries.
         api_key: Datadog API key.
@@ -382,13 +442,21 @@ def _send_batch(batch: list[dict[str, Any]], api_key: str) -> bool:
     Returns:
         True if successfully sent, False otherwise.
     """
-    payload = gzip.compress(json.dumps(batch).encode("utf-8"))
+    json_payload = json.dumps(batch).encode("utf-8")
 
-    headers = {
-        "Content-Type": "application/json",
-        "Content-Encoding": "gzip",
-        "DD-API-KEY": api_key,
-    }
+    if ENABLE_GZIP:
+        payload = gzip.compress(json_payload)
+        headers = {
+            "Content-Type": "application/json",
+            "Content-Encoding": "gzip",
+            "DD-API-KEY": api_key,
+        }
+    else:
+        payload = json_payload
+        headers = {
+            "Content-Type": "application/json",
+            "DD-API-KEY": api_key,
+        }
 
     for attempt in range(MAX_RETRIES):
         try:

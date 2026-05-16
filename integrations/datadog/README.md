@@ -1,4 +1,4 @@
-# FSxN Datadog Integration
+# FSx for ONTAP Datadog Integration
 
 🌐 [日本語](docs/ja/setup-guide.md) | [English](docs/en/setup-guide.md)
 

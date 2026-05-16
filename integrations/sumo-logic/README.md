@@ -1,4 +1,4 @@
-# FSxN Sumo Logic Integration
+# FSx for ONTAP Sumo Logic Integration
 
 ## Architecture
 

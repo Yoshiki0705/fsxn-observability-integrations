@@ -1,4 +1,4 @@
-# FSxN Grafana Cloud Integration
+# FSx for ONTAP Grafana Cloud Integration
 
 🌐 [日本語](docs/ja/setup-guide.md) | [English](docs/en/setup-guide.md)
 
