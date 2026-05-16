@@ -1,0 +1,208 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  FSxN OpenTelemetry Integration - Vendor-neutral audit log shipping via OTLP/HTTP.
+  Ships to any OTLP-compatible backend (Grafana, Honeycomb, Datadog, Jaeger, etc.)
+
+Parameters:
+  S3AccessPointArn:
+    Type: String
+    Description: ARN of the S3 Access Point for FSx ONTAP audit logs
+    AllowedPattern: 'arn:aws:s3:[a-z0-9-]+:\d{12}:accesspoint/.+'
+
+  OtlpEndpoint:
+    Type: String
+    Description: OTLP/HTTP endpoint URL (e.g., http://collector:4318 or https://otlp.vendor.com)
+    AllowedPattern: 'https?://.+'
+
+  OtlpHeaders:
+    Type: String
+    Default: ''
+    Description: >
+      Additional OTLP headers as key=value,key2=value2
+      (e.g., X-Scope-OrgID=tenant1)
+
+  ApiKeySecretArn:
+    Type: String
+    Default: ''
+    Description: >
+      (Optional) Secrets Manager ARN for bearer token auth.
+      Leave empty if using OTLP_HEADERS for auth.
+
+  S3BucketName:
+    Type: String
+    Description: S3 bucket name for event notification
+
+  S3KeyPrefix:
+    Type: String
+    Default: ''
+
+  OtelServiceName:
+    Type: String
+    Default: fsxn-ontap-audit
+    Description: OpenTelemetry service.name resource attribute
+
+  OtelResourceAttributes:
+    Type: String
+    Default: ''
+    Description: >
+      Additional resource attributes as key=value,key2=value2
+      (e.g., deployment.environment=production,cloud.region=ap-northeast-1)
+
+  LogLevel:
+    Type: String
+    Default: INFO
+    AllowedValues: [DEBUG, INFO, WARNING, ERROR]
+
+  LambdaMemorySize:
+    Type: Number
+    Default: 256
+    MinValue: 128
+    MaxValue: 3008
+
+  LambdaTimeout:
+    Type: Number
+    Default: 300
+    MinValue: 30
+    MaxValue: 900
+
+Conditions:
+  HasApiKeySecret: !Not [!Equals [!Ref ApiKeySecretArn, '']]
+
+Resources:
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${AWS::StackName}-dlq'
+      MessageRetentionPeriod: 1209600
+      KmsMasterKeyId: alias/aws/sqs
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3AccessPointRead
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub '${S3AccessPointArn}/object/*'
+        - PolicyName: CloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-shipper:*'
+        - PolicyName: SQSSendMessage
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt DeadLetterQueue.Arn
+        - !If
+          - HasApiKeySecret
+          - PolicyName: SecretsManagerRead
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action: secretsmanager:GetSecretValue
+                  Resource: !Ref ApiKeySecretArn
+          - !Ref 'AWS::NoValue'
+
+  LogShipperFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-shipper'
+      Runtime: python3.12
+      Handler: handler.lambda_handler
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              raise NotImplementedError("Deploy actual handler code")
+      Role: !GetAtt LambdaExecutionRole.Arn
+      MemorySize: !Ref LambdaMemorySize
+      Timeout: !Ref LambdaTimeout
+      DeadLetterConfig:
+        TargetArn: !GetAtt DeadLetterQueue.Arn
+      Environment:
+        Variables:
+          OTLP_ENDPOINT: !Ref OtlpEndpoint
+          OTLP_HEADERS: !Ref OtlpHeaders
+          API_KEY_SECRET_ARN: !If [HasApiKeySecret, !Ref ApiKeySecretArn, '']
+          S3_ACCESS_POINT_ARN: !Ref S3AccessPointArn
+          OTEL_SERVICE_NAME: !Ref OtelServiceName
+          OTEL_RESOURCE_ATTRIBUTES: !Ref OtelResourceAttributes
+          LOG_LEVEL: !Ref LogLevel
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-shipper'
+      RetentionInDays: 30
+
+  EventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${AWS::StackName}-s3-event'
+      State: ENABLED
+      EventPattern:
+        source: [aws.s3]
+        detail-type: [Object Created]
+        detail:
+          bucket:
+            name: [!Ref S3BucketName]
+          object:
+            key:
+              - prefix: !Ref S3KeyPrefix
+      Targets:
+        - Id: LogShipperTarget
+          Arn: !GetAtt LogShipperFunction.Arn
+
+  LambdaEventBridgePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LogShipperFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeRule.Arn
+
+  ErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-errors'
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref LogShipperFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+Outputs:
+  LambdaFunctionArn:
+    Value: !GetAtt LogShipperFunction.Arn
+  DeadLetterQueueArn:
+    Value: !GetAtt DeadLetterQueue.Arn
+  UsageNote:
+    Description: Vendor-neutral OTLP integration
+    Value: >
+      This integration ships logs via OTLP/HTTP to any compatible backend.
+      Configure OtlpEndpoint to point to your collector or vendor OTLP endpoint.

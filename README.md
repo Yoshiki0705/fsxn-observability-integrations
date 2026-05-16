@@ -25,14 +25,14 @@ Lambda → ベンダー固有 API エンドポイントへ配信
 | Vendor | Status | Description |
 |--------|--------|-------------|
 | [Datadog](integrations/datadog/) | ✅ Ready | Logs API v2 via Lambda |
-| [New Relic](integrations/new-relic/) | 🚧 Planned | Log API via Lambda |
-| [Grafana Cloud](integrations/grafana/) | 🚧 Planned | Loki API via Lambda |
-| [Splunk (Serverless)](integrations/splunk-serverless/) | 🚧 Planned | HEC via Lambda/Firehose |
+| [New Relic](integrations/new-relic/) | ✅ Ready | Log API v1 via Lambda |
+| [Splunk (Serverless)](integrations/splunk-serverless/) | ✅ Ready | HEC via Lambda (replaces EC2 pattern) |
+| [OTel Collector](integrations/otel-collector/) | ✅ Ready | Vendor-neutral OTLP/HTTP |
+| [Grafana Cloud](integrations/grafana/) | ✅ Ready | Loki Push API via Lambda |
 | [Elastic](integrations/elastic/) | 🚧 Planned | Elasticsearch Ingest API |
 | [Dynatrace](integrations/dynatrace/) | 🚧 Planned | Log Ingest API |
 | [Sumo Logic](integrations/sumo-logic/) | 🚧 Planned | HTTP Source |
 | [Honeycomb](integrations/honeycomb/) | 🚧 Planned | Events API |
-| [OTel Collector](integrations/otel-collector/) | 🚧 Planned | Vendor-neutral OTLP |
 
 ## Background / 背景
 

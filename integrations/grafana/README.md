@@ -1,6 +1,6 @@
 # FSxN Grafana Cloud Integration
 
-🚧 **Status: Planned**
+🌐 [日本語](docs/ja/setup-guide.md) | [English](docs/en/setup-guide.md)
 
 ## Architecture
 
@@ -8,14 +8,43 @@
 FSx ONTAP → S3 Access Point → EventBridge → Lambda → Grafana Loki Push API
 ```
 
-## API Endpoint
+## Quick Deploy
 
-- `https://<instance>.grafana.net/loki/api/v1/push`
+```bash
+aws cloudformation deploy \
+  --template-file template.yaml \
+  --stack-name fsxn-grafana-integration \
+  --parameter-overrides \
+    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit \
+    GrafanaCredentialsSecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:grafana-creds \
+    LokiEndpoint=https://logs-prod-us-central1.grafana.net \
+    S3BucketName=my-fsxn-audit-bucket \
+  --capabilities CAPABILITY_IAM
+```
 
 ## Authentication
 
-- Basic Auth (Instance ID + API Key)
+Basic Auth with Grafana Cloud Instance ID and API Key:
 
-## Batch Limits
+```bash
+aws secretsmanager create-secret \
+  --name "grafana/fsxn-credentials" \
+  --secret-string '{"instance_id":"123456","api_key":"glc_xxx..."}' \
+  --region ap-northeast-1
+```
 
-- Recommended 4MB per request
+## Loki Labels
+
+Each log stream is labeled with:
+- `job=fsxn-audit`
+- `source=fsxn-ontap`
+- `svm=<svm-name>`
+- `s3_key=<object-key>`
+
+## LogQL Query Examples
+
+```logql
+{job="fsxn-audit"} | json | operation="ReadData"
+{job="fsxn-audit", svm="svm-prod-01"} | json | Result="Failure"
+{job="fsxn-audit"} | json | line_format "{{.UserName}} {{.Operation}} {{.ObjectName}}"
+```
