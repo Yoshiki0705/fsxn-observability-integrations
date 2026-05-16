@@ -29,10 +29,10 @@ Lambda → ベンダー固有 API エンドポイントへ配信
 | [Splunk (Serverless)](integrations/splunk-serverless/) | ✅ Ready | HEC via Lambda (replaces EC2 pattern) |
 | [OTel Collector](integrations/otel-collector/) | ✅ Ready | Vendor-neutral OTLP/HTTP |
 | [Grafana Cloud](integrations/grafana/) | ✅ Ready | Loki Push API via Lambda |
-| [Elastic](integrations/elastic/) | 🚧 Planned | Elasticsearch Ingest API |
-| [Dynatrace](integrations/dynatrace/) | 🚧 Planned | Log Ingest API |
-| [Sumo Logic](integrations/sumo-logic/) | 🚧 Planned | HTTP Source |
-| [Honeycomb](integrations/honeycomb/) | 🚧 Planned | Events API |
+| [Elastic](integrations/elastic/) | ✅ Ready | Elasticsearch Bulk API |
+| [Dynatrace](integrations/dynatrace/) | ✅ Ready | Log Ingest API v2 |
+| [Sumo Logic](integrations/sumo-logic/) | ✅ Ready | HTTP Source |
+| [Honeycomb](integrations/honeycomb/) | ✅ Ready | Events Batch API |
 
 ## Background / 背景
 
