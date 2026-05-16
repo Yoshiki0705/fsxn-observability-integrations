@@ -1,0 +1,30 @@
+{
+  "name": "fsxn-observability-integrations",
+  "version": "0.1.0",
+  "description": "Serverless observability integrations for Amazon FSx for NetApp ONTAP via S3 Access Points",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint . --ext .ts,.tsx",
+    "deploy": "bash shared/scripts/deploy.sh"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.4",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/client-secrets-manager": "^3.600.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
