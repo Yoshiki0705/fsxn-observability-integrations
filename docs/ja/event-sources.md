@@ -1,0 +1,180 @@
+# イベントソースガイド
+
+## 概要
+
+本プロジェクトは FSx for ONTAP の**3つのイベントソース**に対応しています。
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ FSx for ONTAP イベントソース                                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  1. 監査ログ (File Access Auditing)                                  │
+│     → S3 バケット → EventBridge → Lambda → Vendor                   │
+│                                                                     │
+│  2. EMS (Event Management System)                                   │
+│     → Webhook → API Gateway → Lambda → Vendor                      │
+│     → CloudWatch Events → EventBridge → Lambda → Vendor            │
+│                                                                     │
+│  3. FPolicy (ファイルスクリーニング)                                    │
+│     → External Engine → API Gateway → Lambda → Vendor              │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 1. 監査ログ (File Access Auditing)
+
+### 対象イベント
+- ファイル/ディレクトリのアクセス (EventID 4663)
+- オブジェクトのオープン (EventID 4656)
+- セキュリティ記述子の変更 (EventID 4670)
+- CIFS ログオン/ログオフ
+
+### 配信経路
+```
+FSx ONTAP (vserver audit) → S3 バケット → EventBridge → Lambda → Vendor API
+```
+
+### 設定方法
+[前提条件ガイド](prerequisites.md) の Step 2 を参照。
+
+---
+
+## 2. EMS (Event Management System)
+
+### 対象イベント
+
+| カテゴリ | EMS イベント名 | 説明 | ユースケース |
+|---------|--------------|------|------------|
+| **ARP/AI** | `arw.volume.state` | ランサムウェア検知・状態変更 | セキュリティアラート |
+| **ARP/AI** | `arw.vserver.state` | ARP SVM レベル状態変更 | セキュリティアラート |
+| **クォータ** | `wafl.quota.softlimit.exceeded` | ソフトクォータ閾値超過 | 容量管理 |
+| **クォータ** | `wafl.quota.hardlimit.exceeded` | ハードクォータ閾値超過 | 容量管理 |
+| **容量** | `sms.vol.full` | ボリューム容量フル | 容量管理 |
+| **容量** | `sms.vol.nearlyFull` | ボリューム容量ほぼフル (95%) | 容量管理 |
+| **パフォーマンス** | `qos.monitor.memory.maxed` | QoS メモリ上限到達 | パフォーマンス |
+| **HA** | `cf.fsm.takeoverStarted` | HA テイクオーバー開始 | 可用性 |
+| **ネットワーク** | `net.linkDown` | ネットワークリンクダウン | 可用性 |
+
+### 配信経路
+
+#### パターン A: EMS Webhook → API Gateway → Lambda (推奨)
+
+ONTAP 9.10.1+ では EMS イベントを Webhook で外部に通知できます。
+
+```
+ONTAP EMS → Webhook (HTTPS) → API Gateway → Lambda → Vendor API
+```
+
+**ONTAP CLI 設定:**
+```bash
+# 1. Webhook 通知先を作成
+event notification destination create -name aws-apigw \
+  -syslog-transport https \
+  -syslog-port 443 \
+  -url https://<api-gateway-id>.execute-api.ap-northeast-1.amazonaws.com/prod/ems
+
+# 2. イベントフィルタを作成
+event filter create -filter-name arp-and-quota
+event filter rule add -filter-name arp-and-quota -type include \
+  -message-name arw.volume.state
+event filter rule add -filter-name arp-and-quota -type include \
+  -message-name wafl.quota.*
+
+# 3. 通知を設定
+event notification create -filter-name arp-and-quota \
+  -destinations aws-apigw
+```
+
+#### パターン B: CloudWatch → EventBridge → Lambda
+
+FSx ONTAP は EMS イベントを CloudWatch Events として発行します。
+
+```
+FSx ONTAP EMS → CloudWatch Events → EventBridge Rule → Lambda → Vendor API
+```
+
+**EventBridge ルール例:**
+```json
+{
+  "source": ["aws.fsx"],
+  "detail-type": ["FSx ONTAP EMS Event"],
+  "detail": {
+    "event-name": ["arw.volume.state", "wafl.quota.softlimit.exceeded"]
+  }
+}
+```
+
+参考: [AWS Docs - Monitoring FSx ONTAP](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring_overview.html) | [EMS alerts for ARP](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/EMS-ARP.html)
+
+---
+
+## 3. FPolicy (ファイルスクリーニング)
+
+### 対象イベント
+
+FPolicy はファイル操作をリアルタイムで監視し、外部エンジンに通知します。
+
+| プロトコル | 対応操作 |
+|-----------|---------|
+| **CIFS/SMB** | create, open, close, read, write, rename, delete, setattr, getattr |
+| **NFSv3** | create, mkdir, read, write, rename, unlink, rmdir, setattr, link, symlink |
+| **NFSv4** | create, open, close, read, write, rename, remove, setattr, getattr |
+
+### 配信経路
+
+```
+ファイル操作 → FPolicy Engine → External Server (API Gateway) → Lambda → Vendor API
+```
+
+### FPolicy 設定
+
+```bash
+# 1. FPolicy 外部エンジンを作成
+fpolicy policy external-engine create -vserver svm-prod-01 \
+  -engine-name aws-lambda-engine \
+  -primary-servers <api-gateway-nlb-ip> \
+  -port 443 \
+  -extern-engine-type asynchronous \
+  -ssl-option no-auth
+
+# 2. FPolicy イベントを作成
+fpolicy policy event create -vserver svm-prod-01 \
+  -event-name file-ops-event \
+  -protocol cifs \
+  -file-operations create,write,rename,delete
+
+# 3. FPolicy ポリシーを作成
+fpolicy policy create -vserver svm-prod-01 \
+  -policy-name file-screening \
+  -events file-ops-event \
+  -engine aws-lambda-engine
+
+# 4. FPolicy を有効化
+fpolicy enable -vserver svm-prod-01 \
+  -policy-name file-screening \
+  -sequence-number 1
+```
+
+### 注意事項
+
+- FPolicy External Engine は TCP 接続が必要（API Gateway + NLB 構成）
+- 非同期モード (`asynchronous`) を推奨（パフォーマンス影響を最小化）
+- 同期モード (`synchronous`) はファイル操作をブロックできる（DLP 用途）
+
+参考: [NetApp FPolicy API](https://library.netapp.com/ecmdocs/ECMLP2886776/html/resources/fpolicy_event.html) | [FPolicy FAQ](https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/ONTAP_OS/FAQ:_FPolicy:_Auditing)
+
+---
+
+## ユースケース別推奨構成
+
+| ユースケース | イベントソース | 推奨パターン |
+|------------|--------------|------------|
+| コンプライアンス監査 | 監査ログ | S3 → EventBridge → Lambda |
+| ランサムウェア検知アラート | EMS (ARP/AI) | Webhook → API GW → Lambda |
+| 容量管理アラート | EMS (クォータ) | CloudWatch → EventBridge → Lambda |
+| リアルタイムファイル監視 | FPolicy | External Engine → API GW → Lambda |
+| DLP (データ漏洩防止) | FPolicy (同期) | External Engine → Lambda → 判定 |
+| セキュリティ SIEM 連携 | 監査ログ + EMS | 複合パターン |

@@ -19,6 +19,10 @@ venv/
 *.swp
 *.swo
 
+# Kiro (IDE-specific hooks and local settings)
+.kiro/hooks/
+.kiro/settings/
+
 # OS
 .DS_Store
 Thumbs.db
