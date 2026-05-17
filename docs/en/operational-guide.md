@@ -70,6 +70,27 @@ aws lambda invoke \
   /tmp/response.json
 ```
 
+## S3 Access Point Health Monitoring
+
+FSx for ONTAP S3 Access Points can enter a `MISCONFIGURED` state when:
+- The associated file system identity cannot be resolved
+- The attached volume is offline or unmounted
+
+FSx will automatically restore the access point once the underlying issue is fixed. Monitor the access point state periodically:
+
+```bash
+# Check S3 Access Point state
+aws fsx describe-data-repository-associations \
+  --region ap-northeast-1 \
+  --query 'Associations[*].[ResourceARN,Lifecycle]' \
+  --output table
+```
+
+If the access point is MISCONFIGURED, Lambda invocations will fail with AccessDenied or timeout errors. Check:
+1. Volume is online and mounted
+2. File system identity (UNIX/Windows user) is resolvable
+3. SVM is operational
+
 ## Secrets Manager Rotation
 
 API keys should be rotated periodically:

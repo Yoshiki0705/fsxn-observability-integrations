@@ -69,6 +69,27 @@ aws lambda invoke \
   /tmp/response.json
 ```
 
+## S3 Access Point ヘルス監視
+
+FSx for ONTAP S3 Access Points は以下の場合に `MISCONFIGURED` 状態になり得ます:
+- 関連付けられたファイルシステム ID が解決できない場合
+- アタッチされたボリュームがオフラインまたはアンマウントされた場合
+
+FSx は根本的な問題が修正されると自動的にアクセスポイントを復元します。アクセスポイントの状態を定期的に監視してください:
+
+```bash
+# S3 Access Point の状態確認
+aws fsx describe-data-repository-associations \
+  --region ap-northeast-1 \
+  --query 'Associations[*].[ResourceARN,Lifecycle]' \
+  --output table
+```
+
+アクセスポイントが MISCONFIGURED の場合、Lambda 起動は AccessDenied またはタイムアウトエラーで失敗します。確認事項:
+1. ボリュームがオンラインでマウントされているか
+2. ファイルシステム ID (UNIX/Windows ユーザー) が解決可能か
+3. SVM が稼働中か
+
 ## Secrets Manager ローテーション
 
 API キーは定期的にローテーションすべきです:

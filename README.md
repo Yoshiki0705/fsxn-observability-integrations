@@ -96,6 +96,8 @@ aws cloudformation deploy \
 - [Demo Scenarios (English)](docs/en/demo-scenarios.md)
 - [運用ガイド (日本語)](docs/ja/operational-guide.md)
 - [Operational Guide (English)](docs/en/operational-guide.md)
+- [検知ユースケース (日本語)](docs/ja/detection-use-cases.md)
+- [Detection Use Cases (English)](docs/en/detection-use-cases.md)
 
 ## Tech Stack / 技術スタック
 
