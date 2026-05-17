@@ -1,6 +1,6 @@
 # FSx for ONTAP Observability Integrations
 
-🌐 [日本語](docs/ja/getting-started.md) | **English** (this page)
+🌐 [日本語](docs/ja/README.md) | [English](docs/en/README.md)
 
 ---
 
