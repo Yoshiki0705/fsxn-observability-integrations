@@ -52,6 +52,39 @@ Status:
 - ファイルアクセス行動の可視性向上
 - ONTAP ネイティブテレメトリを活用した迅速なセキュリティ対応
 
+## Partner Positioning / パートナー向け
+
+This project helps partners modernize EC2-based FSx for ONTAP audit log collectors into an EC2-free, vendor-neutral observability pipeline.
+
+Common customer scenarios:
+- Replacing Splunk Universal Forwarder on EC2
+- Modernizing audit visibility for enterprise file shares (SAP, VDI, departmental)
+- Integrating FSx for ONTAP with existing SIEM / observability platforms
+- Preparing for ransomware detection workflows using ONTAP telemetry
+
+## Quick Validation / 動作確認手順
+
+After deploying a vendor integration stack:
+
+```bash
+# 1. Confirm Scheduler is invoking Lambda
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/fsxn-datadog-integration-shipper \
+  --start-time $(date -d '5 minutes ago' +%s000) \
+  --region ap-northeast-1
+
+# 2. Confirm DLQ is empty (no failed events)
+aws sqs get-queue-attributes \
+  --queue-url <dlq-url> \
+  --attribute-names All \
+  --query 'Attributes.ApproximateNumberOfMessages'
+
+# 3. Search in your observability platform
+#    Datadog: source:fsxn
+#    Splunk:  index=fsxn_audit
+#    Grafana: {source="fsxn"}
+```
+
 ## Quick Start / クイックスタート
 
 ```bash
