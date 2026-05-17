@@ -23,7 +23,7 @@ import urllib3
 
 DATADOG_SITE = os.environ.get("DATADOG_SITE", "datadoghq.com")
 API_KEY_SECRET_ARN = os.environ.get("API_KEY_SECRET_ARN", "")
-S3_ACCESS_POINT_ARN = os.environ.get("S3_ACCESS_POINT_ARN", "")
+S3_ACCESS_POINT_ARN = os.environ.get("FSX_S3_ACCESS_POINT_ARN", os.environ.get("S3_ACCESS_POINT_ARN", ""))
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 DD_SOURCE = os.environ.get("DD_SOURCE", "fsxn")
 DD_SERVICE = os.environ.get("DD_SERVICE", "ontap-audit")

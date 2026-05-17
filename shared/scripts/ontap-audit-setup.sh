@@ -16,7 +16,7 @@ set -euo pipefail
 #   ./ontap-audit-setup.sh \
 #     --endpoint <management-ip> \
 #     --svm <svm-name> \
-#     --format <evtx|json> \
+#     --format <evtx|xml> \
 #     [--rotate-size <size>] \
 #     [--dry-run]
 # ============================================================
@@ -45,7 +45,7 @@ Required:
   --svm <name>          Storage Virtual Machine name
 
 Optional:
-  --format <format>     Log format: evtx (default) or json
+  --format <format>     Log format: evtx or xml
   --rotate-size <size>  Log rotation size (default: 100MB)
   --dry-run             Print commands without executing
   --help                Show this help message
@@ -54,8 +54,8 @@ Examples:
   # Enable EVTX format audit logging
   $0 --endpoint 10.0.1.100 --svm svm-prod-01
 
-  # Enable JSON format with custom rotation
-  $0 --endpoint 10.0.1.100 --svm svm-prod-01 --format json --rotate-size 50MB
+  # Enable XML format with custom rotation
+  $0 --endpoint 10.0.1.100 --svm svm-prod-01 --format xml --rotate-size 50MB
 
   # Preview commands without executing
   $0 --endpoint 10.0.1.100 --svm svm-prod-01 --dry-run
@@ -82,8 +82,8 @@ if [[ -z "$ENDPOINT" || -z "$SVM_NAME" ]]; then
   usage
 fi
 
-if [[ "$FORMAT" != "evtx" && "$FORMAT" != "json" ]]; then
-  echo -e "${RED}Error: --format must be 'evtx' or 'json'${NC}"
+if [[ "$FORMAT" != "evtx" && "$FORMAT" != "xml" ]]; then
+  echo -e "${RED}Error: --format must be 'evtx' or 'xml'${NC}"
   exit 1
 fi
 
