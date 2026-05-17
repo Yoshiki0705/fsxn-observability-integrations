@@ -157,6 +157,8 @@ aws cloudformation deploy \
 - [Operational Guide (English)](docs/en/operational-guide.md)
 - [ONTAP 監査設定ガイド (日本語)](docs/ja/ontap-audit-setup.md)
 - [ONTAP Audit Setup Guide (English)](docs/en/ontap-audit-setup.md)
+- [最小テストパス (日本語)](docs/ja/quick-start-minimum.md)
+- [Minimum Test Path (English)](docs/en/quick-start-minimum.md)
 - [検知ユースケース (日本語)](docs/ja/detection-use-cases.md)
 - [Detection Use Cases (English)](docs/en/detection-use-cases.md)
 - [正規化イベントスキーマ (日本語)](docs/ja/normalized-event-schema.md)
