@@ -70,7 +70,7 @@ After deploying a vendor integration stack:
 # 1. Confirm Scheduler is invoking Lambda
 aws logs filter-log-events \
   --log-group-name /aws/lambda/fsxn-datadog-integration-shipper \
-  --start-time $(date -d '5 minutes ago' +%s000) \
+  --start-time $(python3 -c "import time; print(int((time.time()-300)*1000))") \
   --region ap-northeast-1
 
 # 2. Confirm DLQ is empty (no failed events)
@@ -84,6 +84,25 @@ aws sqs get-queue-attributes \
 #    Splunk:  index=fsxn_audit
 #    Grafana: {source="fsxn"}
 ```
+
+## Teardown / スタック削除
+
+```bash
+# Remove vendor integration stack
+aws cloudformation delete-stack \
+  --stack-name fsxn-datadog-integration \
+  --region ap-northeast-1
+
+# Remove prerequisites stack (if no other vendor stacks depend on it)
+aws cloudformation delete-stack \
+  --stack-name fsxn-observability-prerequisites \
+  --region ap-northeast-1
+
+# ONTAP audit logging remains active — disable separately if needed:
+# vserver audit disable -vserver <svm-name>
+```
+
+> **Note**: Deleting the stack does not affect ONTAP audit logging or existing data on the FSx volume. Audit logs continue to be written to the audit volume.
 
 ## Quick Start / クイックスタート
 

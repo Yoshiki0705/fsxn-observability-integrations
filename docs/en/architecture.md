@@ -71,6 +71,22 @@ FSx S3 AP → Lambda (Transform) → Kinesis Data Firehose → Vendor API
 - **Benefits**: Automatic buffering, retry, scaling
 - **Supported Vendors**: Splunk (HEC), Datadog, New Relic, any HTTP endpoint
 
+### 6. AWS-Native Alternatives Comparison
+
+| Approach | Best For | Trade-off |
+|----------|----------|-----------|
+| Lambda → Vendor API direct | Vendor-specific mapping, EVTX/XML parsing | Custom retry/backoff needed |
+| Kinesis Data Firehose | Managed buffering | Transformation flexibility limited |
+| CloudWatch Logs first | AWS-native operations | Extra routing to external tools |
+| SQS buffer (between parser and shipper) | Decoupling, backpressure | More components |
+| OpenTelemetry Collector | Vendor-neutral standard | Schema/mapping decisions needed |
+| Security Lake / OCSF | Security analytics, long-term storage | OCSF schema transformation needed |
+
+This project uses Lambda → Vendor API direct because:
+- Full control over EVTX/XML parsing is required
+- Vendor-specific API semantics (batch size, auth, retry) must be handled natively
+- For organizations prioritizing AWS-native logging, CloudWatch Logs or S3 archive can be added as parallel outputs
+
 ## Security Design
 
 ### IAM Least Privilege
