@@ -7,10 +7,10 @@
   - AWS スクリーンショット: アカウントID、ARN
 
 マスク対象の個人情報:
-  - メールアドレス (yoshiki.fujiwara@netapp.com)
-  - 組織名 (NetApp G.K. Japan)
-  - ユーザー名 (Welcome, Yoshiki!)
-  - トライアル情報 (You have X days left in your trial)
+  - メールアドレス
+  - 組織名
+  - ユーザー名
+  - トライアル情報
 
 使用方法:
   python3 docs/screenshots/mask_screenshots.py
