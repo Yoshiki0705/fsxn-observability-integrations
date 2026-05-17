@@ -105,6 +105,8 @@ aws cloudformation deploy \
 - [Operational Guide (English)](docs/en/operational-guide.md)
 - [検知ユースケース (日本語)](docs/ja/detection-use-cases.md)
 - [Detection Use Cases (English)](docs/en/detection-use-cases.md)
+- [正規化イベントスキーマ (日本語)](docs/ja/normalized-event-schema.md)
+- [Normalized Event Schema (English)](docs/en/normalized-event-schema.md)
 
 ## Tech Stack / 技術スタック
 
