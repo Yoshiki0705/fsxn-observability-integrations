@@ -329,6 +329,65 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
 
+  # ============================================================
+  # CloudWatch Dashboard — Operational Health
+  # ============================================================
+  OperationalDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${AWS::StackName}-health'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "Lambda Errors & Throttles",
+                "metrics": [
+                  ["AWS/Lambda", "Errors", "FunctionName", "${LogShipperFunction}", {"color": "#d62728"}],
+                  ["AWS/Lambda", "Throttles", "FunctionName", "${LogShipperFunction}", {"color": "#ff7f0e"}]
+                ],
+                "period": 300, "stat": "Sum", "region": "${AWS::Region}"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "Lambda Duration (ms)",
+                "metrics": [
+                  ["AWS/Lambda", "Duration", "FunctionName", "${LogShipperFunction}", {"stat": "Average"}],
+                  ["AWS/Lambda", "Duration", "FunctionName", "${LogShipperFunction}", {"stat": "Maximum"}]
+                ],
+                "period": 300, "region": "${AWS::Region}"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "Lambda Invocations",
+                "metrics": [
+                  ["AWS/Lambda", "Invocations", "FunctionName", "${LogShipperFunction}"]
+                ],
+                "period": 300, "stat": "Sum", "region": "${AWS::Region}"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "DLQ Depth",
+                "metrics": [
+                  ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "${DeadLetterQueue.QueueName}", {"color": "#d62728"}]
+                ],
+                "period": 300, "stat": "Maximum", "region": "${AWS::Region}"
+              }
+            }
+          ]
+        }
+
 Outputs:
   LambdaFunctionArn:
     Description: ARN of the log shipper Lambda function

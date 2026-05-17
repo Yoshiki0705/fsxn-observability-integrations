@@ -94,6 +94,8 @@ aws cloudformation deploy \
 - [Vendor Comparison (English)](docs/en/vendor-comparison.md)
 - [デモシナリオ (日本語)](docs/ja/demo-scenarios.md)
 - [Demo Scenarios (English)](docs/en/demo-scenarios.md)
+- [運用ガイド (日本語)](docs/ja/operational-guide.md)
+- [Operational Guide (English)](docs/en/operational-guide.md)
 
 ## Tech Stack / 技術スタック
 
