@@ -57,6 +57,10 @@ Create all resources including FSx for ONTAP from scratch.
 ### Create via AWS CLI
 
 ```bash
+# Assumes VPC and subnets already exist
+# Preferred subnet: primary
+# Standby subnet: secondary (for Multi-AZ)
+
 aws fsx create-file-system \
   --file-system-type ONTAP \
   --storage-capacity 1024 \
@@ -69,23 +73,42 @@ aws fsx create-file-system \
     "FsxAdminPassword": "YourSecurePassword123!",
     "EndpointIpAddressRange": "198.19.0.0/24"
   }' \
-  --tags Key=Project,Value=fsxn-observability \
+  --tags Key=Project,Value=fsxn-observability Key=Environment,Value=dev \
   --region ap-northeast-1
 ```
 
 ### Create SVM
 
 ```bash
+# Get file system ID
 FS_ID=$(aws fsx describe-file-systems \
   --query "FileSystems[?Tags[?Key=='Project' && Value=='fsxn-observability']].FileSystemId" \
   --output text --region ap-northeast-1)
 
+# Create SVM
 aws fsx create-storage-virtual-machine \
   --file-system-id $FS_ID \
   --name svm-audit-demo \
   --root-volume-security-style NTFS \
   --region ap-northeast-1
 ```
+
+### Create via CloudFormation
+
+```bash
+aws cloudformation deploy \
+  --template-file shared/templates/fsxn-filesystem.yaml \
+  --stack-name fsxn-demo-filesystem \
+  --parameter-overrides \
+    VpcId=vpc-xxxxxxxx \
+    PrimarySubnetId=subnet-xxxxxxxx \
+    StandbySubnetId=subnet-yyyyyyyy \
+    FsxAdminPassword=YourSecurePassword123! \
+  --capabilities CAPABILITY_IAM \
+  --region ap-northeast-1
+```
+
+> 📝 `shared/templates/fsxn-filesystem.yaml` is a large template and is not included in this project. Refer to the [AWS documentation](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html).
 
 ---
 
@@ -123,7 +146,8 @@ aws cloudformation deploy \
 aws cloudformation describe-stacks \
   --stack-name fsxn-observability-prerequisites \
   --query "Stacks[0].Outputs" \
-  --output table --region ap-northeast-1
+  --output table \
+  --region ap-northeast-1
 ```
 
 Key outputs:
@@ -156,30 +180,41 @@ bash shared/scripts/ontap-audit-setup.sh \
 1. FSx Console → File System → Open management endpoint URL in browser
 2. **Storage** → **SVMs** → Select target SVM
 3. **Settings** → **Audit** → **Enable**
-4. Configure: Destination `/vol/audit_logs`, Format EVTX, Rotation 100MB
+4. Configure:
+   - Destination: `/vol/audit_logs`
+   - Format: EVTX or JSON
+   - Rotation: Size-based, 100MB
 
 ### Method C: Manual SSH
 
 ```bash
+# SSH to FSx ONTAP management endpoint
 ssh admin@<management-endpoint-ip>
 
+# Execute in ONTAP CLI
 vserver audit create -vserver svm-prod-01 \
   -destination /vol/audit_logs \
   -format evtx \
   -rotate-size 100MB
 
 vserver audit enable -vserver svm-prod-01
+
+# Verify
 vserver audit show -vserver svm-prod-01
 ```
 
 ### Audit Log S3 Delivery Options
 
+There are multiple ways to deliver FSx ONTAP audit logs to an S3 bucket:
+
 #### Option 1: FSx Automatic Backups + S3 Export
+
 Use FSx automatic backups and export to S3. Low real-time capability but simple setup.
 
 #### Option 2: DataSync Periodic Sync
 
 ```bash
+# Create a DataSync task for periodic S3 sync
 aws datasync create-task \
   --source-location-arn arn:aws:datasync:ap-northeast-1:123456789012:location/loc-xxxxx \
   --destination-location-arn arn:aws:datasync:ap-northeast-1:123456789012:location/loc-yyyyy \
@@ -191,17 +226,52 @@ aws datasync create-task \
 
 FSx ONTAP S3 Access Points (released 2025) allow direct S3 API access to volume data. Attach an S3 Access Point to the audit log volume for direct Lambda read access.
 
+```bash
+# Create S3 Access Point on FSx ONTAP volume
+# (via FSx Console or API)
+aws fsx create-data-repository-association \
+  --file-system-id fs-0123456789abcdef0 \
+  --file-system-path /audit_logs \
+  --data-repository-configuration '{
+    "Type": "S3",
+    "AutoImportPolicy": {"Events": ["NEW", "CHANGED", "DELETED"]},
+    "AutoExportPolicy": {"Events": ["NEW", "CHANGED", "DELETED"]}
+  }' \
+  --batch-import-meta-data-on-create \
+  --region ap-northeast-1
+```
+
 > 📝 FSx ONTAP S3 Access Points differ from regular S3 Access Points. They attach directly to FSx volumes, providing S3 API access to NFS/SMB data.
 
 ---
 
 ## Step 3: Verify Log Delivery
 
+### Verify logs are arriving in S3 bucket
+
 ```bash
-# Check objects in bucket
+# List objects in bucket
 aws s3 ls s3://my-company-fsxn-audit-logs-ap-northeast-1/audit/ --recursive
 
-# Upload test file
+# Check latest log files
+aws s3 ls s3://my-company-fsxn-audit-logs-ap-northeast-1/audit/ \
+  --recursive --human-readable | tail -5
+```
+
+### Verify EventBridge events are firing
+
+```bash
+# Check S3 events via CloudTrail
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=PutObject \
+  --max-results 5 \
+  --region ap-northeast-1
+```
+
+### Test with a sample file
+
+```bash
+# Upload a test audit log file
 aws s3 cp integrations/datadog/tests/test_data/sample_audit_logs.json \
   s3://my-company-fsxn-audit-logs-ap-northeast-1/audit/svm-prod-01/2026/01/15/test_audit.json
 ```
@@ -209,6 +279,8 @@ aws s3 cp integrations/datadog/tests/test_data/sample_audit_logs.json \
 ---
 
 ## Step 4: Deploy Vendor Integration
+
+Once prerequisites are ready, deploy the vendor integration stack.
 
 ```bash
 # Get prerequisite stack outputs
@@ -237,6 +309,49 @@ aws cloudformation deploy \
 
 ---
 
+## Resource Relationship Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ AWS Account                                                             │
+│                                                                         │
+│  ┌──────────────────┐                                                   │
+│  │ FSx for ONTAP    │                                                   │
+│  │                  │    Audit log output                                │
+│  │  SVM: svm-prod   │──────────────┐                                    │
+│  │  Audit: enabled  │              │                                    │
+│  └──────────────────┘              ▼                                    │
+│                           ┌──────────────────┐                          │
+│                           │ S3 Bucket        │                          │
+│                           │ (audit logs)     │                          │
+│                           │                  │◀── EventBridge enabled    │
+│                           └────────┬─────────┘                          │
+│                                    │                                    │
+│                           ┌────────┴─────────┐                          │
+│                           │ S3 Access Point  │                          │
+│                           │ (for Lambda)     │                          │
+│                           └────────┬─────────┘                          │
+│                                    │                                    │
+│  ┌──────────────────┐              │    ┌──────────────────┐            │
+│  │ EventBridge Rule │──────────────┼───▶│ Lambda           │            │
+│  │ (Object Created) │              │    │ (log shipper)    │────────┐   │
+│  └──────────────────┘              │    └──────────────────┘        │   │
+│                                    │                                │   │
+│                                    │    ┌──────────────────┐        │   │
+│                                    └───▶│ Secrets Manager  │        │   │
+│                                         │ (API Key)        │        │   │
+│                                         └──────────────────┘        │   │
+└─────────────────────────────────────────────────────────────────────┼───┘
+                                                                      │
+                                                                      ▼
+                                                          ┌──────────────────┐
+                                                          │ Vendor API       │
+                                                          │ (Datadog, etc.)  │
+                                                          └──────────────────┘
+```
+
+---
+
 ## Troubleshooting
 
 ### Audit logs not arriving in S3
@@ -245,20 +360,25 @@ aws cloudformation deploy \
    ```
    ssh admin@<endpoint>
    vserver audit show -vserver <svm-name> -fields state
+   # Verify state is "true"
    ```
 
 2. **Check volume**:
    ```
    volume show -vserver <svm-name> -volume audit_logs
+   # Verify volume exists and has sufficient free space
    ```
 
-3. **Check S3 delivery configuration** (DataSync task status or FSx S3 AP)
+3. **Check S3 delivery configuration**:
+   - Verify DataSync task is running successfully
+   - Verify FSx S3 Access Point is configured correctly
 
 ### EventBridge events not firing
 
 1. Verify EventBridge notifications are enabled on the bucket:
    ```bash
-   aws s3api get-bucket-notification-configuration --bucket <bucket-name>
+   aws s3api get-bucket-notification-configuration \
+     --bucket <bucket-name> --region ap-northeast-1
    ```
    Confirm `EventBridgeConfiguration` is present.
 

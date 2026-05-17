@@ -12,7 +12,7 @@
 
 ### 1. Enable FSx ONTAP Audit Logging
 
-Enable audit logging on FSx for ONTAP console or CLI, configured to output to an S3 bucket.
+Enable audit logging on the FSx for ONTAP console or CLI, and configure output to an S3 bucket.
 
 ```bash
 # Enable audit logging via ONTAP CLI
@@ -48,7 +48,7 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_IAM
 ```
 
-### 4. Verify
+### 4. Verify Operation
 
 Perform file operations on FSx ONTAP and verify logs are received on the vendor side.
 

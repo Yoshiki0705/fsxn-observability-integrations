@@ -17,7 +17,7 @@
 │     → CloudWatch Events → EventBridge → Lambda → Vendor            │
 │                                                                     │
 │  3. FPolicy (ファイルスクリーニング)                                    │
-│     → External Engine → API Gateway → Lambda → Vendor              │
+│     → TCP:9898 → ECS Fargate → SQS → EventBridge → Lambda → Vendor │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -123,46 +123,103 @@ FPolicy はファイル操作をリアルタイムで監視し、外部エンジ
 | **NFSv3** | create, mkdir, read, write, rename, unlink, rmdir, setattr, link, symlink |
 | **NFSv4** | create, open, close, read, write, rename, remove, setattr, getattr |
 
+### アーキテクチャ
+
+FPolicy は独自バイナリプロトコル (TCP) を使用するため、HTTP/API Gateway では直接受信できません。
+カスタム FPolicy サーバーコンテナが TCP プロトコルを処理し、SQS → EventBridge 経由でイベントを配信します。
+
+```
+┌──────────────┐     TCP:9898      ┌──────────────────┐
+│ FSx ONTAP    │ ─────────────────→ │ ECS Fargate      │
+│ FPolicy      │   (直接接続)       │ FPolicy Server   │
+└──────────────┘                    └────────┬─────────┘
+                                             │ SQS SendMessage
+                                             ▼
+                                    ┌──────────────────┐
+                                    │ SQS Queue        │
+                                    │ (FPolicy_Q)      │
+                                    └────────┬─────────┘
+                                             │ Event Source Mapping
+                                             ▼
+                                    ┌──────────────────┐
+                                    │ Bridge Lambda    │
+                                    │ (SQS→EventBridge)│
+                                    └────────┬─────────┘
+                                             │ PutEvents
+                                             ▼
+                                    ┌──────────────────┐
+                                    │ EventBridge      │
+                                    │ Custom Bus       │
+                                    │ (fpolicy.fsxn)   │
+                                    └────────┬─────────┘
+                                             │ Rule
+                                             ▼
+                                    ┌──────────────────┐
+                                    │ Vendor Lambda    │
+                                    │ (forwarder)      │
+                                    └──────────────────┘
+```
+
 ### 配信経路
 
 ```
-ファイル操作 → FPolicy Engine → External Server (API Gateway) → Lambda → Vendor API
+ファイル操作 → ONTAP FPolicy → TCP:9898 → ECS Fargate → SQS → EventBridge → Lambda → Vendor API
 ```
+
+### コンピュートモード選択
+
+| モード | 特徴 | 推奨ケース |
+|--------|------|-----------|
+| **Fargate** | サーバーレス、IP 自動更新 Lambda 付き | 本番環境（推奨） |
+| **EC2** | 固定 IP、SSH アクセス可能 | デバッグ・開発環境 |
+
+> **Note**: Fargate モードではタスク再起動時に IP が変わるため、IP Auto-Updater Lambda が
+> ECS Task State Change イベントを検知し、ONTAP REST API で FPolicy External Engine の
+> `primary-servers` を自動更新します。
 
 ### FPolicy 設定
 
 ```bash
-# 1. FPolicy 外部エンジンを作成
-fpolicy policy external-engine create -vserver svm-prod-01 \
-  -engine-name aws-lambda-engine \
-  -primary-servers <api-gateway-nlb-ip> \
-  -port 443 \
-  -extern-engine-type asynchronous \
-  -ssl-option no-auth
+# 1. FPolicy 外部エンジンを作成（ポート 9898、非同期モード）
+vserver fpolicy policy external-engine create -vserver FPolicySMB \
+  -engine-name fpolicy_lambda_engine \
+  -primary-servers <fargate-task-ip> \
+  -port 9898 \
+  -extern-engine-type asynchronous
 
 # 2. FPolicy イベントを作成
-fpolicy policy event create -vserver svm-prod-01 \
+vserver fpolicy policy event create -vserver FPolicySMB \
   -event-name file-ops-event \
   -protocol cifs \
   -file-operations create,write,rename,delete
 
 # 3. FPolicy ポリシーを作成
-fpolicy policy create -vserver svm-prod-01 \
+vserver fpolicy policy create -vserver FPolicySMB \
   -policy-name file-screening \
   -events file-ops-event \
-  -engine aws-lambda-engine
+  -engine fpolicy_lambda_engine \
+  -is-mandatory false
 
 # 4. FPolicy を有効化
-fpolicy enable -vserver svm-prod-01 \
+vserver fpolicy enable -vserver FPolicySMB \
   -policy-name file-screening \
   -sequence-number 1
 ```
 
 ### 注意事項
 
-- FPolicy External Engine は TCP 接続が必要（API Gateway + NLB 構成）
+- FPolicy は独自バイナリプロトコル (TCP) を使用 — HTTP/HTTPS ではない
+- ONTAP は Fargate タスク IP に直接 TCP 接続する（NLB はヘルスチェック専用）
 - 非同期モード (`asynchronous`) を推奨（パフォーマンス影響を最小化）
 - 同期モード (`synchronous`) はファイル操作をブロックできる（DLP 用途）
+- NFSv3 の write-complete には 5 秒のデフォルト遅延あり
+- コンテナイメージは ECR に格納（ARM64 アーキテクチャ）
+
+### NLB の役割
+
+NLB は FPolicy トラフィックのルーティングには使用されません。
+ECS Fargate タスクのヘルスチェック（TCP ポート 9898）のみに使用されます。
+ONTAP は Fargate タスクの ENI IP に直接接続します。
 
 参考: [NetApp FPolicy API](https://library.netapp.com/ecmdocs/ECMLP2886776/html/resources/fpolicy_event.html) | [FPolicy FAQ](https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/ONTAP_OS/FAQ:_FPolicy:_Auditing)
 
@@ -175,6 +232,6 @@ fpolicy enable -vserver svm-prod-01 \
 | コンプライアンス監査 | 監査ログ | S3 → EventBridge → Lambda |
 | ランサムウェア検知アラート | EMS (ARP/AI) | Webhook → API GW → Lambda |
 | 容量管理アラート | EMS (クォータ) | CloudWatch → EventBridge → Lambda |
-| リアルタイムファイル監視 | FPolicy | External Engine → API GW → Lambda |
-| DLP (データ漏洩防止) | FPolicy (同期) | External Engine → Lambda → 判定 |
+| リアルタイムファイル監視 | FPolicy | TCP:9898 → ECS Fargate → SQS → EventBridge → Lambda |
+| DLP (データ漏洩防止) | FPolicy (同期) | TCP:9898 → ECS Fargate → 判定 |
 | セキュリティ SIEM 連携 | 監査ログ + EMS | 複合パターン |
