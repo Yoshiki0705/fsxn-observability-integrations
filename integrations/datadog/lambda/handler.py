@@ -486,6 +486,15 @@ def _format_for_datadog(
             "svm": log.get("SVMName", log.get("svm", "")),
         }
 
+        # Pipeline observability: add processing metadata
+        # Helps operators understand pipeline lag and throughput
+        from datetime import datetime, timezone
+
+        dd_log["attributes"]["_pipeline"] = {
+            "processed_at": datetime.now(timezone.utc).isoformat(),
+            "source_file": source_key,
+        }
+
         dd_logs.append(dd_log)
 
     return dd_logs
