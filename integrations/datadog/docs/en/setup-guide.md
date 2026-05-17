@@ -52,11 +52,10 @@ aws cloudformation deploy \
   --template-file template.yaml \
   --stack-name fsxn-datadog-integration \
   --parameter-overrides \
-    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
+    FsxS3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
     DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:datadog/fsxn-api-key-XXXXXX \
     DatadogSite=datadoghq.com \
-    S3BucketName=your-fsxn-audit-bucket \
-  --capabilities CAPABILITY_IAM \
+  --capabilities CAPABILITY_NAMED_IAM \
   --region ap-northeast-1
 ```
 
@@ -64,10 +63,9 @@ aws cloudformation deploy \
 
 | Parameter | Description |
 |-----------|-------------|
-| `S3AccessPointArn` | S3 Access Point ARN for audit logs |
+| `FsxS3AccessPointArn` | FSx for ONTAP S3 Access Point ARN (attached to audit volume) |
 | `DatadogApiKeySecretArn` | Secrets Manager ARN for the API Key |
 | `DatadogSite` | Datadog site (see below) |
-| `S3BucketName` | Audit log bucket name |
 
 ### Datadog Sites
 
@@ -191,10 +189,9 @@ aws cloudformation deploy \
   --template-file template.yaml \
   --stack-name fsxn-datadog-integration \
   --parameter-overrides \
-    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
+    FsxS3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
     DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:datadog/fsxn-api-key-XXXXXX \
     DatadogSite=ap1.datadoghq.com \
-    S3BucketName=your-fsxn-audit-bucket \
     VpcEnabled=true \
     VpcSubnetIds=subnet-xxx,subnet-yyy \
     VpcSecurityGroupIds=sg-xxx \

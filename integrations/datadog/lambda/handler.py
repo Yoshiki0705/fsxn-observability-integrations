@@ -157,11 +157,19 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 def _extract_s3_records(event: dict[str, Any]) -> list[dict[str, str]]:
     """Extract S3 bucket/key pairs from event.
 
-    Handles both S3 event notifications and EventBridge events.
+    Handles multiple invocation patterns:
+    - Scheduled invocation (EventBridge Scheduler): lists objects from S3 AP
+    - Direct invocation with S3 event payload (testing/backward compat)
+    - EventBridge S3 Object Created event (legacy/other vendor stacks)
     """
     records = []
 
-    # S3 Event Notification format
+    # Scheduled invocation — no S3 records, Lambda will list objects
+    if event.get("source") == "scheduler":
+        # Return empty — caller should use list-based processing
+        return records
+
+    # S3 event notification format (backward compat / testing)
     if "Records" in event:
         for record in event["Records"]:
             s3_info = record.get("s3", {})
@@ -172,7 +180,7 @@ def _extract_s3_records(event: dict[str, Any]) -> list[dict[str, str]]:
                 }
             )
 
-    # EventBridge format
+    # EventBridge S3 Object Created format (other vendor stacks)
     elif "detail" in event:
         detail = event["detail"]
         records.append(

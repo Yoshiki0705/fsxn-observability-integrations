@@ -52,11 +52,10 @@ aws cloudformation deploy \
   --template-file template.yaml \
   --stack-name fsxn-datadog-integration \
   --parameter-overrides \
-    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
+    FsxS3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
     DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:datadog/fsxn-api-key-XXXXXX \
     DatadogSite=datadoghq.com \
-    S3BucketName=your-fsxn-audit-bucket \
-  --capabilities CAPABILITY_IAM \
+  --capabilities CAPABILITY_NAMED_IAM \
   --region ap-northeast-1
 ```
 
@@ -64,10 +63,9 @@ aws cloudformation deploy \
 
 | パラメータ | 説明 |
 |-----------|------|
-| `S3AccessPointArn` | 監査ログ用 S3 Access Point の ARN |
+| `FsxS3AccessPointArn` | FSx for ONTAP S3 Access Point の ARN（audit volume にアタッチ） |
 | `DatadogApiKeySecretArn` | Secrets Manager に保存した API Key の ARN |
 | `DatadogSite` | Datadog サイト（下記参照） |
-| `S3BucketName` | 監査ログバケット名 |
 
 ### Datadog サイト一覧
 
@@ -101,7 +99,7 @@ aws cloudformation deploy \
 
 #### Grok Parser
 ```
-# FSx ONTAP 監査ログパース用ルール
+# Parse rule for FSx ONTAP audit logs
 fsxn_audit %{data:attributes}
 ```
 
@@ -140,7 +138,7 @@ Datadog で FSx ONTAP 監査ログ用のダッシュボードを作成:
 FSx ONTAP でファイル操作を実行:
 
 ```bash
-# FSx ONTAP マウントポイントでファイル操作
+# File operations on FSx ONTAP mount point
 echo "test" > /mnt/fsxn/test-audit.txt
 cat /mnt/fsxn/test-audit.txt
 rm /mnt/fsxn/test-audit.txt
@@ -191,10 +189,9 @@ aws cloudformation deploy \
   --template-file template.yaml \
   --stack-name fsxn-datadog-integration \
   --parameter-overrides \
-    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
+    FsxS3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
     DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:datadog/fsxn-api-key-XXXXXX \
     DatadogSite=ap1.datadoghq.com \
-    S3BucketName=your-fsxn-audit-bucket \
     VpcEnabled=true \
     VpcSubnetIds=subnet-xxx,subnet-yyy \
     VpcSecurityGroupIds=sg-xxx \
@@ -223,11 +220,11 @@ aws lambda put-function-concurrency \
 CloudFormation テンプレートはプレースホルダーコードでデプロイされます。実際の handler.py をデプロイするには:
 
 ```bash
-# Lambda コードをパッケージング
+# Package Lambda code
 cd integrations/datadog/lambda
 zip function.zip handler.py
 
-# Lambda 関数コードを更新
+# Update Lambda function code
 aws lambda update-function-code \
   --function-name fsxn-datadog-integration-shipper \
   --zip-file fileb://function.zip \

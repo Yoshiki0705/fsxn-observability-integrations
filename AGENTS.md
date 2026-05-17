@@ -151,7 +151,7 @@ The following S3 features are NOT supported on FSx ONTAP S3 Access Points:
 
 | Feature | Status | Workaround |
 |---------|--------|-----------|
-| S3 Event Notifications / EventBridge | ❌ Not supported | Use polling (EventBridge Scheduler) or audit log bucket events |
+| S3 Event Notifications / EventBridge | ❌ Not supported | Use EventBridge Scheduler (polling + checkpointing) |
 | GetBucketNotificationConfiguration | ❌ Not supported | N/A — this is why we use a separate S3 bucket for audit logs |
 | Object Lifecycle policies | ❌ Not supported | Implement custom cleanup Lambda |
 | Object Versioning | ❌ Not supported | Use DynamoDB for version tracking |
