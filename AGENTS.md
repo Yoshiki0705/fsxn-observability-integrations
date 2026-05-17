@@ -165,7 +165,7 @@ Reference: [AWS Docs — S3 AP API Support](https://docs.aws.amazon.com/fsx/late
 
 ### Audit log formats
 
-FSx ONTAP outputs audit logs in EVTX (Windows Event Log binary) or JSON format depending on SVM configuration. The `shared/lambda-layers/log-parser/` handles both. EVTX files start with magic bytes `ElfFile\x00`. JSON logs are newline-delimited.
+FSx ONTAP outputs audit logs in EVTX (Windows Event Log binary, the default) or XML format depending on SVM audit configuration (`vserver audit create -format {evtx|xml}`). The `shared/lambda-layers/log-parser/` handles both. EVTX files start with magic bytes `ElfFile\x00`. XML logs contain `<Event>` elements with system and event data.
 
 Reference: [AWS Docs — File access auditing](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html)
 
@@ -242,7 +242,7 @@ For high-volume logs (>1000 events/second sustained), prefer the Firehose path o
 
 - `integrations/datadog/lambda/handler.py` — Reference implementation (fully working)
 - `integrations/datadog/template.yaml` — Reference CloudFormation template
-- `shared/lambda-layers/log-parser/python/fsxn_log_parser/parser.py` — EVTX/JSON parser
+- `shared/lambda-layers/log-parser/python/fsxn_log_parser/parser.py` — EVTX/XML parser
 - `shared/lambda-layers/s3ap-reader/python/s3ap_reader/reader.py` — S3 AP utility
 - `shared/templates/iam-base-roles.yaml` — IAM role pattern
 - `.kiro/steering/vendor-integration.md` — New vendor checklist
@@ -264,6 +264,37 @@ bash shared/scripts/ontap-audit-setup.sh --endpoint <ip> --svm <name> --dry-run
 
 # 3. Deploy vendor stack using outputs from step 1
 ```
+
+### EMS/FPolicy Stacks (CAPABILITY_NAMED_IAM Required)
+
+The EMS Webhook and FPolicy templates create named IAM roles, so they require `CAPABILITY_NAMED_IAM`:
+
+```bash
+# EMS Webhook stack
+aws cloudformation deploy \
+  --template-file shared/templates/ems-webhook-apigw.yaml \
+  --stack-name fsxn-ems-webhook \
+  --parameter-overrides LambdaFunctionArn=<ARN> \
+  --capabilities CAPABILITY_NAMED_IAM
+
+# FPolicy stack (ECS Fargate + SQS + EventBridge)
+aws cloudformation deploy \
+  --template-file shared/templates/fpolicy-apigw.yaml \
+  --stack-name fsxn-fp-srv \
+  --parameter-overrides \
+    ComputeType=fargate \
+    VpcId=<vpc-id> \
+    SubnetIds=<subnet-1>,<subnet-2> \
+    FsxnSvmSecurityGroupId=<sg-id> \
+    ContainerImage=<ecr-uri>:v2-timeout-fix \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+**Architecture:**
+- EMS: ONTAP EMS → Webhook (HTTPS) → API Gateway → Lambda → Vendor
+- FPolicy: ONTAP → TCP:9898 → ECS Fargate → SQS → EventBridge → Lambda → Vendor
+- FPolicy uses a proprietary binary protocol over TCP (NOT HTTP/HTTPS)
+- ONTAP connects directly to Fargate task IP (NLB is health-check only)
 
 Two patterns exist:
 - **Pattern A (existing FSx ONTAP)**: Deploy prerequisites.yaml → enable audit → deploy vendor stack

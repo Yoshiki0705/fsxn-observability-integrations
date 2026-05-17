@@ -1,10 +1,12 @@
 """FSx ONTAP audit log parser.
 
-Supports EVTX (Windows Event Log) and JSON log formats.
+Supports EVTX (Windows Event Log) and XML log formats.
+ONTAP audit logs are created via `vserver audit create -format {evtx|xml}`.
 """
 
 import json
 import struct
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import Any
 
@@ -46,7 +48,7 @@ def parse_evtx(data: bytes) -> list[dict[str, Any]]:
 
 
 def parse_json_log(data: str) -> list[dict[str, Any]]:
-    """Parse JSON format audit log data.
+    """Parse JSON format audit log data (fallback for non-standard formats).
 
     Args:
         data: JSON string (single object or newline-delimited).
@@ -65,6 +67,59 @@ def parse_json_log(data: str) -> list[dict[str, Any]]:
         except json.JSONDecodeError:
             continue
     return events
+
+
+def parse_xml_log(data: str) -> list[dict[str, Any]]:
+    """Parse XML format audit log data.
+
+    ONTAP generates XML audit logs when configured with `-format xml`.
+    The XML contains Event elements with system and event data.
+
+    Args:
+        data: XML string content.
+
+    Returns:
+        List of normalized event dictionaries.
+    """
+    events = []
+
+    try:
+        # Handle multiple root elements by wrapping
+        if not data.strip().startswith("<?xml"):
+            data = f"<AuditEvents>{data}</AuditEvents>"
+        else:
+            lines = data.strip().split("\n")
+            if lines[0].startswith("<?xml"):
+                data = f"<AuditEvents>{''.join(lines[1:])}</AuditEvents>"
+
+        root = ET.fromstring(data)
+
+        for event_elem in root.iter("Event"):
+            raw = _xml_element_to_flat_dict(event_elem)
+            events.append(normalize_event(raw))
+
+        if not events:
+            for child in root:
+                raw = _xml_element_to_flat_dict(child)
+                if raw:
+                    events.append(normalize_event(raw))
+
+    except ET.ParseError:
+        pass
+
+    return events
+
+
+def _xml_element_to_flat_dict(elem) -> dict[str, Any]:
+    """Convert an XML element tree to a flat dictionary."""
+    result: dict[str, Any] = {}
+    for child in elem.iter():
+        tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+        if child.text and child.text.strip():
+            result[tag] = child.text.strip()
+        for attr_name, attr_value in child.attrib.items():
+            result[f"{tag}_{attr_name}"] = attr_value
+    return result
 
 
 def normalize_event(event: dict[str, Any]) -> dict[str, Any]:

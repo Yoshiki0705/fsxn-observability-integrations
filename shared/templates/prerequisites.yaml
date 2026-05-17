@@ -241,7 +241,7 @@ Outputs:
       Name: !Sub '${AWS::StackName}-AlertTopicArn'
 
   NextSteps:
-    Description: After deploying this stack, configure FSx ONTAP audit logging to target this bucket
+    Description: After deploying this stack, configure FSx ONTAP audit logging
     Value: !Sub >
-      1. Configure FSx ONTAP audit logging: vserver audit create -destination s3://${AuditLogBucketName}/audit/
+      1. Configure FSx ONTAP audit logging to write to this bucket (see docs/en/prerequisites.md for details)
       2. Deploy a vendor integration stack with S3AccessPointArn=arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/${AccessPointName}

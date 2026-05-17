@@ -22,8 +22,8 @@ import urllib3
 # No hardcoded values — each deployment can target any Datadog site.
 
 DATADOG_SITE = os.environ.get("DATADOG_SITE", "datadoghq.com")
-API_KEY_SECRET_ARN = os.environ["API_KEY_SECRET_ARN"]
-S3_ACCESS_POINT_ARN = os.environ["S3_ACCESS_POINT_ARN"]
+API_KEY_SECRET_ARN = os.environ.get("API_KEY_SECRET_ARN", "")
+S3_ACCESS_POINT_ARN = os.environ.get("S3_ACCESS_POINT_ARN", "")
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 DD_SOURCE = os.environ.get("DD_SOURCE", "fsxn")
 DD_SERVICE = os.environ.get("DD_SERVICE", "ontap-audit")
@@ -74,7 +74,7 @@ http = urllib3.PoolManager(
 )
 
 # Cache for API key (Lambda execution context reuse)
-_api_key_cache: str | None = None
+_api_key_cache = None  # type: str | None
 
 
 def get_api_key() -> str:
@@ -200,8 +200,9 @@ def _parse_audit_logs(data: bytes, key: str) -> list[dict[str, Any]]:
     """Parse FSx ONTAP audit logs based on file extension.
 
     Supports:
-    - .evtx: Windows Event Log binary format
-    - .json: Newline-delimited JSON or JSON array
+    - .evtx: Windows Event Log binary format (ONTAP default)
+    - .xml: XML format (ONTAP alternative via -format xml)
+    - .json: Newline-delimited JSON or JSON array (fallback)
     - .json.gz: Gzip-compressed JSON
 
     Args:
@@ -213,17 +214,25 @@ def _parse_audit_logs(data: bytes, key: str) -> list[dict[str, Any]]:
     """
     if key.endswith(".evtx"):
         return _parse_evtx(data)
+    elif key.endswith(".xml"):
+        return _parse_xml_logs(data.decode("utf-8", errors="replace"))
     elif key.endswith(".json") or key.endswith(".json.gz"):
         if key.endswith(".gz"):
             data = gzip.decompress(data)
         return _parse_json_logs(data.decode("utf-8"))
     else:
-        # Try JSON first, fall back to treating as text
+        # Detect format by content
+        if data.startswith(b"ElfFile\x00"):
+            return _parse_evtx(data)
+        text = data.decode("utf-8", errors="replace").strip()
+        if text.startswith("<?xml") or text.startswith("<"):
+            return _parse_xml_logs(text)
+        # Fall back to JSON
         try:
-            return _parse_json_logs(data.decode("utf-8"))
+            return _parse_json_logs(text)
         except Exception:
             logger.warning("Unknown format for %s, treating as raw text", key)
-            return [{"message": data.decode("utf-8", errors="replace"), "raw": True}]
+            return [{"message": text, "raw": True}]
 
 
 def _parse_evtx(data: bytes) -> list[dict[str, Any]]:
@@ -307,6 +316,108 @@ def _parse_json_logs(data: str) -> list[dict[str, Any]]:
             continue
 
     return events
+
+
+def _parse_xml_logs(data: str) -> list[dict[str, Any]]:
+    """Parse XML format audit logs (ONTAP -format xml output).
+
+    ONTAP XML audit logs contain Event elements with fields like
+    EventID, TimeCreated, Computer, UserName, ObjectName, etc.
+
+    Args:
+        data: XML string content.
+
+    Returns:
+        List of parsed log event dictionaries.
+    """
+    import xml.etree.ElementTree as ET
+
+    events = []
+
+    try:
+        # Handle multiple root elements by wrapping in a container
+        if not data.strip().startswith("<?xml"):
+            data = f"<AuditEvents>{data}</AuditEvents>"
+        else:
+            # Remove XML declaration and wrap
+            lines = data.strip().split("\n")
+            if lines[0].startswith("<?xml"):
+                data = f"<AuditEvents>{''.join(lines[1:])}</AuditEvents>"
+
+        root = ET.fromstring(data)
+
+        # Find all Event elements (handle various ONTAP XML structures)
+        for event_elem in root.iter("Event"):
+            event = _xml_element_to_dict(event_elem)
+            events.append(event)
+
+        # If no Event elements found, try parsing as flat records
+        if not events:
+            for child in root:
+                event = _xml_element_to_dict(child)
+                if event:
+                    events.append(event)
+
+    except ET.ParseError as e:
+        logger.warning("XML parse error: %s, attempting line-by-line", e)
+        # Try parsing individual XML fragments
+        for line in data.split("\n"):
+            line = line.strip()
+            if line.startswith("<Event") and line.endswith("</Event>"):
+                try:
+                    elem = ET.fromstring(line)
+                    events.append(_xml_element_to_dict(elem))
+                except ET.ParseError:
+                    continue
+
+    return events
+
+
+def _xml_element_to_dict(elem) -> dict[str, Any]:
+    """Convert an XML element to a flat dictionary.
+
+    Extracts common ONTAP audit fields from XML event structure.
+    Handles both namespaced and non-namespaced elements, and
+    ONTAP's <Data Name="key">value</Data> pattern.
+
+    Args:
+        elem: XML Element object.
+
+    Returns:
+        Dictionary with extracted fields.
+    """
+    result: dict[str, Any] = {}
+
+    # Extract text from all child elements recursively
+    for child in elem.iter():
+        tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+
+        # Handle <Data Name="key">value</Data> pattern (ONTAP EventData)
+        if tag == "Data" and "Name" in child.attrib:
+            key = child.attrib["Name"]
+            if child.text and child.text.strip():
+                result[key] = child.text.strip()
+        elif child.text and child.text.strip():
+            result[tag] = child.text.strip()
+
+        # Capture attributes (e.g., TimeCreated SystemTime="...")
+        for attr_name, attr_value in child.attrib.items():
+            if attr_name != "Name":  # Skip the "Name" attr from Data elements
+                result[f"{tag}_{attr_name}"] = attr_value
+
+    # Map common ONTAP XML fields to normalized schema
+    return {
+        "timestamp": result.get("TimeCreated_SystemTime", result.get("TimeCreated", "")),
+        "event_type": result.get("EventID", result.get("EventType", "audit")),
+        "source": "fsxn-ontap",
+        "svm": result.get("Computer", result.get("SVMName", "")),
+        "user": result.get("SubjectUserName", result.get("UserName", "")),
+        "client_ip": result.get("IpAddress", result.get("ClientIP", "")),
+        "operation": result.get("ObjectType", result.get("Operation", "")),
+        "path": result.get("ObjectName", result.get("HandleID", "")),
+        "result": result.get("Keywords", result.get("Result", "")),
+        "raw": result,
+    }
 
 
 def _format_for_datadog(
