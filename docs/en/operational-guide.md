@@ -46,9 +46,10 @@ aws sqs receive-message \
 # 3. After fixing the root cause, re-invoke Lambda manually
 aws lambda invoke \
   --function-name <lambda-function-name> \
+  --cli-binary-format raw-in-base64-out \
   --payload '{}' \
   --region ap-northeast-1 \
-  /tmp/replay-output.json
+  replay-output.json
 
 # 4. Delete processed DLQ messages
 aws sqs delete-message \
@@ -175,3 +176,26 @@ aws lambda update-function-code \
 - [ ] CloudWatch Logs retention is configured
 - [ ] No secrets in Lambda environment variables (ARN references only)
 - [ ] VPC Security Groups allow minimal outbound only
+
+
+## Source Health Checks
+
+Beyond pipeline health (Lambda, DLQ, checkpoint), monitor the audit source itself:
+
+| Check | How | Failure Indicator |
+|-------|-----|-------------------|
+| ONTAP audit enabled | `vserver audit show -vserver <svm> -fields state` | state != enabled |
+| Rotated files exist | `list-objects-v2` via S3 AP | No new files in expected interval |
+| Audit volume capacity | `volume show -vserver <svm> -volume <audit-vol> -fields used` | >80% used |
+| S3 AP available | `aws fsx describe-data-repository-associations` | MISCONFIGURED state |
+| Last processed file age | Check checkpoint timestamp | Stale (>2x scheduler interval) |
+
+### Stale Pipeline Detection
+
+If no new audit files appear for longer than expected (e.g., 2x the rotation interval), investigate:
+
+1. Is `vserver audit` still enabled?
+2. Are SACLs / NFSv4 ACL audit flags still configured on target directories?
+3. Is the audit volume full?
+4. Is the FSx S3 Access Point in MISCONFIGURED state?
+5. Has the file system identity become unresolvable?

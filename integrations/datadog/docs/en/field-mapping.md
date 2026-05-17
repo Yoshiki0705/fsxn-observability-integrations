@@ -110,3 +110,19 @@
   }
 }
 ```
+
+
+## Datadog PoC Checklist
+
+Use this checklist to validate a proof-of-concept deployment:
+
+- [ ] CloudFormation stack deployed successfully
+- [ ] EventBridge Scheduler invoking Lambda (check CloudWatch Logs)
+- [ ] Logs visible in Datadog Log Explorer with `source:fsxn`
+- [ ] Required attributes populated (`@attributes.svm`, `@attributes.user`, `@attributes.operation`, `@attributes.path`, `@attributes.result`)
+- [ ] Failed access query returns expected results
+- [ ] Delete operation query returns expected results
+- [ ] DLQ is empty (no failed events)
+- [ ] CloudWatch alarms are in OK state
+- [ ] Cost estimate reviewed against actual usage
+- [ ] Next-step Monitors identified for Part 3 (ARP, bulk delete, failed access spike)

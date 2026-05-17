@@ -155,6 +155,8 @@ aws cloudformation deploy \
 - [Demo Scenarios (English)](docs/en/demo-scenarios.md)
 - [運用ガイド (日本語)](docs/ja/operational-guide.md)
 - [Operational Guide (English)](docs/en/operational-guide.md)
+- [ONTAP 監査設定ガイド (日本語)](docs/ja/ontap-audit-setup.md)
+- [ONTAP Audit Setup Guide (English)](docs/en/ontap-audit-setup.md)
 - [検知ユースケース (日本語)](docs/ja/detection-use-cases.md)
 - [Detection Use Cases (English)](docs/en/detection-use-cases.md)
 - [正規化イベントスキーマ (日本語)](docs/ja/normalized-event-schema.md)

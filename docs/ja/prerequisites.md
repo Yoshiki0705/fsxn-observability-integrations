@@ -400,3 +400,38 @@ aws cloudformation deploy \
 - [Lambda で FSx ファイルをサーバーレス処理](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/tutorial-process-files-with-lambda.html)
 - [EventBridge で S3 イベントを使用](https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventBridge.html)
 - [NetApp Workload Factory - Journal Table](https://docs.netapp.com/us-en/workload-fsx-ontap/setup-journal-table.html)
+
+
+## FSx for ONTAP S3 Access Point 権限チェックリスト
+
+ベンダー統合をデプロイする前に、FSx for ONTAP S3 Access Point の以下を確認してください:
+
+- [ ] アクセスポイントが正しい audit volume にアタッチされている
+- [ ] ファイルシステム ID が audit ディレクトリへの読み取り権限を持っている
+- [ ] Lambda 実行ロールがアクセスポイント ARN 経由で `s3:GetObject` と `s3:ListBucket` を持っている
+- [ ] アクセスポイントポリシーが Lambda 実行ロールプリンシパルを許可している
+- [ ] ネットワークパスが検証済み（Lambda が VPC 外、または VPC + NAT Gateway）
+- [ ] アクセスポイントが MISCONFIGURED 状態でない（ボリュームオンライン、ID 解決可能）
+
+アクセス確認:
+
+```bash
+aws s3api list-objects-v2 \
+  --bucket <fsx-s3-access-point-arn-or-alias> \
+  --max-keys 5 \
+  --region ap-northeast-1
+```
+
+監査ログファイルが返されれば、アクセスポイントは Lambda 用に正しく設定されています。
+
+## デプロイトポロジー
+
+このプロジェクトは複数のデプロイパターンをサポートします:
+
+| パターン | 説明 | 使用場面 |
+|---------|------|---------|
+| 同一アカウントローカル | FSx + Lambda + ベンダー統合を1アカウントに | 単一ワークロード、最もシンプル |
+| 集約型ロギング | ワークロードアカウントが中央 Observability アカウントにテレメトリを公開 | 共有セキュリティ/ロギングアカウントを持つエンタープライズ |
+| パートナー/MSP 管理 | 顧客ワークロードアカウント + パートナー運用の統合 | マネージドサービス提供 |
+
+マルチアカウントデプロイでは、クロスアカウント S3 Access Point アクセスと IAM 信頼関係が必要です。詳細は[運用ガイド](operational-guide.md)を参照してください。

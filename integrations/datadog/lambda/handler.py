@@ -11,6 +11,7 @@ import gzip
 import json
 import logging
 import os
+import random
 import time
 from typing import Any
 
@@ -630,10 +631,10 @@ def _send_batch(batch: list[dict[str, Any]], api_key: str) -> bool:
                 continue
 
             if response.status >= 500:
-                # Server error - retry with backoff
-                wait_time = 2 ** (attempt + 1)
+                # Server error - retry with backoff + jitter
+                wait_time = 2 ** (attempt + 1) + random.uniform(0, 1)
                 logger.warning(
-                    "Datadog server error %d, retrying in %ds",
+                    "Datadog server error %d, retrying in %.1fs",
                     response.status,
                     wait_time,
                 )
@@ -649,7 +650,7 @@ def _send_batch(batch: list[dict[str, Any]], api_key: str) -> bool:
             return False
 
         except urllib3.exceptions.HTTPError as e:
-            wait_time = 2 ** (attempt + 1)
+            wait_time = 2 ** (attempt + 1) + random.uniform(0, 1)
             logger.warning(
                 "HTTP error shipping to Datadog (attempt %d/%d): %s",
                 attempt + 1,

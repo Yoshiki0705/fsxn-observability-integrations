@@ -399,3 +399,38 @@ aws cloudformation deploy \
 - [Process Files Serverlessly with Lambda](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/tutorial-process-files-with-lambda.html)
 - [Using EventBridge with S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventBridge.html)
 - [NetApp Workload Factory - Journal Table](https://docs.netapp.com/us-en/workload-fsx-ontap/setup-journal-table.html)
+
+
+## FSx for ONTAP S3 Access Point Permission Checklist
+
+Before deploying the vendor integration, verify the following for your FSx for ONTAP S3 Access Point:
+
+- [ ] Access point is attached to the correct audit volume
+- [ ] File system identity has read permission on the audit directory
+- [ ] Lambda execution role has `s3:GetObject` and `s3:ListBucket` through the access point ARN
+- [ ] Access point policy permits the Lambda execution role principal
+- [ ] Network path is validated (Lambda outside VPC, or VPC with NAT Gateway)
+- [ ] Access point is not in MISCONFIGURED state (volume online, identity resolvable)
+
+Verify access with:
+
+```bash
+aws s3api list-objects-v2 \
+  --bucket <fsx-s3-access-point-arn-or-alias> \
+  --max-keys 5 \
+  --region ap-northeast-1
+```
+
+If this returns audit log files, the access point is correctly configured for Lambda.
+
+## Deployment Topologies
+
+This project supports multiple deployment patterns:
+
+| Pattern | Description | When to Use |
+|---------|-------------|-------------|
+| Same-account local | FSx + Lambda + vendor integration in one account | Single workload, simplest setup |
+| Centralized logging | Workload accounts expose telemetry to a central observability account | Enterprise with shared security/logging account |
+| Partner/MSP managed | Customer workload account + partner-operated integration | Managed service offerings |
+
+For multi-account deployments, cross-account S3 Access Point access and IAM trust relationships are required. See the [operational guide](operational-guide.md) for details.

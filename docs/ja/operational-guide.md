@@ -46,9 +46,10 @@ aws sqs receive-message \
 # 3. 根本原因を修正後、Lambda を手動で再実行
 aws lambda invoke \
   --function-name <lambda-function-name> \
+  --cli-binary-format raw-in-base64-out \
   --payload '{}' \
   --region ap-northeast-1 \
-  /tmp/replay-output.json
+  replay-output.json
 
 # 4. 処理済み DLQ メッセージを削除
 aws sqs delete-message \
@@ -175,3 +176,26 @@ aws lambda update-function-code \
 - [ ] CloudWatch Logs の保持期間が設定されている
 - [ ] Lambda 環境変数にシークレットがない（ARN 参照のみ）
 - [ ] VPC セキュリティグループが最小限のアウトバウンドのみ許可
+
+
+## ソースヘルスチェック
+
+パイプラインヘルス（Lambda、DLQ、checkpoint）に加えて、監査ソース自体も監視してください:
+
+| チェック項目 | 方法 | 異常指標 |
+|-------|-----|-------------------|
+| ONTAP audit 有効 | `vserver audit show -vserver <svm> -fields state` | state != enabled |
+| ローテーションファイル存在 | S3 AP 経由 `list-objects-v2` | 想定間隔内に新規ファイルなし |
+| Audit volume 容量 | `volume show -vserver <svm> -volume <audit-vol> -fields used` | 80%超使用 |
+| S3 AP 利用可能 | `aws fsx describe-data-repository-associations` | MISCONFIGURED 状態 |
+| 最終処理ファイル経過時間 | checkpoint タイムスタンプ確認 | 古い（Scheduler 間隔の2倍超） |
+
+### パイプライン停滞検知
+
+想定より長く新しい監査ファイルが出現しない場合（例: rotation 間隔の2倍超）、以下を調査:
+
+1. `vserver audit` はまだ有効か？
+2. 対象ディレクトリの SACL / NFSv4 ACL audit flags はまだ設定されているか？
+3. Audit volume は満杯か？
+4. FSx S3 Access Point は MISCONFIGURED 状態か？
+5. ファイルシステム ID が解決不能になっていないか？

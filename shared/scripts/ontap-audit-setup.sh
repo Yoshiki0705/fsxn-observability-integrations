@@ -105,7 +105,7 @@ COMMANDS=(
   "vserver audit show -vserver ${SVM_NAME}"
   ""
   "# Step 2: Create audit configuration"
-  "vserver audit create -vserver ${SVM_NAME} -destination /vol/audit_logs -format ${FORMAT} -rotate-size ${ROTATE_SIZE}"
+  "vserver audit create -vserver ${SVM_NAME} -destination /vol/audit_logs -events file-ops -format ${FORMAT} -rotate-size ${ROTATE_SIZE}"
   ""
   "# Step 3: Enable audit logging"
   "vserver audit enable -vserver ${SVM_NAME}"

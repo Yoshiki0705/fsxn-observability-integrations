@@ -110,3 +110,19 @@
   }
 }
 ```
+
+
+## Datadog PoC チェックリスト
+
+PoC デプロイの検証に使用してください:
+
+- [ ] CloudFormation スタックが正常にデプロイされた
+- [ ] EventBridge Scheduler が Lambda を起動している（CloudWatch Logs 確認）
+- [ ] Datadog Log Explorer で `source:fsxn` のログが表示される
+- [ ] 必要な属性が入力されている（`@attributes.svm`, `@attributes.user`, `@attributes.operation`, `@attributes.path`, `@attributes.result`）
+- [ ] Failed access クエリが期待通りの結果を返す
+- [ ] Delete operation クエリが期待通りの結果を返す
+- [ ] DLQ が空（失敗イベントなし）
+- [ ] CloudWatch アラームが OK 状態
+- [ ] コスト見積もりを実際の使用量と照合
+- [ ] Part 3 の次ステップ Monitor を特定（ARP、bulk delete、failed access spike）
