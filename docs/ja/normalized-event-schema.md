@@ -93,3 +93,17 @@
 2. **ベンダー固有 Lambda は迅速な導入とネイティブ API 動作に最適化**。一方、OpenTelemetry 統合は OTLP を標準化する組織向けのベンダーニュートラルなパスを提供。
 
 3. **監査パイプライン自体を可観測なシステムとして扱う** — ベンダーがサポートする場合、監査イベントと共に処理レイテンシ、バッチサイズ、リトライ回数、ベンダーレスポンスメタデータを出力。
+
+
+## EMS / ARP イベントマッピング
+
+| 内部フィールド | Datadog | OpenTelemetry | Splunk | Elastic ECS |
+|---------------|---------|---------------|--------|-------------|
+| `event_name` | `@attributes.event_name` | `event.name` | `event_name` | `event.action` |
+| `severity` | `@attributes.severity` | `severity_text` | `severity` | `event.severity` |
+| `svm` | `@attributes.svm` | `netapp.ontap.svm` | `svm` | `netapp.ontap.svm` |
+| `source_node` | `host` | `host.name` | `host` | `host.name` |
+| `parameters.volume_name` | `@attributes.parameters.volume_name` | `netapp.ontap.volume` | `volume_name` | `netapp.ontap.volume` |
+| `parameters.state` | `@attributes.parameters.state` | `netapp.ontap.arp.state` | `arp_state` | `netapp.ontap.arp.state` |
+| `timestamp` | `date` | `time_unix_nano` | `_time` | `@timestamp` |
+| `message` | `message` | `body` | `_raw` | `message` |

@@ -93,3 +93,17 @@ All vendor integrations normalize ONTAP audit events into a common internal sche
 2. **Vendor-specific Lambdas are optimized for quick adoption and native API behavior**, while the OpenTelemetry integration provides a vendor-neutral path for organizations standardizing on OTLP.
 
 3. **Treat the audit pipeline itself as an observable system** — Emit processing latency, batch size, retry count, and vendor response metadata alongside audit events where the vendor supports it.
+
+
+## EMS / ARP Event Mapping
+
+| Internal Field | Datadog | OpenTelemetry | Splunk | Elastic ECS |
+|---------------|---------|---------------|--------|-------------|
+| `event_name` | `@attributes.event_name` | `event.name` | `event_name` | `event.action` |
+| `severity` | `@attributes.severity` | `severity_text` | `severity` | `event.severity` |
+| `svm` | `@attributes.svm` | `netapp.ontap.svm` | `svm` | `netapp.ontap.svm` |
+| `source_node` | `host` | `host.name` | `host` | `host.name` |
+| `parameters.volume_name` | `@attributes.parameters.volume_name` | `netapp.ontap.volume` | `volume_name` | `netapp.ontap.volume` |
+| `parameters.state` | `@attributes.parameters.state` | `netapp.ontap.arp.state` | `arp_state` | `netapp.ontap.arp.state` |
+| `timestamp` | `date` | `time_unix_nano` | `_time` | `@timestamp` |
+| `message` | `message` | `body` | `_raw` | `message` |
