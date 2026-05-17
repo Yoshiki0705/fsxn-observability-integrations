@@ -13,11 +13,12 @@ Serverless observability integrations for Amazon FSx for NetApp ONTAP via S3 Acc
 ## Architecture Pattern / アーキテクチャパターン
 
 ```
-FSx ONTAP → 監査ログ有効化 → S3 Access Point へ出力
-S3 AP → EventBridge / S3 Event Notification → Lambda
-Lambda → ベンダー固有 API エンドポイントへ配信
+FSx ONTAP → 監査ログ有効化 → audit volume に出力
+audit volume → FSx for ONTAP S3 Access Point で S3 API アクセス
+EventBridge Scheduler → Lambda → ベンダー固有 API エンドポイントへ配信
 
-代替: S3 AP → Kinesis Data Firehose → ベンダー直接配信
+EMS: ONTAP → Webhook → API Gateway → Lambda → ベンダー API
+FPolicy: ONTAP → TCP:9898 → ECS Fargate → SQS → Lambda → ベンダー API
 ```
 
 ## Supported Integrations / 対応ベンダー
@@ -50,13 +51,12 @@ cd fsxn-observability-integrations
 # 2. 依存関係インストール
 npm install
 
-# 3. 前提リソースのデプロイ（S3バケット + Access Point + EventBridge通知）
+# 3. 前提リソースのデプロイ（EventBridge Scheduler + チェックポイント）
 aws cloudformation deploy \
   --template-file shared/templates/prerequisites.yaml \
   --stack-name fsxn-observability-prerequisites \
   --parameter-overrides \
-    AuditLogBucketName=my-fsxn-audit-logs \
-    AccessPointName=fsxn-audit-ap \
+    FsxS3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
   --capabilities CAPABILITY_IAM
 
 # 4. FSx ONTAP 監査ログ有効化（ドライラン）
@@ -68,11 +68,10 @@ aws cloudformation deploy \
   --template-file integrations/datadog/template.yaml \
   --stack-name fsxn-datadog-integration \
   --parameter-overrides \
-    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
+    FsxS3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
     DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:datadog-api-key \
     DatadogSite=datadoghq.com \
-    S3BucketName=my-fsxn-audit-logs \
-  --capabilities CAPABILITY_IAM
+  --capabilities CAPABILITY_NAMED_IAM
 ```
 
 > 📝 詳細な手順は [前提条件ガイド (日本語)](docs/ja/prerequisites.md) / [Prerequisites Guide (English)](docs/en/prerequisites.md) を参照してください。

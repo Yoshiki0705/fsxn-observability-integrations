@@ -2,9 +2,11 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: FSxN Datadog Integration - Serverless audit log shipping via S3 Access Point
 
 Parameters:
-  S3AccessPointArn:
+  FsxS3AccessPointArn:
     Type: String
-    Description: ARN of the S3 Access Point for FSx ONTAP audit logs
+    Description: >-
+      ARN of the FSx for ONTAP S3 Access Point attached to the audit volume.
+      Format: arn:aws:s3:<region>:<account-id>:accesspoint/<name>
     AllowedPattern: 'arn:aws:s3:[a-z0-9-]+:\d{12}:accesspoint/.+'
 
   DatadogApiKeySecretArn:
@@ -29,14 +31,20 @@ Parameters:
       EU1=datadoghq.eu, AP1(Tokyo)=ap1.datadoghq.com, AP2=ap2.datadoghq.com,
       US1-FED=ddog-gov.com
 
-  S3BucketName:
+  AuditLogPrefix:
     Type: String
-    Description: Name of the S3 bucket containing FSx ONTAP audit logs (for event notification)
+    Default: 'audit/'
+    Description: >-
+      Key prefix for audit log files within the FSx volume
+      (e.g., audit/ for /audit_log directory)
 
-  S3KeyPrefix:
+  ScheduleRate:
     Type: String
-    Default: ''
-    Description: S3 key prefix filter for audit log objects (optional)
+    Default: 'rate(5 minutes)'
+    Description: >-
+      How often to invoke the audit log processor.
+      FSx ONTAP S3 APs do not support event notifications,
+      so Lambda is invoked on a schedule.
 
   LogLevel:
     Type: String
@@ -59,7 +67,7 @@ Parameters:
     AllowedValues:
       - 'true'
       - 'false'
-    Description: Enable gzip compression for log payloads (recommended for high-volume, but may have issues on some sites)
+    Description: Enable gzip compression for log payloads
 
   LambdaMemorySize:
     Type: Number
@@ -81,17 +89,20 @@ Parameters:
     AllowedValues:
       - 'true'
       - 'false'
-    Description: Enable VPC configuration for Lambda (required when S3 Access Point is VPC-restricted)
+    Description: >-
+      Enable VPC configuration for Lambda.
+      Note: FSx ONTAP S3 APs are NOT accessible via S3 Gateway VPC Endpoints.
+      If VpcEnabled=true, ensure NAT Gateway is available for S3 AP access.
 
   VpcSubnetIds:
     Type: CommaDelimitedList
     Default: ''
-    Description: Comma-separated list of subnet IDs for Lambda VPC configuration (required if VpcEnabled=true)
+    Description: Comma-separated list of subnet IDs (required if VpcEnabled=true)
 
   VpcSecurityGroupIds:
     Type: CommaDelimitedList
     Default: ''
-    Description: Comma-separated list of security group IDs for Lambda VPC configuration (required if VpcEnabled=true)
+    Description: Comma-separated list of security group IDs (required if VpcEnabled=true)
 
 Conditions:
   IsVpcEnabled: !Equals [!Ref VpcEnabled, 'true']
@@ -130,8 +141,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - s3:GetObject
+                  - s3:ListBucket
                 Resource:
-                  - !Sub '${S3AccessPointArn}/object/*'
+                  - !Sub '${FsxS3AccessPointArn}'
+                  - !Sub '${FsxS3AccessPointArn}/object/*'
 
         - PolicyName: SecretsManagerRead
           PolicyDocument:
@@ -200,7 +213,8 @@ Resources:
         Variables:
           DATADOG_SITE: !Ref DatadogSite
           API_KEY_SECRET_ARN: !Ref DatadogApiKeySecretArn
-          S3_ACCESS_POINT_ARN: !Ref S3AccessPointArn
+          FSX_S3_ACCESS_POINT_ARN: !Ref FsxS3AccessPointArn
+          AUDIT_LOG_PREFIX: !Ref AuditLogPrefix
           LOG_LEVEL: !Ref LogLevel
           DD_SOURCE: fsxn
           DD_SERVICE: ontap-audit
@@ -217,15 +231,42 @@ Resources:
         - Key: Vendor
           Value: datadog
 
-  # Lambda Permission for S3
-  LambdaS3Permission:
-    Type: AWS::Lambda::Permission
+  # EventBridge Scheduler - Periodic audit log processing
+  # FSx ONTAP S3 APs do not support event notifications,
+  # so Lambda is invoked on a schedule to check for new files.
+  AuditSchedulerRole:
+    Type: AWS::IAM::Role
     Properties:
-      FunctionName: !Ref LogShipperFunction
-      Action: lambda:InvokeFunction
-      Principal: s3.amazonaws.com
-      SourceArn: !Sub 'arn:aws:s3:::${S3BucketName}'
-      SourceAccount: !Ref AWS::AccountId
+      RoleName: !Sub '${AWS::StackName}-scheduler-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt LogShipperFunction.Arn
+
+  AuditProcessorSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub '${AWS::StackName}-audit-processor'
+      Description: Periodically invoke Lambda to process new FSx ONTAP audit log files
+      ScheduleExpression: !Ref ScheduleRate
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      State: ENABLED
+      Target:
+        Arn: !GetAtt LogShipperFunction.Arn
+        RoleArn: !GetAtt AuditSchedulerRole.Arn
+        Input: !Sub '{"source": "scheduler", "action": "process_audit_logs", "prefix": "${AuditLogPrefix}"}'
 
   # CloudWatch Log Group
   LogGroup:
@@ -233,38 +274,6 @@ Resources:
     Properties:
       LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-shipper'
       RetentionInDays: 30
-
-  # EventBridge Rule (alternative trigger)
-  EventBridgeRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: !Sub '${AWS::StackName}-s3-event'
-      Description: Trigger Lambda on new FSx ONTAP audit log objects
-      State: ENABLED
-      EventPattern:
-        source:
-          - aws.s3
-        detail-type:
-          - Object Created
-        detail:
-          bucket:
-            name:
-              - !Ref S3BucketName
-          object:
-            key:
-              - prefix: !Ref S3KeyPrefix
-      Targets:
-        - Id: LogShipperTarget
-          Arn: !GetAtt LogShipperFunction.Arn
-
-  # Lambda Permission for EventBridge
-  LambdaEventBridgePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref LogShipperFunction
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt EventBridgeRule.Arn
 
   # CloudWatch Alarm - Errors
   ErrorAlarm:
@@ -341,6 +350,6 @@ Outputs:
     Description: ARN of the error CloudWatch alarm
     Value: !GetAtt ErrorAlarm.Arn
 
-  EventBridgeRuleArn:
-    Description: ARN of the EventBridge rule
-    Value: !GetAtt EventBridgeRule.Arn
+  EventBridgeScheduleArn:
+    Description: ARN of the EventBridge Scheduler schedule
+    Value: !GetAtt AuditProcessorSchedule.Arn
