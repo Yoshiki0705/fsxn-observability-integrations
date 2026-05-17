@@ -22,6 +22,9 @@ venv/
 # Kiro (IDE-specific, not for public repo)
 .kiro/
 
+# Blog drafts (not for public repo)
+docs/blog/
+
 # OS
 .DS_Store
 Thumbs.db
