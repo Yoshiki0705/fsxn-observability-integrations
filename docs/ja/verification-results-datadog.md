@@ -208,3 +208,104 @@ python3 scripts/compare-bilingual.py \
 | 8 | セットアップガイド日英対応確認 | ⚠️ 条件付き合格 |
 
 **総合判定**: ✅ 合格（E2E 動作確認完了）
+
+---
+
+## EMS/FPolicy 検証結果
+
+### 検証環境（追加）
+
+- **EMS/FPolicy スタック名**: fsxn-datadog-ems-fpolicy
+- **EMS Lambda 関数名**: fsxn-datadog-ems-fpolicy-ems
+- **FPolicy Lambda 関数名**: fsxn-datadog-ems-fpolicy-fpolicy
+- **EMS Webhook スタック**: fsxn-ems-webhook（既存）
+- **FPolicy サーバースタック**: fsxn-fp-srv（既存）
+
+---
+
+### ステップ E1: EMS/FPolicy Lambda デプロイ
+
+- **結果**: ✅ 成功
+
+```bash
+aws cloudformation deploy \
+  --template-file integrations/datadog/template-ems-fpolicy.yaml \
+  --stack-name fsxn-datadog-ems-fpolicy \
+  --parameter-overrides \
+    DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:178625946981:secret:fsxn-datadog-api-key-7Ti8iQ \
+    DatadogSite=ap1.datadoghq.com \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region ap-northeast-1
+```
+
+- **スタックステータス**: CREATE_COMPLETE
+- **作成されたリソース**: EMS Lambda, FPolicy Lambda, IAM Roles, EventBridge Rule, Log Groups
+
+![EMS Lambda CloudWatch Logs](../screenshots/aws-ems-lambda-logs.png)
+
+---
+
+### ステップ E2: ARP ランサムウェア検知テスト（EMS → Datadog）
+
+- **結果**: ✅ 成功
+
+```bash
+aws lambda invoke \
+  --function-name fsxn-datadog-ems-fpolicy-ems \
+  --payload '{"body":"{\"messageName\":\"arw.volume.state\",\"severity\":\"alert\",...}","requestContext":{}}' \
+  --cli-binary-format raw-in-base64-out \
+  --region ap-northeast-1 response.json
+```
+
+- **Lambda レスポンス**: `{"statusCode": 200, "body": {"total_events": 1, "shipped": 1}}`
+- **Datadog 検索**: `source:fsxn-ems` → 1件到着確認
+- **ログ内容**: `Anti-ransomware: Volume vol_data state changed to attack-detected`
+- **到着時間**: 約30秒
+
+![ARP ランサムウェア検知 — Datadog ログ一覧](../screenshots/datadog-arp-detection.png)
+
+![ARP ランサムウェア検知 — ログ詳細](../screenshots/datadog-arp-log-detail.png)
+
+---
+
+### ステップ E3: クォータ閾値超過テスト（EMS → Datadog）
+
+- **結果**: ✅ 成功
+
+- **Lambda レスポンス**: `{"statusCode": 200, "body": {"total_events": 1, "shipped": 1}}`
+- **イベント名**: `wafl.quota.softlimit.exceeded`
+- **パラメータ**: volume_name=vol_data, quota_target=user1, used_bytes=62914560, limit_bytes=52428800
+
+---
+
+### ステップ E4: FPolicy ファイル操作テスト（FPolicy → Datadog）
+
+- **結果**: ✅ 成功
+
+```bash
+aws lambda invoke \
+  --function-name fsxn-datadog-ems-fpolicy-fpolicy \
+  --payload '{"source":"fpolicy.fsxn","detail-type":"FPolicy File Operation","detail":{"operation":"create","file_path":"/vol/data/test-fpolicy.txt","user":"admin@corp.local","client_ip":"10.0.1.50","vserver":"FPolicySMB","timestamp":"2026-05-16T23:56:00Z","protocol":"cifs"}}' \
+  --cli-binary-format raw-in-base64-out \
+  --region ap-northeast-1 response.json
+```
+
+- **Lambda レスポンス**: `{"statusCode": 200, "body": {"total_events": 1, "shipped": 1}}`
+- **Datadog 検索**: `source:fsxn-fpolicy` → 1件到着確認
+- **ログ内容**: `FPolicy: create /vol/data/test-fpolicy.txt by admin@corp.local from 10.0.1.50`
+- **到着時間**: 約30秒
+
+![FPolicy ファイル操作 — Datadog ログ一覧](../screenshots/datadog-fpolicy-suspect-activity.png)
+
+---
+
+### EMS/FPolicy 検証サマリ
+
+| ステップ | 名称 | 結果 |
+|---------|------|------|
+| E1 | EMS/FPolicy Lambda デプロイ | ✅ 成功 |
+| E2 | ARP ランサムウェア検知テスト | ✅ 成功 |
+| E3 | クォータ閾値超過テスト | ✅ 成功 |
+| E4 | FPolicy ファイル操作テスト | ✅ 成功 |
+
+**EMS/FPolicy 総合判定**: ✅ 合格
