@@ -199,3 +199,19 @@ If no new audit files appear for longer than expected (e.g., 2x the rotation int
 3. Is the audit volume full?
 4. Is the FSx S3 Access Point in MISCONFIGURED state?
 5. Has the file system identity become unresolvable?
+
+
+## EMS Pipeline Health Checks
+
+For the event-driven EMS webhook path (Part 3), monitor:
+
+| Check | How | Failure Indicator |
+|-------|-----|-------------------|
+| API Gateway 4xx/5xx | CloudWatch API Gateway metrics | Spike in error responses |
+| Lambda errors | CloudWatch Lambda Errors metric | > 0 |
+| EMS events shipped | Lambda logs (shipped count) | 0 when events expected |
+| Datadog API failures | Lambda logs (batch failures) | RuntimeError raised |
+| DLQ depth | SQS ApproximateNumberOfMessagesVisible | > 0 |
+| Last webhook received | API Gateway access logs | No requests in expected window |
+
+> Note: Absence of EMS events is often normal (no ARP alerts = good). Use a synthetic heartbeat event or periodic test invocation if you need positive confirmation that the pipeline is alive.

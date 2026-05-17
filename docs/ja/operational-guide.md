@@ -199,3 +199,35 @@ aws lambda update-function-code \
 3. Audit volume は満杯か？
 4. FSx S3 Access Point は MISCONFIGURED 状態か？
 5. ファイルシステム ID が解決不能になっていないか？
+
+
+## EMS パイプラインヘルスチェック
+
+イベント駆動型 EMS Webhook パス（Part 3）については、以下を監視してください:
+
+| チェック項目 | 方法 | 異常指標 |
+|-------|-----|-------------------|
+| API Gateway 4xx/5xx | CloudWatch API Gateway メトリクス | エラーレスポンスの急増 |
+| Lambda エラー | CloudWatch Lambda Errors メトリクス | > 0 |
+| EMS イベント配信数 | Lambda ログ（shipped count） | イベントが期待される時に 0 |
+| Datadog API 失敗 | Lambda ログ（batch failures） | RuntimeError 発生 |
+| DLQ 深度 | SQS ApproximateNumberOfMessagesVisible | > 0 |
+| 最終 Webhook 受信 | API Gateway アクセスログ | 想定期間内にリクエストなし |
+
+> 注: EMS イベントが存在しないことは多くの場合正常です（ARP アラートなし = 良好）。パイプラインが稼働していることを積極的に確認する必要がある場合は、合成ハートビートイベントまたは定期的なテスト呼び出しを使用してください。
+
+
+## EMS パイプラインヘルスチェック
+
+イベント駆動型 EMS webhook パス（Part 3）の監視:
+
+| チェック項目 | 方法 | 異常指標 |
+|-------|-----|-------------------|
+| API Gateway 4xx/5xx | CloudWatch API Gateway メトリクス | エラーレスポンスのスパイク |
+| Lambda エラー | CloudWatch Lambda Errors メトリクス | > 0 |
+| EMS イベント配信数 | Lambda ログ (shipped count) | イベント期待時に 0 |
+| Datadog API 失敗 | Lambda ログ (batch failures) | RuntimeError 発生 |
+| DLQ 深度 | SQS ApproximateNumberOfMessagesVisible | > 0 |
+| 最終 webhook 受信 | API Gateway アクセスログ | 想定期間内にリクエストなし |
+
+> 注: EMS イベントがないことは通常正常です（ARP アラートなし = 良好）。パイプラインの生存確認が必要な場合は、合成ハートビートイベントまたは定期テスト呼び出しを使用してください。
