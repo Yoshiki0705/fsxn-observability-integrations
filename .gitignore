@@ -26,6 +26,9 @@ venv/
 # Blog drafts (not for public repo)
 docs/blog/
 
+# Private credentials and environment files
+.private/
+
 # OS
 .DS_Store
 Thumbs.db
