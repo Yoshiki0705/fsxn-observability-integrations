@@ -10,7 +10,8 @@ set -euo pipefail
 # Prerequisites:
 #   - SSH access to FSx ONTAP management endpoint
 #   - ONTAP admin credentials
-#   - S3 bucket already created (use prerequisites.yaml)
+#   - Audit volume available on the SVM
+#   - FSx for ONTAP S3 Access Point attached to the audit volume
 #
 # Usage:
 #   ./ontap-audit-setup.sh \
@@ -165,9 +166,9 @@ if [[ $RESULT -eq 0 ]]; then
   echo ""
   echo "Next steps:"
   echo "  1. Verify logs are being generated: vserver audit show -vserver ${SVM_NAME}"
-  echo "  2. Configure S3 delivery for the audit volume"
+  echo "  2. Attach an FSx for ONTAP S3 Access Point to the audit volume"
   echo "  3. Deploy the prerequisites stack: shared/templates/prerequisites.yaml"
-  echo "  4. Deploy a vendor integration stack"
+  echo "  4. Deploy a vendor integration stack (e.g., integrations/datadog/template.yaml)"
 else
   echo ""
   echo -e "${RED}❌ Failed to configure audit logging (exit code: $RESULT)${NC}"
