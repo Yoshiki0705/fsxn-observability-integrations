@@ -412,3 +412,11 @@ Outputs:
   EventBridgeScheduleArn:
     Description: ARN of the EventBridge Scheduler schedule
     Value: !GetAtt AuditProcessorSchedule.Arn
+
+  LogGroupName:
+    Description: CloudWatch Log Group name for Lambda execution logs
+    Value: !Sub '/aws/lambda/${AWS::StackName}-shipper'
+
+  DashboardName:
+    Description: CloudWatch Dashboard name for operational health
+    Value: !Sub '${AWS::StackName}-health'
