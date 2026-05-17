@@ -58,7 +58,7 @@ This project helps partners modernize EC2-based FSx for ONTAP audit log collecto
 
 Common customer scenarios:
 - Replacing Splunk Universal Forwarder on EC2
-- Modernizing audit visibility for enterprise file shares (SAP, VDI, departmental)
+- Modernizing audit visibility for enterprise file shares (departmental file servers, application interface directories such as SAP/Oracle/SQL Server adjacent shares, VDI/EUC home directories, engineering and design repositories)
 - Integrating FSx for ONTAP with existing SIEM / observability platforms
 - Preparing for ransomware detection workflows using ONTAP telemetry
 
