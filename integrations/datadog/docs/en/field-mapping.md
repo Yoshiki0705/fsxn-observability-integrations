@@ -88,7 +88,7 @@
   "name": "FSx ONTAP: Ransomware Detected (ARP)",
   "type": "log alert",
   "query": "source:fsxn-ems @attributes.event_name:arw.volume.state @attributes.parameters.state:attack-detected",
-  "message": "🚨 ONTAP Anti-Ransomware Protection detected encryption activity.\n\nVolume: {{attributes.parameters.volume_name}}\nSVM: {{attributes.svm}}\nNode: {{host}}\n\nImmediate actions:\n1. Create snapshot of affected volume\n2. Disable client access\n3. Investigate with FPolicy logs",
+  "message": "🚨 ONTAP Autonomous Ransomware Protection detected encryption activity.\n\nVolume: {{attributes.parameters.volume_name}}\nSVM: {{attributes.svm}}\nNode: {{host}}\n\nImmediate actions:\n1. Create snapshot of affected volume\n2. Disable client access\n3. Investigate with FPolicy logs",
   "options": {
     "thresholds": {"critical": 0},
     "notify_no_data": false

@@ -173,7 +173,7 @@ class TestSendBatch:
         call_kwargs = mock_http.request.call_args
         headers = call_kwargs[1]["headers"] if "headers" in call_kwargs[1] else call_kwargs[0][3]
         assert headers["DD-API-KEY"] == "test-api-key"
-        assert headers["Content-Encoding"] == "gzip"
+        assert headers["Content-Type"] == "application/json"
 
     @patch("handler.http")
     def test_retry_on_server_error(self, mock_http):
