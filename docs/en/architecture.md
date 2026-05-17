@@ -15,6 +15,16 @@
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
+## ONTAP Telemetry Source Selection Guide
+
+| Requirement | Best Source | Latency |
+|-------------|------------|---------|
+| Compliance file access history | Audit logs | Near-real-time (Scheduler interval) |
+| Ransomware detection | ARP via EMS | Real-time (webhook) |
+| Real-time file operation detail | FPolicy | Real-time (TCP) |
+| Operational alerting (quota, HA, volume full) | EMS | Real-time (webhook) |
+| Vendor-neutral pipeline | OpenTelemetry | Configuration-dependent |
+
 ## Component Details
 
 ### 1. FSx for NetApp ONTAP Audit Logs
