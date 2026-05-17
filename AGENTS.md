@@ -195,9 +195,9 @@ Sources: [Datadog Logs API](https://docs.datadoghq.com/api/latest/logs/) | [New 
 
 ## AWS Service Patterns
 
-### EventBridge for S3 object notifications
+### EventBridge Scheduler for audit log processing
 
-Use EventBridge rules (not legacy S3 event notifications) for filtering flexibility. EventBridge supports content-based filtering on object key prefix, suffix, and size. Enable EventBridge notifications on the S3 bucket first.
+FSx for ONTAP S3 Access Points do not support S3 Event Notifications or EventBridge object-level events. Use EventBridge Scheduler to invoke the audit log processor Lambda on a periodic schedule (e.g., every 5 minutes). Lambda uses checkpointing (DynamoDB or S3 marker objects) to track which audit log files have been processed and only reads newly rotated files.
 
 ### Lambda Powertools (recommended for new integrations)
 
