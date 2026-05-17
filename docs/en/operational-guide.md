@@ -28,6 +28,8 @@ Monitor these metrics for pipeline health:
 
 When events fail processing and land in the DLQ:
 
+This stack uses an SQS queue as the Lambda asynchronous invocation DLQ. Because the DLQ is attached to Lambda (not an SQS source queue), `sqs start-message-move-task` cannot redrive messages automatically.
+
 ```bash
 # 1. Check DLQ message count
 aws sqs get-queue-attributes \
@@ -37,13 +39,21 @@ aws sqs get-queue-attributes \
 # 2. Inspect a sample message
 aws sqs receive-message \
   --queue-url <dlq-url> \
-  --max-number-of-messages 1
+  --max-number-of-messages 1 \
+  --attribute-names All \
+  --message-attribute-names All
 
-# 3. After fixing the root cause, replay messages
-# (re-drive from DLQ back to the Lambda)
-aws sqs start-message-move-task \
-  --source-arn <dlq-arn> \
-  --destination-arn <main-queue-arn>
+# 3. After fixing the root cause, re-invoke Lambda manually
+aws lambda invoke \
+  --function-name <lambda-function-name> \
+  --payload '{}' \
+  --region ap-northeast-1 \
+  /tmp/replay-output.json
+
+# 4. Delete processed DLQ messages
+aws sqs delete-message \
+  --queue-url <dlq-url> \
+  --receipt-handle <receipt-handle-from-step-2>
 ```
 
 ## Checkpoint Management

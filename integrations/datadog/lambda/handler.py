@@ -503,17 +503,24 @@ def _format_for_datadog(
 def _ship_to_datadog(logs: list[dict[str, Any]], api_key: str) -> int:
     """Ship logs to Datadog Logs Intake API v2 in batches.
 
+    If any batch fails after retries, raises RuntimeError so the Lambda
+    invocation is treated as failed and the checkpoint is not advanced.
+
     Args:
         logs: Datadog-formatted log entries.
         api_key: Datadog API key.
 
     Returns:
         Number of successfully shipped logs.
+
+    Raises:
+        RuntimeError: If one or more batches fail after all retries.
     """
     if not logs:
         return 0
 
     shipped = 0
+    failed_batches = 0
     batches = _create_batches(logs)
 
     for batch in batches:
@@ -521,7 +528,14 @@ def _ship_to_datadog(logs: list[dict[str, Any]], api_key: str) -> int:
         if success:
             shipped += len(batch)
         else:
+            failed_batches += 1
             logger.error("Failed to ship batch of %d logs", len(batch))
+
+    if failed_batches:
+        raise RuntimeError(
+            f"{failed_batches} Datadog batch(es) failed after retries. "
+            f"Shipped {shipped}/{len(logs)} logs."
+        )
 
     return shipped
 
