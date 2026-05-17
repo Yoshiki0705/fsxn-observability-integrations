@@ -6,9 +6,9 @@
 
 ## Overview / 概要
 
-Amazon FSx for NetApp ONTAP の監査ログ・メトリクスを、**S3 Access Points** 経由で各 Observability ベンダーへ**サーバーレス**に配信するパターン集です。
+Amazon FSx for NetApp ONTAP の監査ログ・メトリクスを、**FSx for ONTAP S3 Access Points** 経由で各 Observability ベンダーへ **EC2 不要**で配信するパターン集です。
 
-Serverless observability integrations for Amazon FSx for NetApp ONTAP via S3 Access Points.
+EC2-free observability integrations for Amazon FSx for NetApp ONTAP via FSx for ONTAP S3 Access Points.
 
 ## Architecture Pattern / アーキテクチャパターン
 
@@ -25,21 +25,25 @@ FPolicy: ONTAP → TCP:9898 → ECS Fargate → SQS → Lambda → ベンダー 
 
 | Vendor | Status | Description |
 |--------|--------|-------------|
-| [Datadog](integrations/datadog/) | ✅ Ready | Logs API v2 via Lambda |
-| [New Relic](integrations/new-relic/) | ✅ Ready | Log API v1 via Lambda |
-| [Splunk (Serverless)](integrations/splunk-serverless/) | ✅ Ready | HEC via Lambda (replaces EC2 pattern) |
-| [OTel Collector](integrations/otel-collector/) | ✅ Ready | Vendor-neutral OTLP/HTTP |
-| [Grafana Cloud](integrations/grafana/) | ✅ Ready | Loki Push API via Lambda |
-| [Elastic](integrations/elastic/) | ✅ Ready | Elasticsearch Bulk API |
-| [Dynatrace](integrations/dynatrace/) | ✅ Ready | Log Ingest API v2 |
-| [Sumo Logic](integrations/sumo-logic/) | ✅ Ready | HTTP Source |
-| [Honeycomb](integrations/honeycomb/) | ✅ Ready | Events Batch API |
+| [Datadog](integrations/datadog/) | ✅ E2E verified | Logs API v2 via Lambda |
+| [New Relic](integrations/new-relic/) | 🧪 Implementation ready | Log API v1 via Lambda |
+| [Splunk (Serverless)](integrations/splunk-serverless/) | 🧪 Implementation ready | HEC via Lambda (replaces EC2 pattern) |
+| [OTel Collector](integrations/otel-collector/) | 🧪 Implementation ready | Vendor-neutral OTLP/HTTP |
+| [Grafana Cloud](integrations/grafana/) | 🧪 Implementation ready | Loki Push API via Lambda |
+| [Elastic](integrations/elastic/) | 🧪 Implementation ready | Elasticsearch Bulk API |
+| [Dynatrace](integrations/dynatrace/) | 🧪 Implementation ready | Log Ingest API v2 |
+| [Sumo Logic](integrations/sumo-logic/) | 🧪 Implementation ready | HTTP Source |
+| [Honeycomb](integrations/honeycomb/) | 🧪 Implementation ready | Events Batch API |
+
+Status:
+- ✅ **E2E verified** — Deployed and validated with real FSx for ONTAP audit logs
+- 🧪 **Implementation ready** — Code and CloudFormation available; E2E validation pending
 
 ## Background / 背景
 
 既存の Splunk 統合ブログ ([AWS Blog](https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on-amazon-fsx-for-netapp-ontap-using-splunk/)) は EC2 ベース（syslog-ng + Universal Forwarder）のアプローチです。
 
-本プロジェクトでは、**完全サーバーレス**の代替パターンを提供します。
+本プロジェクトでは、**EC2 不要**の代替パターンを提供します（Lambda + ECS Fargate を使用）。
 
 ## Quick Start / クイックスタート
 

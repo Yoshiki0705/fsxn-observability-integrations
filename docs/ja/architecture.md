@@ -21,7 +21,7 @@
 
 FSx for ONTAP の監査ログ機能を有効化し、SVM 内の audit volume に出力します。
 
-- **ログ形式**: EVTX (Windows Event Log、デフォルト) または XML
+- **ログ形式**: EVTX (Windows Event Log) または XML
 - **出力先**: SVM 内の audit volume（`vserver audit create -destination /audit_log`）
 - **ログ内容**: ファイルアクセス（SMB/NFS）、認証イベント
 - **アクセス方式**: FSx for ONTAP S3 Access Point 経由で S3 API としてアクセス

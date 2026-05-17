@@ -200,8 +200,8 @@ def _parse_audit_logs(data: bytes, key: str) -> list[dict[str, Any]]:
     """Parse FSx ONTAP audit logs based on file extension.
 
     Supports:
-    - .evtx: Windows Event Log binary format (ONTAP default)
-    - .xml: XML format (ONTAP alternative via -format xml)
+    - .evtx: Windows Event Log binary format
+    - .xml: XML format (ONTAP -format xml)
     - .json: Newline-delimited JSON or JSON array (fallback)
     - .json.gz: Gzip-compressed JSON
 

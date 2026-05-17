@@ -21,7 +21,7 @@
 
 Enable audit logging on FSx for ONTAP to output logs to an audit volume inside the SVM.
 
-- **Log Format**: EVTX (Windows Event Log, default) or XML
+- **Log Format**: EVTX (Windows Event Log) or XML
 - **Destination**: Audit volume inside the SVM (`vserver audit create -destination /audit_log`)
 - **Log Content**: File access (SMB/NFS), authentication events
 - **Access Method**: Read via FSx for ONTAP S3 Access Point using S3 APIs
