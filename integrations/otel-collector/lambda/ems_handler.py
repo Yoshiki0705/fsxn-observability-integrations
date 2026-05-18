@@ -10,14 +10,16 @@ events, and all other EMS event types.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
 import random
 import time
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
+import boto3
 import urllib3
 
 # Conditionally import ems_parser (available as Lambda Layer)
@@ -63,6 +65,8 @@ except ImportError:
 OTLP_ENDPOINT = os.environ.get("OTLP_ENDPOINT", "http://localhost:4318")
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 SERVICE_NAME = os.environ.get("SERVICE_NAME", "fsxn-ems")
+API_KEY_SECRET_ARN = os.environ.get("API_KEY_SECRET_ARN", "")
+AUTH_MODE = os.environ.get("AUTH_MODE", "none")  # "none", "bearer", or "basic"
 
 # ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -92,6 +96,31 @@ http = urllib3.PoolManager(
     maxsize=10,
     retries=urllib3.Retry(total=0),
 )
+
+# AWS client (initialized outside handler for connection reuse)
+secrets_client = boto3.client("secretsmanager")
+
+# Cache for API key (Lambda execution context reuse)
+_api_key_cache: Optional[str] = None
+
+
+def get_api_key() -> str:
+    """Retrieve optional auth token from Secrets Manager with caching.
+
+    Supports both plain string and JSON format secrets:
+    - Plain string: "your-token"
+    - JSON: {"api_key": "your-token"}
+    """
+    global _api_key_cache
+    if _api_key_cache is None:
+        response = secrets_client.get_secret_value(SecretId=API_KEY_SECRET_ARN)
+        secret = response["SecretString"]
+        try:
+            parsed = json.loads(secret)
+            _api_key_cache = parsed.get("api_key", parsed.get("token", secret))
+        except (json.JSONDecodeError, AttributeError):
+            _api_key_cache = secret
+    return _api_key_cache
 
 
 # ─── OTLP payload construction ────────────────────────────────────────────
@@ -220,17 +249,20 @@ def build_ems_otlp_payload(normalized: dict[str, Any]) -> dict[str, Any]:
 # ─── OTLP delivery ────────────────────────────────────────────────────────
 
 
-def _send_otlp_payload(payload: dict[str, Any]) -> bool:
+def _send_otlp_payload(payload: dict[str, Any], auth_headers: Optional[dict[str, str]] = None) -> bool:
     """Send OTLP payload to the configured endpoint with retry.
 
     Args:
         payload: OTLP JSON payload dict.
+        auth_headers: Optional additional headers for authentication.
 
     Returns:
         True if successfully sent, False otherwise.
     """
     url = f"{OTLP_ENDPOINT}/v1/logs"
     headers = {"Content-Type": "application/json"}
+    if auth_headers:
+        headers.update(auth_headers)
     json_body = json.dumps(payload).encode("utf-8")
 
     for attempt in range(MAX_RETRIES):
@@ -293,6 +325,20 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     body = event.get("body", "")
     logger.info("EMS event received, body length: %d", len(body) if body else 0)
 
+    # Get optional auth headers
+    auth_headers: Optional[dict[str, str]] = None
+    if API_KEY_SECRET_ARN and AUTH_MODE != "none":
+        try:
+            token = get_api_key()
+            if token:
+                if AUTH_MODE == "basic":
+                    encoded = base64.b64encode(token.encode("utf-8")).decode("utf-8")
+                    auth_headers = {"Authorization": f"Basic {encoded}"}
+                else:
+                    auth_headers = {"Authorization": f"Bearer {token}"}
+        except Exception as e:
+            logger.warning("Could not retrieve auth token: %s", str(e))
+
     try:
         # Parse EMS event using shared layer
         normalized = parse_ems_event(body)
@@ -307,7 +353,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         payload = build_ems_otlp_payload(normalized)
 
         # Forward to OTel Collector
-        success = _send_otlp_payload(payload)
+        success = _send_otlp_payload(payload, auth_headers)
 
         if success:
             return {
