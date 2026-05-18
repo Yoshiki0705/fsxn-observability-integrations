@@ -62,7 +62,7 @@ aws cloudformation deploy \
 | 項目 | 内容 |
 |------|------|
 | **期待結果** | スタックが CREATE_COMPLETE となり、Outputs に `ApiEndpointUrl`、`ApiGatewayId`、`DeadLetterQueueArn` が出力される |
-| **実際の結果** | スタック `fsxn-ems-webhook` が CREATE_COMPLETE。Outputs: ApiEndpointUrl=`https://2tpkso4jge.execute-api.ap-northeast-1.amazonaws.com/prod/ems`, ApiGatewayId=`2tpkso4jge`, DeadLetterQueueArn=`arn:aws:sqs:ap-northeast-1:123456789012:fsxn-ems-webhook-ems-dlq` |
+| **実際の結果** | スタック `fsxn-ems-webhook` が CREATE_COMPLETE。Outputs: ApiEndpointUrl=`https://<api-gateway-id>.execute-api.ap-northeast-1.amazonaws.com/prod/ems`, ApiGatewayId=`<api-gateway-id>`, DeadLetterQueueArn=`arn:aws:sqs:ap-northeast-1:123456789012:fsxn-ems-webhook-ems-dlq` |
 | **判定** | ✅ PASS |
 
 ---
@@ -80,7 +80,7 @@ aws cloudformation deploy \
 curl -X POST \
   -H "Content-Type: application/json" \
   -d '{"time":"2026-05-17T07:20:00+09:00","messageName":"arw.volume.state","severity":"alert","node":"fsxn-node-01","svmName":"FPolicySMB","message":"ARP event","parameters":{"volume_name":"vol1","state":"enabled"}}' \
-  https://2tpkso4jge.execute-api.ap-northeast-1.amazonaws.com/prod/ems
+  https://<api-gateway-id>.execute-api.ap-northeast-1.amazonaws.com/prod/ems
 ```
 
 | 項目 | 内容 |
@@ -101,7 +101,7 @@ curl -X POST \
 **実行コマンド:**
 
 ```bash
-curl -X GET https://2tpkso4jge.execute-api.ap-northeast-1.amazonaws.com/prod/ems
+curl -X GET https://<api-gateway-id>.execute-api.ap-northeast-1.amazonaws.com/prod/ems
 ```
 
 | 項目 | 内容 |
@@ -201,7 +201,7 @@ aws cloudformation deploy \
   --parameter-overrides \
     ComputeType=fargate \
     VpcId=vpc-0123456789abcdef0 \
-    SubnetIds=subnet-0307ebbd55b35c842,subnet-0af86ebd3c65481b8 \
+    SubnetIds=subnet-xxxxxxxxxxxxxxxx1,subnet-xxxxxxxxxxxxxxxx2 \
     FsxnSvmSecurityGroupId=sg-0123456789abcdef0 \
     ContainerImage=123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix \
     FPolicyPort=9898 \
@@ -251,7 +251,7 @@ aws ecs describe-tasks --cluster fsxn-fp-srv-cluster --tasks <タスクARN> \
 | 項目 | 内容 |
 |------|------|
 | **期待結果** | ECS タスクが RUNNING 状態で、runningCount = desiredCount (1) であること。Fargate タスクのプライベート IP が取得できること |
-| **実際の結果** | タスク RUNNING、runningCount=1、desiredCount=1。Fargate タスク IP: `10.0.143.211` |
+| **実際の結果** | タスク RUNNING、runningCount=1、desiredCount=1。Fargate タスク IP: `10.0.x.x` |
 | **判定** | ✅ PASS |
 
 ---
@@ -278,7 +278,7 @@ aws logs filter-log-events \
 | 項目 | 内容 |
 |------|------|
 | **期待結果** | 30 秒以内に `KeepAlive from <IP>` メッセージが ECS ログに記録されていること。これは ONTAP が FPolicy サーバーに正常に接続していることを示す |
-| **実際の結果** | ONTAP から約6秒間隔で KeepAlive メッセージ受信確認。送信元 IP: `10.0.135.90` |
+| **実際の結果** | ONTAP から約6秒間隔で KeepAlive メッセージ受信確認。送信元 IP: `10.0.x.x` |
 | **判定** | ✅ PASS |
 
 ---
@@ -351,7 +351,7 @@ cfn-lint shared/templates/fpolicy-apigw.yaml
 curl -X POST \
   -H "Content-Type: application/json" \
   -d '{"time":"2026-05-17T07:20:00+09:00","messageName":"arw.volume.state","severity":"alert","node":"fsxn-node-01","svmName":"FPolicySMB","message":"Anti-ransomware alert","parameters":{"volume_name":"vol1","state":"dry-run"}}' \
-  https://2tpkso4jge.execute-api.ap-northeast-1.amazonaws.com/prod/ems
+  https://<api-gateway-id>.execute-api.ap-northeast-1.amazonaws.com/prod/ems
 ```
 
 | 項目 | 内容 |
@@ -404,7 +404,7 @@ aws logs filter-log-events \
 curl -X POST \
   -H "Content-Type: application/json" \
   -d '{"time":"2026-05-17T07:21:00+09:00","messageName":"wafl.quota.softlimit.exceeded","severity":"warning","node":"fsxn-node-01","svmName":"FSxN_OnPre","message":"Quota soft limit exceeded","parameters":{"volume_name":"vol_data","quota_target":"/vol/vol_data","used_bytes":"68157440","limit_bytes":"52428800"}}' \
-  https://2tpkso4jge.execute-api.ap-northeast-1.amazonaws.com/prod/ems
+  https://<api-gateway-id>.execute-api.ap-northeast-1.amazonaws.com/prod/ems
 ```
 
 | 項目 | 内容 |

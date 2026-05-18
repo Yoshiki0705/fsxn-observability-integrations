@@ -1,0 +1,246 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "fsxn-audit"
+            }
+          },
+          {
+            "key": "cloud.provider",
+            "value": {
+              "stringValue": "aws"
+            }
+          },
+          {
+            "key": "cloud.platform",
+            "value": {
+              "stringValue": "aws_fsx"
+            }
+          }
+        ]
+      },
+      "scopeLogs": [
+        {
+          "scope": {
+            "name": "fsxn-otel-shipper",
+            "version": "1.0.0"
+          },
+          "logRecords": [
+            {
+              "timeUnixNano": "1779106522142514944",
+              "severityNumber": 9,
+              "severityText": "INFO",
+              "body": {
+                "stringValue": "{\"Timestamp\": \"2026-05-18T12:00:01Z\", \"EventID\": \"4663\", \"SVMName\": \"svm-prod-01\", \"UserName\": \"admin@corp.local\", \"ClientIP\": \"10.0.1.50\", \"Operation\": \"ReadData\", \"ObjectName\": \"/vol/data/reports/quarterly.xlsx\", \"Result\": \"Success\"}"
+              },
+              "attributes": [
+                {
+                  "key": "event.type",
+                  "value": {
+                    "stringValue": "4663"
+                  }
+                },
+                {
+                  "key": "user.name",
+                  "value": {
+                    "stringValue": "admin@corp.local"
+                  }
+                },
+                {
+                  "key": "client.address",
+                  "value": {
+                    "stringValue": "10.0.1.50"
+                  }
+                },
+                {
+                  "key": "fsxn.operation",
+                  "value": {
+                    "stringValue": "ReadData"
+                  }
+                },
+                {
+                  "key": "fsxn.path",
+                  "value": {
+                    "stringValue": "/vol/data/reports/quarterly.xlsx"
+                  }
+                },
+                {
+                  "key": "fsxn.result",
+                  "value": {
+                    "stringValue": "Success"
+                  }
+                },
+                {
+                  "key": "fsxn.svm",
+                  "value": {
+                    "stringValue": "svm-prod-01"
+                  }
+                }
+              ]
+            },
+            {
+              "timeUnixNano": "1779106523142514944",
+              "severityNumber": 9,
+              "severityText": "INFO",
+              "body": {
+                "stringValue": "{\"Timestamp\": \"2026-05-18T12:00:02Z\", \"EventID\": \"4663\", \"SVMName\": \"svm-prod-01\", \"UserName\": \"user1@corp.local\", \"ClientIP\": \"10.0.1.51\", \"Operation\": \"WriteData\", \"ObjectName\": \"/vol/data/shared/document.docx\", \"Result\": \"Success\"}"
+              },
+              "attributes": [
+                {
+                  "key": "event.type",
+                  "value": {
+                    "stringValue": "4663"
+                  }
+                },
+                {
+                  "key": "user.name",
+                  "value": {
+                    "stringValue": "user1@corp.local"
+                  }
+                },
+                {
+                  "key": "client.address",
+                  "value": {
+                    "stringValue": "10.0.1.51"
+                  }
+                },
+                {
+                  "key": "fsxn.operation",
+                  "value": {
+                    "stringValue": "WriteData"
+                  }
+                },
+                {
+                  "key": "fsxn.path",
+                  "value": {
+                    "stringValue": "/vol/data/shared/document.docx"
+                  }
+                },
+                {
+                  "key": "fsxn.result",
+                  "value": {
+                    "stringValue": "Success"
+                  }
+                },
+                {
+                  "key": "fsxn.svm",
+                  "value": {
+                    "stringValue": "svm-prod-01"
+                  }
+                }
+              ]
+            },
+            {
+              "timeUnixNano": "1779106524142514944",
+              "severityNumber": 13,
+              "severityText": "WARN",
+              "body": {
+                "stringValue": "{\"Timestamp\": \"2026-05-18T12:00:03Z\", \"EventID\": \"4656\", \"SVMName\": \"svm-prod-01\", \"UserName\": \"unknown@external.com\", \"ClientIP\": \"192.168.1.100\", \"Operation\": \"Open\", \"ObjectName\": \"/vol/data/confidential/secret.pdf\", \"Result\": \"Failure\"}"
+              },
+              "attributes": [
+                {
+                  "key": "event.type",
+                  "value": {
+                    "stringValue": "4656"
+                  }
+                },
+                {
+                  "key": "user.name",
+                  "value": {
+                    "stringValue": "unknown@external.com"
+                  }
+                },
+                {
+                  "key": "client.address",
+                  "value": {
+                    "stringValue": "192.168.1.100"
+                  }
+                },
+                {
+                  "key": "fsxn.operation",
+                  "value": {
+                    "stringValue": "Open"
+                  }
+                },
+                {
+                  "key": "fsxn.path",
+                  "value": {
+                    "stringValue": "/vol/data/confidential/secret.pdf"
+                  }
+                },
+                {
+                  "key": "fsxn.result",
+                  "value": {
+                    "stringValue": "Failure"
+                  }
+                },
+                {
+                  "key": "fsxn.svm",
+                  "value": {
+                    "stringValue": "svm-prod-01"
+                  }
+                }
+              ]
+            },
+            {
+              "timeUnixNano": "1779106525142514944",
+              "severityNumber": 13,
+              "severityText": "WARN",
+              "body": {
+                "stringValue": "{\"Timestamp\": \"2026-05-18T12:00:04Z\", \"EventID\": \"4670\", \"SVMName\": \"svm-prod-01\", \"UserName\": \"attacker@malicious.net\", \"ClientIP\": \"203.0.113.42\", \"Operation\": \"Delete\", \"ObjectName\": \"/vol/data/backup/critical.bak\", \"Result\": \"Access Denied\"}"
+              },
+              "attributes": [
+                {
+                  "key": "event.type",
+                  "value": {
+                    "stringValue": "4670"
+                  }
+                },
+                {
+                  "key": "user.name",
+                  "value": {
+                    "stringValue": "attacker@malicious.net"
+                  }
+                },
+                {
+                  "key": "client.address",
+                  "value": {
+                    "stringValue": "203.0.113.42"
+                  }
+                },
+                {
+                  "key": "fsxn.operation",
+                  "value": {
+                    "stringValue": "Delete"
+                  }
+                },
+                {
+                  "key": "fsxn.path",
+                  "value": {
+                    "stringValue": "/vol/data/backup/critical.bak"
+                  }
+                },
+                {
+                  "key": "fsxn.result",
+                  "value": {
+                    "stringValue": "Access Denied"
+                  }
+                },
+                {
+                  "key": "fsxn.svm",
+                  "value": {
+                    "stringValue": "svm-prod-01"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

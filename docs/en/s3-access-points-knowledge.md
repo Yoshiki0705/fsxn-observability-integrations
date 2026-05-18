@@ -64,7 +64,7 @@ aws fsx create-and-attach-s3-access-point \
       "ResourceARN": "arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-observability",
       "Alias": "fsxn-audit-obser-cbsi8mwwgahuh7sans3bbtxijig4sapn1b-ext-s3alias",
       "VpcConfiguration": {
-        "VpcId": "vpc-0ae01826f906191af"
+        "VpcId": "vpc-0123456789abcdef0"
       }
     }
   }
@@ -122,7 +122,7 @@ An Access Point enters MISCONFIGURED state when:
 | Access Point Name | `fsxn-audit-observability` |
 | Access Point ARN | `arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-observability` |
 | Access Point Alias | `fsxn-audit-obser-cbsi8mwwgahuh7sans3bbtxijig4sapn1b-ext-s3alias` |
-| VPC | `vpc-0ae01826f906191af` |
+| VPC | `vpc-0123456789abcdef0` |
 | File System User | `root` (UNIX) |
 
 ## References

@@ -2,6 +2,9 @@
 
 FSx for ONTAP audit log shipping via OTLP/HTTP to an OpenTelemetry Collector, enabling vendor-neutral multi-backend delivery (Grafana Cloud + Honeycomb).
 
+> **✅ Verified Working**: FPolicy → OTel Collector → Datadog path confirmed operational (2026-05-18).
+> Tested with `otel/opentelemetry-collector-contrib:0.152.0`. Lambda code unchanged across backends.
+
 ## Architecture
 
 ```
@@ -60,6 +63,44 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_IAM \
   --region ap-northeast-1
 ```
+
+## Alternative: Datadog Backend
+
+The default configuration targets Grafana Cloud + Honeycomb. To use **Datadog** as the backend instead:
+
+```bash
+# 1. Configure Datadog credentials
+cp .env.datadog.example .env.datadog
+# Edit .env.datadog with your DD_API_KEY and DD_SITE
+# DD_SITE examples: datadoghq.com (US1), ap1.datadoghq.com (AP1/Japan)
+
+# 2. Start OTel Collector with Datadog config
+# Option A: docker compose (if available)
+docker compose -f docker-compose-datadog.yaml --env-file .env.datadog up -d
+
+# Option B: docker run (fallback for Colima or environments without compose plugin)
+docker run -d --name otel-collector-datadog \
+  -p 4318:4318 -p 13133:13133 \
+  -v $(pwd)/otel-collector-config-datadog.yaml:/etc/otelcol-contrib/config.yaml \
+  --env-file .env.datadog \
+  otel/opentelemetry-collector-contrib:0.152.0
+
+# 3. Verify health
+curl -f http://localhost:13133/
+
+# 4. Send test OTLP payload
+curl -X POST http://localhost:4318/v1/logs \
+  -H "Content-Type: application/json" \
+  -d @tests/test_data/sample_otlp_payload.json
+```
+
+This proves the key architectural point: **Lambda code is UNCHANGED** — only the Collector config changes to route logs to Datadog.
+
+| File | Purpose |
+|------|---------|
+| `otel-collector-config-datadog.yaml` | Collector config with Datadog exporter |
+| `docker-compose-datadog.yaml` | Docker Compose using Datadog config |
+| `.env.datadog.example` | Template for Datadog credentials |
 
 ## Documentation
 

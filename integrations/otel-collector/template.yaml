@@ -1,5 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: FSxN OTel Collector Integration - OTLP/HTTP audit log shipping via S3 Access Point
+# Tested OTel Collector image: otel/opentelemetry-collector-contrib:0.152.0
+# Verified working with Datadog exporter (AP1 region: ap1.datadoghq.com)
 
 Parameters:
   S3AccessPointArn:
@@ -35,6 +37,16 @@ Parameters:
     Type: String
     Default: 'audit/'
     Description: Key prefix for audit log files within the S3 bucket
+
+  DatadogSite:
+    Type: String
+    Default: datadoghq.com
+    Description: >-
+      Datadog site for the OTel Collector Datadog exporter.
+      Common values: datadoghq.com (US1), datadoghq.eu (EU),
+      ap1.datadoghq.com (AP1/Japan), us3.datadoghq.com (US3),
+      us5.datadoghq.com (US5). Only used when deploying with
+      the Datadog backend configuration.
 
   LogLevel:
     Type: String

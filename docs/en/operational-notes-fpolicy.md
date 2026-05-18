@@ -22,8 +22,8 @@ ONTAP FPolicy → TCP:9898 → ECS Fargate → SQS (FPolicy_Q) → Bridge Lambda
 | Container Image | `123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix` |
 | Listen Port | TCP 9898 |
 | VPC | `vpc-0123456789abcdef0` |
-| Subnet | `subnet-0307ebbd55b35c842` (private) |
-| FPolicy Server SG | `sg-0a5472cd966cd7905` (TCP 9898 inbound) |
+| Subnet | `subnet-xxxxxxxxxxxxxxxx1` (private) |
+| FPolicy Server SG | `sg-xxxxxxxxxxxxxxxxx` (TCP 9898 inbound) |
 | FSxN SVM SG | `sg-0123456789abcdef0` |
 | SVM | `FPolicySMB` (svm-0123456789abcdef0) |
 | SVM UUID | `<svm-uuid>` |
@@ -95,7 +95,7 @@ aws logs filter-log-events \
 
 ### Expected Output
 ```
-KeepAlive from 10.0.135.90 (session: xxx)
+KeepAlive from 10.0.x.x (session: xxx)
 ```
 
 If KeepAlive messages are not visible:
@@ -278,7 +278,7 @@ FPolicy events not arriving
 ├─ Are KeepAlive messages present?
 │  └─ No → ONTAP cannot connect
 │     ├─ Is the Fargate task IP correct?
-│     ├─ Does SG (sg-0a5472cd966cd7905) allow TCP 9898?
+│     ├─ Does SG (sg-xxxxxxxxxxxxxxxxx) allow TCP 9898?
 │     └─ Check ONTAP external engine configuration
 │
 ├─ Are [SQS] Sent: messages present?

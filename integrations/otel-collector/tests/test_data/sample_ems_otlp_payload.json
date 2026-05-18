@@ -1,0 +1,142 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "fsxn-ems"
+            }
+          },
+          {
+            "key": "service.namespace",
+            "value": {
+              "stringValue": "fsxn-ontap"
+            }
+          }
+        ]
+      },
+      "scopeLogs": [
+        {
+          "scope": {
+            "name": "fsxn-ems-shipper",
+            "version": "1.0.0"
+          },
+          "logRecords": [
+            {
+              "timeUnixNano": "1779106293336720896",
+              "severityNumber": 17,
+              "severityText": "ERROR",
+              "body": {
+                "stringValue": "{\"timestamp\": \"2026-05-18T21:10:00Z\", \"event_name\": \"arw.volume.state.change\", \"severity\": \"alert\", \"source_node\": \"fsxn-node-01\", \"svm\": \"svm-prod-01\", \"message\": \"Anti-ransomware monitoring state of volume vol_data of Vserver svm-prod-01 has changed from active to warning\", \"parameters\": {\"volume_name\": \"vol_data\", \"state\": \"warning\", \"previous_state\": \"active\"}}"
+              },
+              "attributes": [
+                {
+                  "key": "event_name",
+                  "value": {
+                    "stringValue": "arw.volume.state.change"
+                  }
+                },
+                {
+                  "key": "severity",
+                  "value": {
+                    "stringValue": "alert"
+                  }
+                },
+                {
+                  "key": "source_node",
+                  "value": {
+                    "stringValue": "fsxn-node-01"
+                  }
+                },
+                {
+                  "key": "svm",
+                  "value": {
+                    "stringValue": "svm-prod-01"
+                  }
+                },
+                {
+                  "key": "volume_name",
+                  "value": {
+                    "stringValue": "vol_data"
+                  }
+                },
+                {
+                  "key": "state",
+                  "value": {
+                    "stringValue": "warning"
+                  }
+                },
+                {
+                  "key": "previous_state",
+                  "value": {
+                    "stringValue": "active"
+                  }
+                }
+              ]
+            },
+            {
+              "timeUnixNano": "1779106298336720896",
+              "severityNumber": 13,
+              "severityText": "WARN",
+              "body": {
+                "stringValue": "{\"timestamp\": \"2026-05-18T21:10:05Z\", \"event_name\": \"wafl.quota.exceeded\", \"severity\": \"warning\", \"source_node\": \"fsxn-node-01\", \"svm\": \"svm-prod-01\", \"message\": \"Quota exceeded for user admin on volume vol_data\", \"parameters\": {\"volume_name\": \"vol_data\", \"user\": \"admin\", \"quota_type\": \"user\", \"usage_percent\": \"95\"}}"
+              },
+              "attributes": [
+                {
+                  "key": "event_name",
+                  "value": {
+                    "stringValue": "wafl.quota.exceeded"
+                  }
+                },
+                {
+                  "key": "severity",
+                  "value": {
+                    "stringValue": "warning"
+                  }
+                },
+                {
+                  "key": "source_node",
+                  "value": {
+                    "stringValue": "fsxn-node-01"
+                  }
+                },
+                {
+                  "key": "svm",
+                  "value": {
+                    "stringValue": "svm-prod-01"
+                  }
+                },
+                {
+                  "key": "volume_name",
+                  "value": {
+                    "stringValue": "vol_data"
+                  }
+                },
+                {
+                  "key": "user",
+                  "value": {
+                    "stringValue": "admin"
+                  }
+                },
+                {
+                  "key": "quota_type",
+                  "value": {
+                    "stringValue": "user"
+                  }
+                },
+                {
+                  "key": "usage_percent",
+                  "value": {
+                    "stringValue": "95"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
