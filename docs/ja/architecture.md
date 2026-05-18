@@ -69,7 +69,7 @@ ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Vendor API
 |------|-----------|----------|
 | コンプライアンス向けファイルアクセス履歴 | 監査ログ | ニアリアルタイム（Scheduler 間隔依存） |
 | ランサムウェア検知 | ARP via EMS | リアルタイム（webhook） |
-| リアルタイムファイル操作詳細 | FPolicy | リアルタイム（TCP） |
+| イベント駆動ファイル操作詳細 | FPolicy | イベント駆動（TCP） |
 | 運用アラート（クォータ、HA、ボリューム満杯） | EMS | リアルタイム（webhook） |
 | ベンダーニュートラルパイプライン | OpenTelemetry | 構成依存 |
 

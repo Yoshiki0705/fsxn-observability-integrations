@@ -5,12 +5,12 @@
 | Detection Use Case | Best Source | Why | Latency |
 |-------------------|-------------|-----|---------|
 | Ransomware encryption behavior | EMS (ARP) | ONTAP native ML-based detection | Real-time (webhook) |
-| Bulk file deletion | Audit Logs or FPolicy | Audit for near-real-time, FPolicy for real-time | Minutes / Seconds |
+| Bulk file deletion | Audit Logs or FPolicy | Audit for near-real-time, FPolicy for event-driven | Minutes / Seconds |
 | Unusual read volume | Audit Logs | Policy-dependent, volume-heavy | Minutes |
 | Unauthorized access attempts | Audit Logs | Failed access events (Result: Failure) | Minutes |
 | Real-time file blocking / DLP | FPolicy | Protocol-level interception | Sub-second |
 | Quota threshold exceeded | EMS | ONTAP native quota monitoring | Real-time (webhook) |
-| Suspicious user behavior | FPolicy + Audit Logs | Correlate real-time ops with historical pattern | Seconds + Minutes |
+| Suspicious user behavior | FPolicy + Audit Logs | Correlate event-driven ops with historical pattern | Seconds + Minutes |
 | Permission changes | Audit Logs | SACL/ACL modification events | Minutes |
 
 ## Source Characteristics
@@ -19,7 +19,7 @@
 |--------|--------------|--------|----------|
 | File Access Audit Logs | Near-real-time (Scheduler frequency + rotation interval) | High (especially with read auditing) | Compliance, forensics, pattern analysis |
 | EMS Webhooks | Real-time (HTTPS push) | Low (critical events only) | Security alerting, operational monitoring |
-| FPolicy | Real-time (TCP stream) | Medium-High (all file operations) | DLP, real-time monitoring, suspicious behavior |
+| FPolicy | Event-driven (TCP stream) | Medium-High (all file operations) | DLP, event-driven monitoring, suspicious behavior |
 
 ## Datadog Monitor Examples by Use Case
 

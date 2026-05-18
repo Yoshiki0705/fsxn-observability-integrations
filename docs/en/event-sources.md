@@ -115,7 +115,7 @@ References: [AWS Docs - Monitoring FSx ONTAP](https://docs.aws.amazon.com/fsx/la
 
 ### Target Events
 
-FPolicy monitors file operations in real-time and notifies an external engine.
+FPolicy monitors file operations via event-driven TCP notifications and notifies an external engine.
 
 | Protocol | Supported Operations |
 |----------|---------------------|
