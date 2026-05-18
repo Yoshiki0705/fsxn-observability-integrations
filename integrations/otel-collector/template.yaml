@@ -14,9 +14,9 @@ Parameters:
   S3AccessPointArn:
     Type: String
     Description: >-
-      ARN of the FSx for ONTAP S3 Access Point attached to the audit volume.
-      Format: arn:aws:s3:<region>:<account-id>:accesspoint/<name>
-    AllowedPattern: 'arn:aws:s3:[a-z0-9-]+:\d{12}:accesspoint/.+'
+      ARN of the FSx for ONTAP S3 Access Point or S3 bucket name.
+      Accepts either full ARN (arn:aws:s3:<region>:<account-id>:accesspoint/<name>)
+      or a plain S3 bucket name for simpler deployments.
 
   ApiKeySecretArn:
     Type: String

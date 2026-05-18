@@ -216,6 +216,65 @@ Honeycomb の `fsxn-audit` データセットでクエリを実行します：
 
 Grafana Cloud と Honeycomb の両方で同一のイベント（同じタイムスタンプ、同じファイルパス）が確認できることを検証します。
 
+## Honeycomb のみの設定
+
+Grafana Cloud を使用せず、**Honeycomb のみ**をバックエンドとして使用する場合の設定です。Lambda コードの変更は不要で、OTel Collector の設定ファイルを切り替えるだけです。
+
+### Honeycomb 専用 Collector 設定
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1000
+
+exporters:
+  otlphttp/honeycomb:
+    endpoint: https://api.honeycomb.io
+    headers:
+      x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
+      x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/honeycomb]
+```
+
+### 環境変数
+
+```bash
+# .env.honeycomb
+HONEYCOMB_API_KEY=hcaik_your_ingest_key_here
+HONEYCOMB_DATASET=fsxn-audit
+```
+
+### 起動コマンド
+
+```bash
+# Honeycomb 専用設定ファイルを作成後:
+docker run -d --name otel-collector-honeycomb \
+  -p 4318:4318 -p 13133:13133 \
+  -v $(pwd)/otel-collector-config-honeycomb.yaml:/etc/otelcol-contrib/config.yaml \
+  --env-file .env.honeycomb \
+  otel/opentelemetry-collector-contrib:0.152.0
+```
+
+> **注意**: Honeycomb の Ingest API Key は `hcaik_` で始まります。Environment Key（`hcxik_`）ではデータ取り込みができません。
+
 ## Datadog バックエンド設定
 
 Grafana Cloud + Honeycomb の代わりに **Datadog** をバックエンドとして使用する場合の設定です。Lambda コードの変更は不要で、OTel Collector の設定ファイルを切り替えるだけで配信先を変更できます。
@@ -306,3 +365,58 @@ bash scripts/test-local-datadog.sh
 - サンプル OTLP ペイロードの送信
 - Collector ログの確認
 - クリーンアップ
+
+
+## Firehose バッファリングパス（高ボリューム向け）
+
+1,000 イベント/秒を超える高ボリュームシナリオでは、Lambda から直接 OTel Collector に送信する代わりに、Kinesis Data Firehose を中間バッファとして使用することを検討してください。
+
+### アーキテクチャ
+
+```
+S3 Access Point → Lambda → Kinesis Data Firehose → OTel Collector → Backends
+                                    │
+                                    ├── 自動バッファリング (60秒 or 1MB)
+                                    ├── 自動リトライ
+                                    └── バックプレッシャー処理
+```
+
+### いつ Firehose パスを使用するか
+
+| 条件 | 直接送信 | Firehose パス |
+|------|---------|--------------|
+| イベント量 | < 1,000/秒 | > 1,000/秒 |
+| レイテンシ要件 | リアルタイム (< 5秒) | ニアリアルタイム (< 60秒) |
+| バースト耐性 | Lambda 同時実行数に依存 | Firehose が自動バッファ |
+| コスト | Lambda 実行時間のみ | + Firehose 料金 |
+| 信頼性 | Lambda リトライのみ | Firehose 自動リトライ + S3 バックアップ |
+
+### Firehose 設定例
+
+```yaml
+# CloudFormation snippet
+FirehoseDeliveryStream:
+  Type: AWS::KinesisFirehose::DeliveryStream
+  Properties:
+    DeliveryStreamName: fsxn-otel-firehose
+    HttpEndpointDestinationConfiguration:
+      EndpointConfiguration:
+        Url: http://<collector-endpoint>:4318/v1/logs
+        Name: OTelCollector
+      BufferingHints:
+        IntervalInSeconds: 60
+        SizeInMBs: 1
+      RetryOptions:
+        DurationInSeconds: 300
+      S3BackupMode: FailedDataOnly
+      S3Configuration:
+        BucketARN: arn:aws:s3:::fsxn-firehose-backup
+        RoleARN: !GetAtt FirehoseRole.Arn
+```
+
+### 注意事項
+
+- Firehose は HTTP エンドポイントに対して JSON 形式でバッチ送信します
+- OTel Collector 側で Firehose 形式のパースが必要な場合があります
+- Datadog と Splunk は Firehose のネイティブ宛先として利用可能（OTel Collector 不要）
+- Firehose の最小バッファ間隔は 60 秒のため、リアルタイム性が必要な場合は直接送信を推奨
