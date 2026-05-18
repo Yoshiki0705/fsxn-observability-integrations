@@ -22,8 +22,8 @@ ONTAP FPolicy → TCP:9898 → ECS Fargate → SQS (FPolicy_Q) → Bridge Lambda
 | コンテナイメージ | `123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix` |
 | リスンポート | TCP 9898 |
 | VPC | `vpc-0123456789abcdef0` |
-| サブネット | `subnet-0307ebbd55b35c842` (プライベート) |
-| FPolicy Server SG | `sg-0a5472cd966cd7905` (TCP 9898 inbound) |
+| サブネット | `subnet-xxxxxxxxxxxxxxxx1` (プライベート) |
+| FPolicy Server SG | `sg-xxxxxxxxxxxxxxxxx` (TCP 9898 inbound) |
 | FSxN SVM SG | `sg-0123456789abcdef0` |
 | SVM | `FPolicySMB` (svm-0123456789abcdef0) |
 | SVM UUID | `<svm-uuid>` |
@@ -95,7 +95,7 @@ aws logs filter-log-events \
 
 ### 期待される出力
 ```
-KeepAlive from 10.0.135.90 (session: xxx)
+KeepAlive from 10.0.x.x (session: xxx)
 ```
 
 KeepAlive が見えない場合:
@@ -278,7 +278,7 @@ FPolicy イベントが届かない
 ├─ KeepAlive メッセージはあるか？
 │  └─ No → ONTAP が接続できていない
 │     ├─ Fargate タスク IP は正しいか？
-│     ├─ SG (sg-0a5472cd966cd7905) は TCP 9898 を許可しているか？
+│     ├─ SG (sg-xxxxxxxxxxxxxxxxx) は TCP 9898 を許可しているか？
 │     └─ ONTAP external engine の設定を確認
 │
 ├─ [SQS] Sent: メッセージはあるか？

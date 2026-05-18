@@ -31,8 +31,10 @@ MAX_RETRIES = 3
 BASE_INTERVAL = 2
 
 # FPolicy field mapping to OTLP attributes
+# Supports both "operation_type" (SQS/FPolicy server) and "operation" (EventBridge) field names
 FPOLICY_FIELD_MAPPING = {
-    "operation": "operation",
+    "operation_type": "operation_type",
+    "operation": "operation_type",
     "file_path": "file_path",
     "user": "user",
     "client_ip": "client_ip",
@@ -101,7 +103,7 @@ def build_fpolicy_otlp_payload(event_detail: dict[str, Any]) -> dict[str, Any]:
             })
 
     # Add any additional fields as attributes
-    for key in ("volume", "svm", "protocol", "event_id"):
+    for key in ("volume_name", "volume", "svm", "vserver", "protocol", "event_id", "file_size", "timestamp"):
         value = event_detail.get(key)
         if value is not None and str(value) != "":
             attributes.append({

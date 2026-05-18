@@ -195,3 +195,94 @@ Confirm that FSx ONTAP audit logs appear within 5 minutes.
 ### 4. Multi-Backend Consistency Check
 
 Verify that the same event (matching timestamp and file path) appears in both Grafana Cloud and Honeycomb.
+
+## Datadog Backend Configuration
+
+To use **Datadog** as the backend instead of Grafana Cloud + Honeycomb, swap the OTel Collector config file. No Lambda code changes are required — only the Collector configuration determines the destination.
+
+### Datadog Collector Configuration
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1000
+
+exporters:
+  datadog:
+    api:
+      key: ${env:DD_API_KEY}
+      site: ${env:DD_SITE}
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [datadog]
+```
+
+### Starting Docker Compose (Datadog Variant)
+
+```bash
+# 1. Configure credentials
+cp .env.datadog.example .env.datadog
+# Edit .env.datadog with your DD_API_KEY and DD_SITE
+# DD_SITE examples:
+#   datadoghq.com (US1), datadoghq.eu (EU),
+#   ap1.datadoghq.com (AP1/Japan), us3.datadoghq.com (US3)
+
+# 2. Start OTel Collector with Datadog config
+# Option A: docker compose (if available)
+docker compose -f docker-compose-datadog.yaml --env-file .env.datadog up -d
+
+# Option B: docker run (fallback for Colima or environments without compose plugin)
+docker run -d --name otel-collector-datadog \
+  -p 4318:4318 -p 13133:13133 \
+  -v $(pwd)/otel-collector-config-datadog.yaml:/etc/otelcol-contrib/config.yaml \
+  --env-file .env.datadog \
+  otel/opentelemetry-collector-contrib:0.152.0
+
+# 3. Verify health check
+curl -f http://localhost:13133/
+```
+
+> **Note**: On macOS with Colima, the `docker compose` v2 plugin may not be available. Use Option B (`docker run`) as a fallback.
+
+### Verification in Datadog
+
+1. Log in to the Datadog Logs UI
+2. Enter `source:fsxn-audit` or `service:fsxn-ontap` (for FPolicy) in the search filter
+3. Confirm FSx ONTAP logs arrive within 5 minutes
+4. Verify structured attributes are present:
+   - **S3 Audit Logs**: `event.type`, `user.name`, `fsxn.operation`, `client.address`, `fsxn.result`, `fsxn.path`
+   - **FPolicy**: `client_ip`, `file_path`, `operation_type`, `volume_name`, `event_id`, `timestamp`, `file_size`, `svm`/`vserver`
+
+> **Verified**: FPolicy → OTel Collector → Datadog path confirmed operational (2026-05-18).
+> Logs appear as Service: `fsxn-ontap`, Source: `fsxn-fpolicy` in Datadog.
+
+### Local Test Script
+
+Run the automated local test:
+
+```bash
+bash scripts/test-local-datadog.sh
+```
+
+This script automatically:
+- Starts the OTel Collector with Datadog config
+- Verifies the health check
+- Sends a sample OTLP payload
+- Checks collector logs for export activity
+- Cleans up

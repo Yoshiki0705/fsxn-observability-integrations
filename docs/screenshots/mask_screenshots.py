@@ -385,6 +385,51 @@ def mask_datadog_logs_arrival():
     print(f"  ℹ️  {filepath.name}: サイドバーなし、個人情報なし（マスク不要）")
 
 
+def mask_otel_screenshots():
+    """OTel Collector 検証スクリーンショットのマスク処理。
+
+    対象ファイル:
+      - 01-datadog-otel-logs-arrival.png
+      - 02-datadog-otel-structured-attributes.png
+      - 03-datadog-otel-s3-audit-logs.png
+      - 04-datadog-otel-s3-audit-attributes.png
+      - 05-datadog-otel-ems-logs.png
+
+    マスク対象:
+      1. 上部ウェルカムバナー（ユーザー名 + トライアル情報）
+      2. サイドバー下部プロファイル（メールアドレス + 組織名）
+    """
+    otel_files = [
+        "01-datadog-otel-logs-arrival.png",
+        "02-datadog-otel-structured-attributes.png",
+        "03-datadog-otel-s3-audit-logs.png",
+        "04-datadog-otel-s3-audit-attributes.png",
+        "05-datadog-otel-ems-logs.png",
+    ]
+
+    for filename in otel_files:
+        filepath = SCRIPT_DIR / filename
+        if not filepath.exists():
+            print(f"  ⏭️  {filename}: ファイルが見つかりません")
+            continue
+
+        img = Image.open(filepath)
+        width, height = img.size
+        print(f"  📐 {filename}: {width}x{height}")
+
+        # Datadog UI: サイドバー幅は縮小状態で ~105px
+        sidebar_width = 105
+
+        # 1. 上部バナー（Welcome + Trial info）
+        mask_datadog_top_banner(img, sidebar_width)
+
+        # 2. サイドバー下部プロファイル
+        mask_datadog_sidebar_profile(img, sidebar_width)
+
+        img.save(filepath)
+        print(f"  ✅ {filename}: マスク完了")
+
+
 if __name__ == "__main__":
     print("🔒 スクリーンショットマスク処理開始...")
     print()
@@ -408,6 +453,10 @@ if __name__ == "__main__":
     mask_datadog_pipeline_config()
     mask_datadog_unauthorized_access()
     mask_datadog_logs_arrival()
+
+    print()
+    print("--- OTel Collector 検証分 ---")
+    mask_otel_screenshots()
 
     print()
     print("✅ 全マスク処理完了")

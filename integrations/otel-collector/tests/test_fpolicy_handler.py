@@ -113,7 +113,7 @@ class TestBuildFpolicyOtlpPayload:
 
         # Attributes
         record_attrs = {a["key"]: a["value"]["stringValue"] for a in log_record["attributes"]}
-        assert record_attrs["operation"] == "create"
+        assert record_attrs["operation_type"] == "create"
         assert record_attrs["file_path"] == "/vol/data/shared/new_document.docx"
         assert record_attrs["user"] == "admin@corp.local"
         assert record_attrs["client_ip"] == "10.0.1.50"
@@ -131,7 +131,7 @@ class TestBuildFpolicyOtlpPayload:
         log_record = payload["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0]
 
         attr_map = {a["key"]: a["value"]["stringValue"] for a in log_record["attributes"]}
-        assert attr_map["operation"] == "write"
+        assert attr_map["operation_type"] == "write"
         assert attr_map["file_path"] == "/vol/data/test.txt"
         assert attr_map["user"] == "testuser"
         assert attr_map["client_ip"] == "192.168.1.1"
@@ -143,7 +143,7 @@ class TestBuildFpolicyOtlpPayload:
         log_record = payload["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0]
 
         attr_keys = {a["key"] for a in log_record["attributes"]}
-        assert "operation" in attr_keys
+        assert "operation_type" in attr_keys
         assert "file_path" not in attr_keys
         assert "user" not in attr_keys
         assert "client_ip" not in attr_keys

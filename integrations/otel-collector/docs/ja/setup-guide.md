@@ -195,3 +195,94 @@ Honeycomb の `fsxn-audit` データセットでクエリを実行します：
 ### 4. マルチバックエンド一貫性確認
 
 Grafana Cloud と Honeycomb の両方で同一のイベント（同じタイムスタンプ、同じファイルパス）が確認できることを検証します。
+
+## Datadog バックエンド設定
+
+Grafana Cloud + Honeycomb の代わりに **Datadog** をバックエンドとして使用する場合の設定です。Lambda コードの変更は不要で、OTel Collector の設定ファイルを切り替えるだけで配信先を変更できます。
+
+### Datadog 用 Collector 設定
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1000
+
+exporters:
+  datadog:
+    api:
+      key: ${env:DD_API_KEY}
+      site: ${env:DD_SITE}
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [datadog]
+```
+
+### Docker Compose（Datadog 版）の起動
+
+```bash
+# 1. Configure credentials
+cp .env.datadog.example .env.datadog
+# Edit .env.datadog with your DD_API_KEY and DD_SITE
+# DD_SITE の例:
+#   datadoghq.com (US1), datadoghq.eu (EU),
+#   ap1.datadoghq.com (AP1/日本), us3.datadoghq.com (US3)
+
+# 2. Start OTel Collector with Datadog config
+# 方法 A: docker compose（利用可能な場合）
+docker compose -f docker-compose-datadog.yaml --env-file .env.datadog up -d
+
+# 方法 B: docker run（Colima 等で compose プラグインが利用不可の場合）
+docker run -d --name otel-collector-datadog \
+  -p 4318:4318 -p 13133:13133 \
+  -v $(pwd)/otel-collector-config-datadog.yaml:/etc/otelcol-contrib/config.yaml \
+  --env-file .env.datadog \
+  otel/opentelemetry-collector-contrib:0.152.0
+
+# 3. Verify health check
+curl -f http://localhost:13133/
+```
+
+> **注意**: macOS で Colima を使用している場合、`docker compose` (v2 プラグイン) が利用できないことがあります。その場合は方法 B の `docker run` を使用してください。
+
+### Datadog での検証手順
+
+1. Datadog Logs UI にログインします
+2. 検索フィルタに `source:fsxn-audit` または `service:fsxn-ontap`（FPolicy の場合）を入力します
+3. FSx ONTAP ログが到着していることを確認します（5分以内）
+4. 構造化属性が含まれることを確認します：
+   - **S3 監査ログ**: `event.type`、`user.name`、`fsxn.operation`、`client.address`、`fsxn.result`、`fsxn.path`
+   - **FPolicy**: `client_ip`、`file_path`、`operation_type`、`volume_name`、`event_id`、`timestamp`、`file_size`、`svm`/`vserver`
+
+> **確認済み**: FPolicy → OTel Collector → Datadog パスは 2026-05-18 に検証完了。
+> Service: `fsxn-ontap`、Source: `fsxn-fpolicy` として Datadog に表示されます。
+
+### ローカルテストスクリプト
+
+自動化されたローカルテストを実行するには：
+
+```bash
+bash scripts/test-local-datadog.sh
+```
+
+このスクリプトは以下を自動実行します：
+- OTel Collector の起動（Datadog 設定）
+- ヘルスチェック確認
+- サンプル OTLP ペイロードの送信
+- Collector ログの確認
+- クリーンアップ
