@@ -200,13 +200,13 @@ Japanese (`docs/ja/`) is the primary language. English (`docs/en/`) must mirror 
 |--------|----------|-------------|-----------|----------|-------|
 | Datadog | `https://http-intake.logs.{site}/api/v2/logs` | `DD-API-KEY: <key>` | 5MB / 1000 items | ✅ | |
 | New Relic | `https://log-api.newrelic.com/log/v1` (US) | `Api-Key: <license>` | 1MB | ✅ | |
-| Grafana/Loki | `https://<instance>.grafana.net/loki/api/v1/push` | Basic Auth (ID + token) | ~4MB recommended | ❌ | |
+| Grafana/Loki | `https://otlp-gateway-prod-<region>.grafana.net/otlp` | Basic Auth (base64(ID:token)) | ~4MB recommended | ❌ | ✅ Verified via otlphttp exporter (NOT loki exporter) |
 | Splunk | `https://<host>:8088/services/collector/event` | `Authorization: Splunk <token>` | No hard limit | ✅ (built-in) | |
 | Elastic | `https://<cluster>/_bulk` | `Authorization: ApiKey <key>` | ~10MB recommended | ❌ | |
 | Dynatrace | `https://<env>.live.dynatrace.com/api/v2/logs/ingest` | `Authorization: Api-Token <token>` | 1MB | ✅ | |
 | Sumo Logic | `https://endpoint<N>.collection.sumologic.com/...` | Embedded in URL | 1MB | ❌ | |
-| Honeycomb | `https://api.honeycomb.io/1/batch/<dataset>` | `X-Honeycomb-Team: <key>` | 5MB | ❌ | |
-| OTel (OTLP) | `http://<collector>:4318/v1/logs` | Configurable | Configurable | ❌ | Verified with Datadog exporter (0.152.0) |
+| Honeycomb | `https://api.honeycomb.io` | `x-honeycomb-team: <hcaik_key>` | 5MB | ❌ | ✅ Verified via otlphttp exporter + x-honeycomb-dataset header |
+| OTel (OTLP) | `http://<collector>:4318/v1/logs` | Configurable | Configurable | ❌ | ✅ Verified: Datadog + Grafana + Honeycomb multi-backend (0.152.0) |
 
 Sources: [Datadog Logs API](https://docs.datadoghq.com/api/latest/logs/) | [New Relic Log API](https://docs.newrelic.com/docs/enable-new-relic-logs-http-input/) | [Grafana Loki HTTP API](https://grafana.com/docs/loki/latest/reference/loki-http-api/) | [Splunk HEC](https://docs.splunk.com/Documentation/Splunk/9.4.0/Data/FormateventsforHTTPEventCollector) | [OpenTelemetry Lambda](https://github.com/open-telemetry/opentelemetry-lambda)
 

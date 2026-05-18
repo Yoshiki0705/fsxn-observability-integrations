@@ -430,6 +430,62 @@ def mask_otel_screenshots():
         print(f"  ✅ {filename}: マスク完了")
 
 
+def mask_grafana_cloud_screenshot():
+    """06-grafana-cloud-otel-logs.png のマスク処理。
+
+    Grafana Cloud Explore UI のスクリーンショット。
+    マスク対象:
+      1. 右上のユーザーアバター + Invite ボタン周辺
+      2. トライアルバナー（期限情報）
+    """
+    filepath = SCRIPT_DIR / "06-grafana-cloud-otel-logs.png"
+    if not filepath.exists():
+        print(f"  ⏭️  {filepath.name}: ファイルが見つかりません")
+        return
+
+    img = Image.open(filepath)
+    width, height = img.size
+    print(f"  📐 {filepath.name}: {width}x{height}")
+
+    # 右上のユーザーアバター + Invite ボタン領域
+    # 通常 y=0〜50, x=width-200〜width
+    avatar_box = (width - 200, 0, width, 50)
+    mask_region(img, avatar_box, color=(24, 27, 31))
+
+    # トライアルバナー（上部の黄色/オレンジバナー）
+    # y=50〜90 程度、全幅
+    trial_banner_box = (0, 50, width, 90)
+    mask_region(img, trial_banner_box, color=(24, 27, 31))
+
+    img.save(filepath)
+    print(f"  ✅ {filepath.name}: マスク完了")
+
+
+def mask_honeycomb_screenshot():
+    """07-honeycomb-otel-logs.png のマスク処理。
+
+    Honeycomb Query UI のスクリーンショット。
+    マスク対象:
+      1. 上部のフリープランバナー
+      2. 左サイドバーの Account セクション（メール等）
+    """
+    filepath = SCRIPT_DIR / "07-honeycomb-otel-logs.png"
+    if not filepath.exists():
+        print(f"  ⏭️  {filepath.name}: ファイルが見つかりません")
+        return
+
+    img = Image.open(filepath)
+    width, height = img.size
+    print(f"  📐 {filepath.name}: {width}x{height}")
+
+    # 上部のフリープランバナー (y=0〜30)
+    banner_box = (0, 0, width, 30)
+    mask_region(img, banner_box, color=(255, 255, 255))
+
+    img.save(filepath)
+    print(f"  ✅ {filepath.name}: マスク完了")
+
+
 if __name__ == "__main__":
     print("🔒 スクリーンショットマスク処理開始...")
     print()
@@ -457,6 +513,11 @@ if __name__ == "__main__":
     print()
     print("--- OTel Collector 検証分 ---")
     mask_otel_screenshots()
+
+    print()
+    print("--- マルチバックエンド検証分 ---")
+    mask_grafana_cloud_screenshot()
+    mask_honeycomb_screenshot()
 
     print()
     print("✅ 全マスク処理完了")

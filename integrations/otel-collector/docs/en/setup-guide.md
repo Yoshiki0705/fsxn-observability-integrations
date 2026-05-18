@@ -20,16 +20,15 @@ Run the OTel Collector locally to receive logs via OTLP/HTTP.
 ```yaml
 services:
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:0.152.0
     ports:
       - "4318:4318"   # OTLP HTTP
       - "13133:13133" # Health check
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
     environment:
-      - GRAFANA_LOKI_ENDPOINT=${GRAFANA_LOKI_ENDPOINT}
-      - GRAFANA_LOKI_USER=${GRAFANA_LOKI_USER}
-      - GRAFANA_LOKI_TOKEN=${GRAFANA_LOKI_TOKEN}
+      - GRAFANA_OTLP_ENDPOINT=${GRAFANA_OTLP_ENDPOINT}
+      - GRAFANA_BASIC_AUTH=${GRAFANA_BASIC_AUTH}
       - HONEYCOMB_API_KEY=${HONEYCOMB_API_KEY}
       - HONEYCOMB_DATASET=${HONEYCOMB_DATASET:-fsxn-audit}
     healthcheck:
@@ -40,6 +39,15 @@ services:
       start_period: 10s
     restart: unless-stopped
 ```
+
+> **Note**: On macOS with Colima, the `docker compose` v2 plugin is not available. Use `docker run` as a fallback:
+> ```bash
+> docker run -d --name otel-collector \
+>   -p 4318:4318 -p 13133:13133 \
+>   -v $(pwd)/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml \
+>   --env-file .env \
+>   otel/opentelemetry-collector-contrib:0.152.0
+> ```
 
 ### Configure Environment Variables
 
@@ -65,7 +73,9 @@ curl -f http://localhost:13133/
 
 ## Collector YAML Configuration
 
-The OTel Collector config defines an OTLP receiver, batch processor, and dual exporters for Loki and Honeycomb.
+The OTel Collector config defines an OTLP receiver, batch processor, and dual exporters for Grafana Cloud and Honeycomb.
+
+> **Important**: Use the `otlphttp/grafana` exporter (NOT the `loki` exporter) for OTLP → Grafana Cloud. The OTLP gateway endpoint handles log ingestion natively.
 
 ```yaml
 receivers:
@@ -80,13 +90,10 @@ processors:
     send_batch_size: 1000
 
 exporters:
-  loki:
-    endpoint: ${env:GRAFANA_LOKI_ENDPOINT}
-    default_labels_enabled:
-      exporter: false
-      job: true
+  otlphttp/grafana:
+    endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
     headers:
-      Authorization: "Basic ${env:GRAFANA_LOKI_USER}:${env:GRAFANA_LOKI_TOKEN}"
+      Authorization: "Basic ${env:GRAFANA_BASIC_AUTH}"
 
   otlphttp/honeycomb:
     endpoint: https://api.honeycomb.io
@@ -104,10 +111,23 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [loki, otlphttp/honeycomb]
+      exporters: [otlphttp/grafana, otlphttp/honeycomb]
 ```
 
 This configuration automatically fans out OTLP logs from the Lambda to both Grafana Cloud and Honeycomb simultaneously.
+
+### Verified Auth Patterns
+
+**Grafana Cloud**:
+- Endpoint: `https://otlp-gateway-prod-<region>.grafana.net/otlp`
+- Auth: `Basic base64(instanceId:apiToken)`
+- Instance ID is numeric (e.g., 1649835)
+- Region example: `ap-northeast-0` (Japan)
+
+**Honeycomb**:
+- Endpoint: `https://api.honeycomb.io`
+- Auth: `x-honeycomb-team` header with Ingest API Key
+- Ingest keys start with `hcaik_`
 
 ## CloudFormation Deployment
 
