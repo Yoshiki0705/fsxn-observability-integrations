@@ -239,15 +239,15 @@ service:
 # 1. Configure credentials
 cp .env.datadog.example .env.datadog
 # Edit .env.datadog with your DD_API_KEY and DD_SITE
-# DD_SITE の例:
+# DD_SITE examples:
 #   datadoghq.com (US1), datadoghq.eu (EU),
-#   ap1.datadoghq.com (AP1/日本), us3.datadoghq.com (US3)
+#   ap1.datadoghq.com (AP1/Japan), us3.datadoghq.com (US3)
 
 # 2. Start OTel Collector with Datadog config
-# 方法 A: docker compose（利用可能な場合）
+# Option A: docker compose (if available)
 docker compose -f docker-compose-datadog.yaml --env-file .env.datadog up -d
 
-# 方法 B: docker run（Colima 等で compose プラグインが利用不可の場合）
+# Option B: docker run (fallback for Colima or environments without compose plugin)
 docker run -d --name otel-collector-datadog \
   -p 4318:4318 -p 13133:13133 \
   -v $(pwd)/otel-collector-config-datadog.yaml:/etc/otelcol-contrib/config.yaml \
