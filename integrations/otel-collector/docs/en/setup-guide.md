@@ -216,6 +216,65 @@ Confirm that FSx ONTAP audit logs appear within 5 minutes.
 
 Verify that the same event (matching timestamp and file path) appears in both Grafana Cloud and Honeycomb.
 
+## Honeycomb-Only Configuration
+
+To use **Honeycomb as the sole backend** without Grafana Cloud, swap the OTel Collector config. No Lambda code changes are required.
+
+### Honeycomb-Only Collector Configuration
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1000
+
+exporters:
+  otlphttp/honeycomb:
+    endpoint: https://api.honeycomb.io
+    headers:
+      x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
+      x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/honeycomb]
+```
+
+### Environment Variables
+
+```bash
+# .env.honeycomb
+HONEYCOMB_API_KEY=hcaik_your_ingest_key_here
+HONEYCOMB_DATASET=fsxn-audit
+```
+
+### Start Command
+
+```bash
+# Honeycomb 専用設定ファイルを作成後:
+docker run -d --name otel-collector-honeycomb \
+  -p 4318:4318 -p 13133:13133 \
+  -v $(pwd)/otel-collector-config-honeycomb.yaml:/etc/otelcol-contrib/config.yaml \
+  --env-file .env.honeycomb \
+  otel/opentelemetry-collector-contrib:0.152.0
+```
+
+> **Note**: Honeycomb Ingest API Keys start with `hcaik_`. Environment keys (`hcxik_`) will NOT work for data ingestion.
+
 ## Datadog Backend Configuration
 
 To use **Datadog** as the backend instead of Grafana Cloud + Honeycomb, swap the OTel Collector config file. No Lambda code changes are required — only the Collector configuration determines the destination.
@@ -306,3 +365,58 @@ This script automatically:
 - Sends a sample OTLP payload
 - Checks collector logs for export activity
 - Cleans up
+
+
+## Firehose Buffering Path (High Volume)
+
+For high-volume scenarios exceeding 1,000 events/second, consider using Kinesis Data Firehose as an intermediate buffer instead of sending directly from Lambda to the OTel Collector.
+
+### Architecture
+
+```
+S3 Access Point → Lambda → Kinesis Data Firehose → OTel Collector → Backends
+                                    │
+                                    ├── 自動バッファリング (60秒 or 1MB)
+                                    ├── 自動リトライ
+                                    └── バックプレッシャー処理
+```
+
+### When to Use the Firehose Path
+
+| Condition | Direct Send | Firehose Path |
+|-----------|-------------|---------------|
+| Event volume | < 1,000/sec | > 1,000/sec |
+| Latency requirement | Real-time (< 5s) | Near real-time (< 60s) |
+| Burst tolerance | Depends on Lambda concurrency | Firehose auto-buffers |
+| Cost | Lambda execution time only | + Firehose charges |
+| Reliability | Lambda retry only | Firehose auto-retry + S3 backup |
+
+### Firehose Configuration Example
+
+```yaml
+# CloudFormation snippet
+FirehoseDeliveryStream:
+  Type: AWS::KinesisFirehose::DeliveryStream
+  Properties:
+    DeliveryStreamName: fsxn-otel-firehose
+    HttpEndpointDestinationConfiguration:
+      EndpointConfiguration:
+        Url: http://<collector-endpoint>:4318/v1/logs
+        Name: OTelCollector
+      BufferingHints:
+        IntervalInSeconds: 60
+        SizeInMBs: 1
+      RetryOptions:
+        DurationInSeconds: 300
+      S3BackupMode: FailedDataOnly
+      S3Configuration:
+        BucketARN: arn:aws:s3:::fsxn-firehose-backup
+        RoleARN: !GetAtt FirehoseRole.Arn
+```
+
+### Important Notes
+
+- Firehose sends batched JSON to HTTP endpoints
+- The OTel Collector may need to parse Firehose-formatted payloads
+- Datadog and Splunk are available as native Firehose destinations (no OTel Collector needed)
+- Firehose minimum buffer interval is 60 seconds — use direct send when real-time delivery is required

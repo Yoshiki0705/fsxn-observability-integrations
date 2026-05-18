@@ -79,7 +79,6 @@ bash scripts/test-local-multi-backend.sh
 | EMS Handler | `lambda/ems_handler.py` | Receives EMS webhook events, forwards as OTLP |
 | FPolicy Handler | `lambda/fpolicy_handler.py` | Receives FPolicy events from EventBridge, forwards as OTLP |
 | OTel Config (default) | `otel-collector-config.yaml` | Grafana Cloud + Honeycomb (otlphttp) |
-| OTel Config (Grafana+HC) | `otel-collector-config-grafana-honeycomb.yaml` | Same as default (standalone) |
 | OTel Config (Datadog) | `otel-collector-config-datadog.yaml` | Datadog exporter |
 | Docker Compose | `docker-compose.yaml` | Local OTel Collector (pinned 0.152.0) |
 | CloudFormation | `template.yaml` | AWS deployment template |
