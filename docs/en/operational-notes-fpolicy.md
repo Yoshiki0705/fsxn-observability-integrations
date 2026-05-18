@@ -19,15 +19,15 @@ ONTAP FPolicy → TCP:9898 → ECS Fargate → SQS (FPolicy_Q) → Bridge Lambda
 |-----------|-------|
 | Compute Mode | ECS Fargate (ARM64) |
 | CPU / Memory | 256 CPU / 512 MB |
-| Container Image | `178625946981.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix` |
+| Container Image | `123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix` |
 | Listen Port | TCP 9898 |
-| VPC | `vpc-0ae01826f906191af` |
+| VPC | `vpc-0123456789abcdef0` |
 | Subnet | `subnet-0307ebbd55b35c842` (private) |
 | FPolicy Server SG | `sg-0a5472cd966cd7905` (TCP 9898 inbound) |
-| FSxN SVM SG | `sg-04b2fedb571860818` |
-| SVM | `FPolicySMB` (svm-037cedb30df493c1e) |
-| SVM UUID | `2c3f92e2-4ee2-11f1-acbd-21ab1e8e6bf5` |
-| SVM Management IP | `10.0.15.0` |
+| FSxN SVM SG | `sg-0123456789abcdef0` |
+| SVM | `FPolicySMB` (svm-0123456789abcdef0) |
+| SVM UUID | `<svm-uuid>` |
+| SVM Management IP | `10.0.x.x` |
 | Secrets | `fsx-ontap-fsxadmin-credentials` |
 
 ---
@@ -110,8 +110,8 @@ If KeepAlive messages are not visible:
 ### Symptoms
 The following error appears in ECS logs:
 ```
-AccessDenied: User: arn:aws:sts::178625946981:assumed-role/xxx is not authorized
-to perform: sqs:SendMessage on resource: arn:aws:sqs:ap-northeast-1:178625946981:FPolicy_Q
+AccessDenied: User: arn:aws:sts::123456789012:assumed-role/xxx is not authorized
+to perform: sqs:SendMessage on resource: arn:aws:sqs:ap-northeast-1:123456789012:FPolicy_Q
 ```
 
 ### Cause
@@ -130,7 +130,7 @@ Add the following policy to the ECS task role:
         "sqs:SendMessage",
         "sqs:GetQueueUrl"
       ],
-      "Resource": "arn:aws:sqs:ap-northeast-1:178625946981:*-fpolicy-ingestion"
+      "Resource": "arn:aws:sqs:ap-northeast-1:123456789012:*-fpolicy-ingestion"
     }
   ]
 }
@@ -145,7 +145,7 @@ Add the following policy to the ECS task role:
 
 ### Current Image
 ```
-178625946981.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix
+123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix
 ```
 
 ### Tag Descriptions
@@ -165,11 +165,11 @@ Add the following policy to the ECS task role:
 # 1. ECR authentication
 aws ecr get-login-password --region ap-northeast-1 | \
   docker login --username AWS --password-stdin \
-  178625946981.dkr.ecr.ap-northeast-1.amazonaws.com
+  123456789012.dkr.ecr.ap-northeast-1.amazonaws.com
 
 # 2. Build & push (ARM64)
 docker buildx build --platform linux/arm64 \
-  -t 178625946981.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:<new-tag> \
+  -t 123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:<new-tag> \
   --push .
 
 # 3. Update ECS service (restart task with new image)
@@ -249,7 +249,7 @@ aws logs filter-log-events \
 ```bash
 # Check queue status
 aws sqs get-queue-attributes \
-  --queue-url https://sqs.ap-northeast-1.amazonaws.com/178625946981/FPolicy_Q \
+  --queue-url https://sqs.ap-northeast-1.amazonaws.com/123456789012/FPolicy_Q \
   --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
 ```
 

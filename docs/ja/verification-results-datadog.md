@@ -9,8 +9,8 @@
 - **CloudFormation スタック名**: fsxn-datadog-integration
 - **Lambda 関数名**: fsxn-datadog-integration-shipper
 - **Datadog サイト**: ap1.datadoghq.com (AP1 Tokyo)
-- **FSx ONTAP ファイルシステム**: fs-09ffe72a3b2b7dbbd
-- **S3 Access Point**: arn:aws:s3:ap-northeast-1:178625946981:accesspoint/fsxn-audit-observability
+- **FSx ONTAP ファイルシステム**: fs-0123456789abcdef0
+- **S3 Access Point**: arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-observability
 
 ---
 
@@ -25,8 +25,8 @@ aws cloudformation deploy \
   --template-file integrations/datadog/template.yaml \
   --stack-name fsxn-datadog-integration \
   --parameter-overrides \
-    S3AccessPointArn=arn:aws:s3:ap-northeast-1:178625946981:accesspoint/fsxn-audit-observability \
-    DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:178625946981:secret:fsxn-datadog-api-key-7Ti8iQ \
+    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-observability \
+    DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:fsxn-datadog-api-key-XXXXXX \
     DatadogSite=ap1.datadoghq.com \
     S3BucketName=fsxn-audit-obser-cbsi8mwwgahuh7sans3bbtxijig4sapn1b-ext-s3alias \
   --capabilities CAPABILITY_NAMED_IAM \
@@ -232,7 +232,7 @@ aws cloudformation deploy \
   --template-file integrations/datadog/template-ems-fpolicy.yaml \
   --stack-name fsxn-datadog-ems-fpolicy \
   --parameter-overrides \
-    DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:178625946981:secret:fsxn-datadog-api-key-7Ti8iQ \
+    DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:fsxn-datadog-api-key-XXXXXX \
     DatadogSite=ap1.datadoghq.com \
   --capabilities CAPABILITY_NAMED_IAM \
   --region ap-northeast-1
@@ -309,3 +309,144 @@ aws lambda invoke \
 | E4 | FPolicy ファイル操作テスト | ✅ 成功 |
 
 **EMS/FPolicy 総合判定**: ✅ 合格
+
+---
+
+## FPolicy フルパス E2E 検証（ECS Fargate 経由）
+
+- **検証日時**: 2026-05-17T23:35〜23:50 JST
+- **スタック名**: fsxn-fpolicy-server (Fargate) + fsxn-datadog-ems-fpolicy (Lambda)
+- **パイプライン**: ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Datadog
+
+### 検証環境
+
+| コンポーネント | 値 |
+|--------------|-----|
+| ECS クラスタ | fsxn-fpolicy-server-cluster |
+| Fargate タスク IP | 10.0.x.x |
+| SQS キュー | fsxn-fpolicy-server-fpolicy-queue |
+| Lambda 関数 | fsxn-datadog-ems-fpolicy-fpolicy |
+| FSx ONTAP SVM | FPolicySMB (svm-0123456789abcdef0) |
+| FPolicy Engine | fpolicy_aws_engine |
+| FPolicy Policy | fpolicy_aws (async, cifs) |
+| 監視対象ボリューム | smb_test_vol |
+| SMB 共有 | //10.0.x.x/smb_test |
+
+### ステップ F1: Fargate デプロイ
+
+- **結果**: ✅ 成功
+- **注意点**: ECR イメージは `linux/amd64` でビルドが必須（Apple Silicon でビルドすると arm64 のみになり Fargate で起動失敗）
+- **コマンド**:
+```bash
+docker buildx build --platform linux/amd64 \
+  -t 123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix \
+  --push shared/fpolicy-server/
+```
+
+### ステップ F2: ONTAP FPolicy 接続
+
+- **結果**: ✅ 成功
+- **接続確認**: KeepAlive メッセージ受信（2ノードから接続）
+- **注意点**: External Engine の IP 更新にはポリシーの一時無効化が必要
+
+```
+[INFO] fpolicy-server: [+] Connection from ('10.0.x.x', 44107)
+[INFO] fpolicy-server: [+] Connection from ('10.0.x.x', 24523)
+[INFO] fpolicy-server: [Handshake] Policy=fpolicy_aws | Version=1.2
+[INFO] fpolicy-server: [KeepAlive] Received — connection healthy
+```
+
+### ステップ F3: ファイル操作 → Datadog 到着
+
+- **結果**: ✅ 成功
+- **テスト操作**: SMB 経由で create (smbclient)
+- **到着時間**: 約6〜8秒
+
+```bash
+smbclient //10.0.x.x/smb_test -U 'FPOLSMB\Administrator%<password>' \
+  -c 'put /etc/hostname fpolicy_e2e_test.txt'
+```
+
+**ECS ログ**:
+```
+[Event] create fpolicy_e2e_test.txt
+[SQS] Sent: fpolicy_e2e_test.txt (create)
+```
+
+**Lambda ログ**:
+```
+FPolicy handler invoked: source=unknown
+Extracted 1 FPolicy event(s)
+Processing complete: {"statusCode": 200, "body": {"shipped": 1}}
+```
+
+**Datadog 確認**: `source:fsxn-fpolicy` で7件のログ到着確認
+
+### ステップ F4: 構造化属性確認
+
+| フィールド | 値 | 状態 |
+|-----------|-----|------|
+| source | fsxn-fpolicy | ✅ |
+| file_path | e2e_write_test.txt | ✅ |
+| @attributes.operation_type | create | ✅ |
+| client_ip | 10.0.x.x | ✅ |
+| volume_name | vol1 | ✅ |
+| timestamp | 2026-05-17T14:43:51+00:00 | ✅ |
+
+### 発見された課題と対応
+
+| # | 課題 | 原因 | 対応 |
+|---|------|------|------|
+| 1 | Fargate 起動失敗 | ECR イメージが arm64 のみ | `--platform linux/amd64` でリビルド |
+| 2 | SQS → Lambda 未接続 | EventBridge ルールのみ、SQS マッピングなし | Lambda に SQS 対応追加 + イベントソースマッピング作成 |
+| 3 | fsxadmin ロック | パスワード試行超過 | `aws fsx update-file-system` でリセット |
+| 4 | SMB パスワード変更要求 | 初回ログイン時の強制変更 | ONTAP CLI で `set-password` 実行 |
+| 5 | rename/delete 未検出 | FPolicy async モードの特性 | 今後の検証で確認（sync モードで改善可能） |
+
+### FPolicy フルパス検証サマリ
+
+| ステップ | 名称 | 結果 | レイテンシ |
+|---------|------|------|-----------|
+| F1 | Fargate デプロイ | ✅ 成功 | — |
+| F2 | ONTAP 接続確認 | ✅ 成功 | — |
+| F3 | ファイル操作 → Datadog | ✅ 成功 | ~6-8秒 |
+| F4 | 構造化属性確認 | ✅ 成功 | — |
+
+**FPolicy フルパス総合判定**: ✅ 合格（create イベントの全パス検証完了）
+
+### スクリーンショット
+
+![FPolicy ログ一覧 — Datadog Log Explorer](../screenshots/datadog-fpolicy-full-path.png)
+
+![FPolicy イベント詳細](../screenshots/datadog-fpolicy-detail.png)
+
+
+---
+
+### ステップ F5: Fargate タスク再起動レジリエンステスト
+
+- **結果**: ✅ 成功
+- **テスト手順**:
+  1. Fargate 起動 → タスク IP: 10.0.x.x → ONTAP 接続確認 → イベントフロー確認
+  2. Fargate 停止（scale to 0）→ タスク停止確認
+  3. Fargate 再起動（scale to 1）→ 新タスク IP: 10.0.x.x
+  4. ONTAP External Engine IP 更新 → 再接続確認
+  5. ファイル操作 → イベントフロー再開確認
+
+**結果詳細**:
+
+| ステップ | 結果 | 備考 |
+|---------|------|------|
+| 初回起動 → 接続 | ✅ | IP: 10.0.x.x、~20秒で接続 |
+| イベントフロー（再起動前） | ✅ | pre_restart_test.txt → SQS → Datadog |
+| タスク停止 | ✅ | ~30秒で停止完了 |
+| タスク再起動 | ✅ | 新 IP: 10.0.x.x |
+| ONTAP 再接続 | ✅ | Engine IP 更新後 ~20秒で再接続 |
+| イベントフロー（再起動後） | ✅ | post_restart_test.txt → SQS → Datadog |
+| Lambda リトライ | ✅ | 初回接続エラー → リトライ成功 |
+
+**重要な知見**:
+- Fargate タスク再起動時に IP が変わる（10.0.x.x → 10.0.x.x）
+- ONTAP External Engine の IP 更新が必須（自動化スクリプトで対応可能）
+- Lambda のリトライロジックが一時的な接続エラーを正しくハンドリング
+- 再起動から完全復旧まで約2分（タスク起動45秒 + Engine更新 + 接続20秒）

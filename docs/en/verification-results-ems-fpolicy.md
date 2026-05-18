@@ -12,8 +12,8 @@
 | Item | Value |
 |------|-------|
 | **AWS Region** | `ap-northeast-1` |
-| **FSx ONTAP File System ID** | `fs-09ffe72a3b2b7dbbd` (SINGLE_AZ_1) |
-| **SVM Name** | `FPolicySMB` (svm-037cedb30df493c1e), `FSxN_OnPre` (svm-0d5f81cd0146af242) |
+| **FSx ONTAP File System ID** | `fs-0123456789abcdef0` (SINGLE_AZ_1) |
+| **SVM Name** | `FPolicySMB` (svm-0123456789abcdef0), `FSxN_OnPre` (svm-0abcdef123456789a) |
 | **ONTAP Version** | `9.17.1P6` |
 
 ### CloudFormation Stack Names
@@ -62,7 +62,7 @@ aws cloudformation deploy \
 | Item | Details |
 |------|---------|
 | **Expected Result** | Stack reaches CREATE_COMPLETE with Outputs: `ApiEndpointUrl`, `ApiGatewayId`, `DeadLetterQueueArn` |
-| **Actual Result** | Stack `fsxn-ems-webhook` reached CREATE_COMPLETE. Outputs: ApiEndpointUrl=`https://2tpkso4jge.execute-api.ap-northeast-1.amazonaws.com/prod/ems`, ApiGatewayId=`2tpkso4jge`, DeadLetterQueueArn=`arn:aws:sqs:ap-northeast-1:178625946981:fsxn-ems-webhook-ems-dlq` |
+| **Actual Result** | Stack `fsxn-ems-webhook` reached CREATE_COMPLETE. Outputs: ApiEndpointUrl=`https://2tpkso4jge.execute-api.ap-northeast-1.amazonaws.com/prod/ems`, ApiGatewayId=`2tpkso4jge`, DeadLetterQueueArn=`arn:aws:sqs:ap-northeast-1:123456789012:fsxn-ems-webhook-ems-dlq` |
 | **Judgment** | ✅ PASS |
 
 ---
@@ -200,13 +200,13 @@ aws cloudformation deploy \
   --stack-name fsxn-fp-srv \
   --parameter-overrides \
     ComputeType=fargate \
-    VpcId=vpc-0ae01826f906191af \
+    VpcId=vpc-0123456789abcdef0 \
     SubnetIds=subnet-0307ebbd55b35c842,subnet-0af86ebd3c65481b8 \
-    FsxnSvmSecurityGroupId=sg-04b2fedb571860818 \
-    ContainerImage=178625946981.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix \
+    FsxnSvmSecurityGroupId=sg-0123456789abcdef0 \
+    ContainerImage=123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix \
     FPolicyPort=9898 \
-    FsxnMgmtIp=10.0.15.0 \
-    FsxnSvmUuid=2c3f92e2-4ee2-11f1-acbd-21ab1e8e6bf5 \
+    FsxnMgmtIp=10.0.x.x \
+    FsxnSvmUuid=<svm-uuid> \
     FsxnEngineName=fpolicy_lambda_engine \
     FsxnPolicyName=fpolicy_lambda_policy \
     FsxnCredentialsSecret=<Secrets Manager ARN> \
@@ -302,7 +302,7 @@ aws logs filter-log-events \
 
 # 2. Check SQS queue message count
 aws sqs get-queue-attributes \
-  --queue-url https://sqs.ap-northeast-1.amazonaws.com/178625946981/<queue-name> \
+  --queue-url https://sqs.ap-northeast-1.amazonaws.com/123456789012/<queue-name> \
   --attribute-names ApproximateNumberOfMessages \
   --region ap-northeast-1
 ```

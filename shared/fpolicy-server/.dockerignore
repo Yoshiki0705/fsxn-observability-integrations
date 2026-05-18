@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+.env
+*.md
+tests/
+.pytest_cache
+.hypothesis
+build-and-push.sh

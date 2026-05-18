@@ -1,81 +1,83 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: >
-  FSxN OpenTelemetry Integration - Vendor-neutral audit log shipping via OTLP/HTTP.
-  Ships to any OTLP-compatible backend (Grafana, Honeycomb, Datadog, Jaeger, etc.)
+Description: FSxN OTel Collector Integration - OTLP/HTTP audit log shipping via S3 Access Point
 
 Parameters:
   S3AccessPointArn:
     Type: String
-    Description: ARN of the S3 Access Point for FSx ONTAP audit logs
+    Description: >-
+      ARN of the FSx for ONTAP S3 Access Point attached to the audit volume.
+      Format: arn:aws:s3:<region>:<account-id>:accesspoint/<name>
     AllowedPattern: 'arn:aws:s3:[a-z0-9-]+:\d{12}:accesspoint/.+'
-
-  OtlpEndpoint:
-    Type: String
-    Description: OTLP/HTTP endpoint URL (e.g., http://collector:4318 or https://otlp.vendor.com)
-    AllowedPattern: 'https?://.+'
-
-  OtlpHeaders:
-    Type: String
-    Default: ''
-    Description: >
-      Additional OTLP headers as key=value,key2=value2
-      (e.g., X-Scope-OrgID=tenant1)
 
   ApiKeySecretArn:
     Type: String
     Default: ''
-    Description: >
-      (Optional) Secrets Manager ARN for bearer token auth.
-      Leave empty if using OTLP_HEADERS for auth.
+    Description: >-
+      ARN of the Secrets Manager secret containing optional auth token
+      for the OTLP endpoint. Leave empty if no authentication is required.
+
+  OtlpEndpoint:
+    Type: String
+    Description: >-
+      OTel Collector OTLP/HTTP endpoint URL (e.g., http://collector:4318).
+      The Lambda will POST to <endpoint>/v1/logs.
+
+  ServiceName:
+    Type: String
+    Default: fsxn-audit
+    Description: Value for the OTLP resource attribute service.name
 
   S3BucketName:
     Type: String
-    Description: S3 bucket name for event notification
+    Description: Name of the S3 bucket containing audit log files
 
   S3KeyPrefix:
     Type: String
-    Default: ''
-
-  OtelServiceName:
-    Type: String
-    Default: fsxn-ontap-audit
-    Description: OpenTelemetry service.name resource attribute
-
-  OtelResourceAttributes:
-    Type: String
-    Default: ''
-    Description: >
-      Additional resource attributes as key=value,key2=value2
-      (e.g., deployment.environment=production,cloud.region=ap-northeast-1)
+    Default: 'audit/'
+    Description: Key prefix for audit log files within the S3 bucket
 
   LogLevel:
     Type: String
     Default: INFO
-    AllowedValues: [DEBUG, INFO, WARNING, ERROR]
+    AllowedValues:
+      - DEBUG
+      - INFO
+      - WARNING
+      - ERROR
+    Description: Lambda function log level
 
   LambdaMemorySize:
     Type: Number
     Default: 256
     MinValue: 128
     MaxValue: 3008
+    Description: Lambda function memory size in MB
 
   LambdaTimeout:
     Type: Number
     Default: 300
     MinValue: 30
     MaxValue: 900
+    Description: Lambda function timeout in seconds
 
 Conditions:
   HasApiKeySecret: !Not [!Equals [!Ref ApiKeySecretArn, '']]
 
 Resources:
+  # Dead Letter Queue
   DeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub '${AWS::StackName}-dlq'
       MessageRetentionPeriod: 1209600
       KmsMasterKeyId: alias/aws/sqs
+      Tags:
+        - Key: Project
+          Value: fsxn-observability
+        - Key: Vendor
+          Value: otel-collector
 
+  # Lambda Execution Role
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -93,8 +95,13 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: s3:GetObject
-                Resource: !Sub '${S3AccessPointArn}/object/*'
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub '${S3AccessPointArn}'
+                  - !Sub '${S3AccessPointArn}/object/*'
+
         - PolicyName: CloudWatchLogs
           PolicyDocument:
             Version: '2012-10-17'
@@ -104,14 +111,19 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-shipper:*'
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-shipper:*'
+
         - PolicyName: SQSSendMessage
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: sqs:SendMessage
-                Resource: !GetAtt DeadLetterQueue.Arn
+                Action:
+                  - sqs:SendMessage
+                Resource:
+                  - !GetAtt DeadLetterQueue.Arn
+
         - !If
           - HasApiKeySecret
           - PolicyName: SecretsManagerRead
@@ -119,10 +131,13 @@ Resources:
               Version: '2012-10-17'
               Statement:
                 - Effect: Allow
-                  Action: secretsmanager:GetSecretValue
-                  Resource: !Ref ApiKeySecretArn
-          - !Ref 'AWS::NoValue'
+                  Action:
+                    - secretsmanager:GetSecretValue
+                  Resource:
+                    - !Ref ApiKeySecretArn
+          - !Ref AWS::NoValue
 
+  # Lambda Function
   LogShipperFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -131,6 +146,7 @@ Resources:
       Handler: handler.lambda_handler
       Code:
         ZipFile: |
+          # Placeholder - deploy actual code via CI/CD or S3
           def lambda_handler(event, context):
               raise NotImplementedError("Deploy actual handler code")
       Role: !GetAtt LambdaExecutionRole.Arn
@@ -141,38 +157,41 @@ Resources:
       Environment:
         Variables:
           OTLP_ENDPOINT: !Ref OtlpEndpoint
-          OTLP_HEADERS: !Ref OtlpHeaders
           API_KEY_SECRET_ARN: !If [HasApiKeySecret, !Ref ApiKeySecretArn, '']
           S3_ACCESS_POINT_ARN: !Ref S3AccessPointArn
-          OTEL_SERVICE_NAME: !Ref OtelServiceName
-          OTEL_RESOURCE_ATTRIBUTES: !Ref OtelResourceAttributes
           LOG_LEVEL: !Ref LogLevel
+          SERVICE_NAME: !Ref ServiceName
+      Tags:
+        - Key: Project
+          Value: fsxn-observability
+        - Key: Vendor
+          Value: otel-collector
 
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-shipper'
-      RetentionInDays: 30
-
+  # EventBridge Rule - S3 Object Created
   EventBridgeRule:
     Type: AWS::Events::Rule
     Properties:
-      Name: !Sub '${AWS::StackName}-s3-event'
+      Name: !Sub '${AWS::StackName}-s3-trigger'
+      Description: Trigger Lambda on new audit log files in S3
       State: ENABLED
       EventPattern:
-        source: [aws.s3]
-        detail-type: [Object Created]
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
         detail:
           bucket:
-            name: [!Ref S3BucketName]
+            name:
+              - !Ref S3BucketName
           object:
             key:
               - prefix: !Ref S3KeyPrefix
       Targets:
-        - Id: LogShipperTarget
+        - Id: LogShipperLambda
           Arn: !GetAtt LogShipperFunction.Arn
 
-  LambdaEventBridgePermission:
+  # Permission for EventBridge to invoke Lambda
+  EventBridgeLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref LogShipperFunction
@@ -180,10 +199,19 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt EventBridgeRule.Arn
 
+  # CloudWatch Log Group
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-shipper'
+      RetentionInDays: 30
+
+  # CloudWatch Alarm - Errors
   ErrorAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub '${AWS::StackName}-errors'
+      AlarmDescription: FSxN OTel log shipper error rate exceeded threshold
       Namespace: AWS/Lambda
       MetricName: Errors
       Dimensions:
@@ -196,13 +224,63 @@ Resources:
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
 
+  # CloudWatch Alarm - Throttles
+  ThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-throttles'
+      AlarmDescription: FSxN OTel log shipper throttling detected
+      Namespace: AWS/Lambda
+      MetricName: Throttles
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref LogShipperFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  # CloudWatch Alarm - DLQ Messages
+  DLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-dlq-messages'
+      AlarmDescription: Messages appearing in Dead Letter Queue
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt DeadLetterQueue.QueueName
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
 Outputs:
   LambdaFunctionArn:
+    Description: ARN of the OTLP log shipper Lambda function
     Value: !GetAtt LogShipperFunction.Arn
+
+  LambdaFunctionName:
+    Description: Name of the OTLP log shipper Lambda function
+    Value: !Ref LogShipperFunction
+
+  DeadLetterQueueUrl:
+    Description: URL of the Dead Letter Queue
+    Value: !Ref DeadLetterQueue
+
   DeadLetterQueueArn:
+    Description: ARN of the Dead Letter Queue
     Value: !GetAtt DeadLetterQueue.Arn
-  UsageNote:
-    Description: Vendor-neutral OTLP integration
-    Value: >
-      This integration ships logs via OTLP/HTTP to any compatible backend.
-      Configure OtlpEndpoint to point to your collector or vendor OTLP endpoint.
+
+  ErrorAlarmArn:
+    Description: ARN of the error CloudWatch alarm
+    Value: !GetAtt ErrorAlarm.Arn
+
+  EventBridgeRuleArn:
+    Description: ARN of the EventBridge rule
+    Value: !GetAtt EventBridgeRule.Arn

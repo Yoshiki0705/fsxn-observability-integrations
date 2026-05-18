@@ -1,54 +1,71 @@
-# OpenTelemetry Collector Setup Guide
+# OTel Collector Integration Setup Guide
 
-🌐 [日本語](../ja/setup-guide.md)
-
-## Overview
-
-Vendor-neutral OTLP/HTTP integration for shipping FSx ONTAP audit logs to any compatible backend.
+This guide walks you through setting up the FSx for ONTAP audit log pipeline that delivers logs simultaneously to Grafana Cloud (Loki) and Honeycomb via an OpenTelemetry Collector.
 
 ## Prerequisites
 
-- OTLP-compatible backend (Grafana, Honeycomb, Datadog, Jaeger, etc.)
-- [Prerequisites stack](../../../docs/en/prerequisites.md) deployed
+- Docker and Docker Compose installed
+- AWS CLI v2 configured (`aws configure`)
+- FSx for ONTAP S3 Access Point created
+- Grafana Cloud account (Loki endpoint, User ID, API Token)
+- Honeycomb account (API Key)
+- Python 3.12 (for Lambda development)
 
-## Step 1: Prepare OTLP Endpoint
+## OTel Collector Docker Setup
 
-### Grafana Cloud
-```
-Endpoint: https://otlp-gateway-prod-ap-southeast-0.grafana.net/otlp
-Headers: Authorization=Basic <base64(instance_id:api_key)>
+Run the OTel Collector locally to receive logs via OTLP/HTTP.
+
+### Docker Compose Configuration
+
+```yaml
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      - "4318:4318"   # OTLP HTTP
+      - "13133:13133" # Health check
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    environment:
+      - GRAFANA_LOKI_ENDPOINT=${GRAFANA_LOKI_ENDPOINT}
+      - GRAFANA_LOKI_USER=${GRAFANA_LOKI_USER}
+      - GRAFANA_LOKI_TOKEN=${GRAFANA_LOKI_TOKEN}
+      - HONEYCOMB_API_KEY=${HONEYCOMB_API_KEY}
+      - HONEYCOMB_DATASET=${HONEYCOMB_DATASET:-fsxn-audit}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:13133/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
 ```
 
-### Honeycomb
-```
-Endpoint: https://api.honeycomb.io
-Headers: x-honeycomb-team=<api-key>,x-honeycomb-dataset=fsxn-audit
-```
+### Configure Environment Variables
 
-### Self-hosted Collector
-```
-Endpoint: http://<collector-host>:4318
-```
-
-## Step 2: Deploy CloudFormation
+Copy `.env.example` to `.env` and fill in your credentials:
 
 ```bash
-aws cloudformation deploy \
-  --template-file integrations/otel-collector/template.yaml \
-  --stack-name fsxn-otel-integration \
-  --parameter-overrides \
-    S3AccessPointArn=$AP_ARN \
-    OtlpEndpoint=https://otlp-gateway.grafana.net/otlp \
-    OtlpHeaders="Authorization=Basic xxx" \
-    S3BucketName=$BUCKET_NAME \
-  --capabilities CAPABILITY_IAM
+cp .env.example .env
+# Edit .env with your actual credentials
 ```
 
-## Step 3: Verify
+### Start the Collector
 
-Upload test event and confirm log arrival in your backend.
+```bash
+cd integrations/otel-collector
+docker compose up -d
+```
 
-## Self-hosted Collector Config
+Verify the health check:
+
+```bash
+curl -f http://localhost:13133/
+```
+
+## Collector YAML Configuration
+
+The OTel Collector config defines an OTLP receiver, batch processor, and dual exporters for Loki and Honeycomb.
 
 ```yaml
 receivers:
@@ -56,22 +73,125 @@ receivers:
     protocols:
       http:
         endpoint: 0.0.0.0:4318
+
 processors:
   batch:
     timeout: 5s
+    send_batch_size: 1000
+
 exporters:
   loki:
-    endpoint: http://loki:3100/loki/api/v1/push
+    endpoint: ${env:GRAFANA_LOKI_ENDPOINT}
+    default_labels_enabled:
+      exporter: false
+      job: true
+    headers:
+      Authorization: "Basic ${env:GRAFANA_LOKI_USER}:${env:GRAFANA_LOKI_TOKEN}"
+
+  otlphttp/honeycomb:
+    endpoint: https://api.honeycomb.io
+    headers:
+      x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
+      x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
 service:
+  extensions: [health_check]
   pipelines:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [loki]
+      exporters: [loki, otlphttp/honeycomb]
 ```
 
-## Benefits
+This configuration automatically fans out OTLP logs from the Lambda to both Grafana Cloud and Honeycomb simultaneously.
 
-- No vendor lock-in: Switch backends without code changes
-- Multi-destination: Fan-out to multiple backends simultaneously
-- Standard format: CNCF OpenTelemetry Log Data Model
+## CloudFormation Deployment
+
+Deploy the Lambda function and supporting resources to AWS.
+
+### Parameters
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `S3AccessPointArn` | FSx ONTAP S3 AP ARN | `arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit` |
+| `OtlpEndpoint` | OTel Collector endpoint | `http://collector:4318` |
+| `ApiKeySecretArn` | Auth token Secret ARN (optional) | `arn:aws:secretsmanager:...` |
+| `ServiceName` | OTLP service.name attribute | `fsxn-audit` |
+| `S3BucketName` | Audit log bucket name | `fsxn-audit-logs-bucket` |
+
+### Deploy Command
+
+```bash
+aws cloudformation deploy \
+  --template-file integrations/otel-collector/template.yaml \
+  --stack-name fsxn-otel-integration \
+  --parameter-overrides \
+    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit \
+    OtlpEndpoint=http://your-collector:4318 \
+    S3BucketName=fsxn-audit-logs-bucket \
+    ServiceName=fsxn-audit \
+  --capabilities CAPABILITY_IAM \
+  --region ap-northeast-1
+```
+
+## Test Event Invocation
+
+Send a test event to the Lambda function to verify the pipeline.
+
+```bash
+aws lambda invoke \
+  --function-name fsxn-otel-integration-shipper \
+  --payload file://integrations/otel-collector/tests/test_data/sample_s3_event.json \
+  --cli-binary-format raw-in-base64-out \
+  /tmp/otel-response.json
+
+cat /tmp/otel-response.json
+```
+
+Expected response:
+
+```json
+{"statusCode": 200, "body": {"total_logs": 6, "total_shipped": 6, "errors": []}}
+```
+
+## Verification Steps
+
+### 1. Check Lambda Execution Logs
+
+Confirm successful OTLP delivery in CloudWatch Logs:
+
+```bash
+aws logs tail /aws/lambda/fsxn-otel-integration-shipper --since 5m
+```
+
+Expected output: Log entries showing `OTLP payload sent successfully`.
+
+![CloudWatch OTLP delivery success](../../../../docs/screenshots/01-cloudwatch-otlp-success.png)
+
+### 2. Verify Log Arrival in Grafana Cloud
+
+In Grafana Cloud Explore, run the following query:
+
+- Data source: Loki
+- Query: `{job="fsxn-audit"}`
+
+Confirm that FSx ONTAP audit logs appear within 5 minutes. Verify that `event.type`, `user.name`, and `fsxn.operation` attributes are present.
+
+![Grafana Cloud log arrival](../../../../docs/screenshots/02-grafana-logs-arrival.png)
+
+### 3. Verify Log Arrival in Honeycomb
+
+Query the `fsxn-audit` dataset in Honeycomb:
+
+- Dataset: `fsxn-audit`
+- Time range: Last 5 minutes
+
+Confirm that FSx ONTAP audit logs appear within 5 minutes.
+
+### 4. Multi-Backend Consistency Check
+
+Verify that the same event (matching timestamp and file path) appears in both Grafana Cloud and Honeycomb.

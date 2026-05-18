@@ -80,7 +80,7 @@ aws logs filter-log-events \
 **手順**:
 1. FSx ONTAP 管理エンドポイントに SSH 接続:
    ```bash
-   ssh admin@management.fs-09ffe72a3b2b7dbbd.fsx.ap-northeast-1.amazonaws.com
+   ssh admin@management.fs-0123456789abcdef0.fsx.ap-northeast-1.amazonaws.com
    ```
 2. 以下のコマンドを実行:
    ```

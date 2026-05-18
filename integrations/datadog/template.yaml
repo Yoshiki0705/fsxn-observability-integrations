@@ -91,7 +91,7 @@ Parameters:
       - 'false'
     Description: >-
       Enable VPC configuration for Lambda.
-      Note: FSx ONTAP S3 APs are NOT accessible via S3 Gateway VPC Endpoints.
+      Note: Internet-origin FSx ONTAP S3 APs timed out with only Gateway Endpoints in our testing.
       If VpcEnabled=true, ensure NAT Gateway is available for S3 AP access.
 
   VpcSubnetIds:

@@ -1,0 +1,12 @@
+{
+  "time": "2024-01-15T11:00:00+09:00",
+  "messageName": "arw.vserver.state",
+  "severity": "alert",
+  "node": "fsxn-node-01",
+  "svmName": "svm-prod-01",
+  "message": "Anti-ransomware: Vserver svm-prod-01 state changed to enabled",
+  "parameters": {
+    "vserver_name": "svm-prod-01",
+    "state": "enabled"
+  }
+}

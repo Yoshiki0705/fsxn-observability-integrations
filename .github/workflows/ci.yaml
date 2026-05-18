@@ -58,6 +58,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check for sensitive data in tracked files
+        run: |
+          echo "Checking for common sensitive patterns..."
+          FAILED=0
+
+          # Check .kiro/ is not tracked
+          KIRO_COUNT=$(git ls-files .kiro/ | wc -l)
+          if [ "${KIRO_COUNT}" -gt 0 ]; then
+            echo "❌ .kiro/ files are tracked"
+            FAILED=1
+          fi
+
+          # Check docs/blog/ is not tracked
+          BLOG_COUNT=$(git ls-files docs/blog/ | wc -l)
+          if [ "${BLOG_COUNT}" -gt 0 ]; then
+            echo "❌ docs/blog/ files are tracked"
+            FAILED=1
+          fi
+
+          # Check .env is not tracked
+          if git ls-files | grep -q "^\.env$"; then
+            echo "❌ .env is tracked"
+            FAILED=1
+          fi
+
+          # Check for personal file paths
+          if git ls-files | xargs grep -lE "/Users/[^/]+/(Downloads|Library)/.*\.pem" 2>/dev/null; then
+            echo "❌ Personal file paths found in tracked files"
+            FAILED=1
+          fi
+
+          if [ "${FAILED}" -eq 1 ]; then
+            exit 1
+          fi
+          echo "✅ Security checks passed"
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:

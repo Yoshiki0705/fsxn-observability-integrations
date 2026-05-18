@@ -34,6 +34,21 @@ bash shared/scripts/deploy.sh <vendor> <stack-name> --region ap-northeast-1
 bash shared/scripts/test.sh
 ```
 
+## FPolicy Operations
+
+```bash
+# Build and push FPolicy server image (MUST use linux/amd64 for Fargate)
+bash shared/fpolicy-server/build-and-push.sh v2-timeout-fix
+
+# Start/stop FPolicy Fargate service
+bash shared/scripts/fpolicy-fargate-control.sh start
+bash shared/scripts/fpolicy-fargate-control.sh stop
+bash shared/scripts/fpolicy-fargate-control.sh status
+
+# Update ONTAP FPolicy External Engine IP after task restart
+bash shared/scripts/fpolicy-update-engine-ip.sh --auto
+```
+
 ## Project Structure
 
 ```
@@ -99,18 +114,18 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
 ### ⚠️ CRITICAL: FSx ONTAP S3 Access Points — Network Constraints
 
-**FSx ONTAP S3 Access Points are NOT accessible via S3 Gateway VPC Endpoint.**
+**VPC-internal Lambda with only a Gateway Endpoint timed out accessing Internet-origin FSx ONTAP S3 Access Points in our environment.**
 
-This is the #1 source of deployment failures. FSx ONTAP S3 APs route through the FSx data plane, not the standard S3 data plane.
+This is the #1 source of deployment failures. The observed behavior is that Internet-origin S3 APs require an internet-routed path (NAT Gateway or VPC-external Lambda) when accessed from within a VPC.
 
 | Lambda Placement | S3 AP Access | ONTAP REST API Access | Recommendation |
 |-----------------|-------------|----------------------|----------------|
 | **VPC 外 (no VPC config)** | ✅ Works | ❌ Requires VPC | Simplest for S3 AP only |
-| **VPC 内 + S3 Gateway EP** | ❌ TIMEOUT | ✅ Works | Do NOT use for S3 AP |
+| **VPC 内 + S3 Gateway EP only** | ⚠️ TIMEOUT (Internet-origin AP) | ✅ Works | Use NAT or VPC-origin AP |
 | **VPC 内 + NAT Gateway** | ✅ Works | ✅ Works | Production recommended |
-| **VPC 内 + Interface EP** | ❌ TIMEOUT | ✅ Works | Do NOT use for S3 AP |
+| **VPC 内 + VPC-origin AP + Gateway EP** | ✅ Expected per AWS docs | ✅ Works | Requires VPC-origin AP creation |
 
-**Root cause**: S3 Gateway VPC Endpoints only route traffic for the standard S3 service (`com.amazonaws.<region>.s3`). FSx ONTAP S3 Access Points use a different data path through the FSx service. Traffic to FSx S3 APs from within a VPC requires NAT Gateway or internet access.
+**Observed behavior**: In our environment (Internet-origin S3 AP), VPC Lambda with only a Gateway Endpoint timed out. AWS [documents](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html) that VPC-origin access points work with Gateway Endpoints for traffic originating within the bound VPC. The network origin cannot be changed after creation.
 
 **Design pattern for this project**:
 - Lambda functions that ONLY read from S3 AP → Deploy **outside VPC** (simplest, lowest cost)
@@ -166,6 +181,8 @@ Reference: [AWS Docs — S3 AP API Support](https://docs.aws.amazon.com/fsx/late
 ### Audit log formats
 
 FSx ONTAP outputs audit logs in EVTX (Windows Event Log binary) or XML format depending on SVM audit configuration (`vserver audit create -format {evtx|xml}`). The `shared/lambda-layers/log-parser/` handles both. EVTX files start with magic bytes `ElfFile\x00`. XML logs contain `<Event>` elements with system and event data.
+
+> **ONTAP CLI note**: ONTAP 9.11+ deprecates the `vserver` prefix on FPolicy commands (e.g., `vserver fpolicy` → `fpolicy`). Both forms work for backward compatibility. This project uses the deprecated form for compatibility with older ONTAP versions on FSx.
 
 Reference: [AWS Docs — File access auditing](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html)
 
@@ -237,15 +254,78 @@ For high-volume logs (>1000 events/second sustained), prefer the Firehose path o
 - Delete `shared/lambda-layers/` or `shared/templates/`
 - Use `requests` library in Lambda (not in runtime, use `urllib3`)
 - Store secrets in Lambda environment variables (use Secrets Manager ARN only)
+- Commit real AWS account IDs, resource IDs, or IP addresses (use placeholders)
+- Commit screenshots without running `mask_screenshots.py`
+
+## Security & Privacy (Public Repository)
+
+This is a **public repository**. All committed content is visible to anyone.
+
+### Sensitive Data Rules
+
+| Data Type | Placeholder | Example |
+|-----------|-------------|---------|
+| AWS Account ID | `123456789012` | `arn:aws:s3:us-east-1:123456789012:accesspoint/...` |
+| Secret ARN suffix | `-XXXXXX` | `secret:fsxn-datadog-api-key-XXXXXX` |
+| FSx File System ID | `fs-0123456789abcdef0` | — |
+| SVM ID | `svm-0123456789abcdef0` | — |
+| VPC/Subnet/SG IDs | `vpc-0123456789abcdef0` | — |
+| Private IPs | `10.0.x.x` or `<management-ip>` | — |
+| Public IPs | `<bastion-ip>` | — |
+| SSH key paths | `<your-ssh-key.pem>` | — |
+| SVM UUID | `<svm-uuid>` | — |
+
+### Pre-Push Checklist
+
+```bash
+# 1. Check for real account IDs in tracked files
+git ls-files | xargs grep -l "<your-account-id>" 2>/dev/null && echo "FAIL" || echo "PASS"
+
+# 2. Check .kiro/ is not tracked
+git ls-files .kiro/ | wc -l  # Should be 0
+
+# 3. Check docs/blog/ is not tracked
+git ls-files docs/blog/ | wc -l  # Should be 0
+
+# 4. Mask screenshots before committing
+python3 docs/screenshots/mask_screenshots.py
+
+# 5. Run tests
+python -m pytest integrations/datadog/tests/ -q
+```
+
+### .gitignore Protected Paths
+
+These paths MUST remain in `.gitignore`:
+- `.kiro/` — IDE steering files (contain environment-specific info)
+- `docs/blog/` — Draft articles (published via dev.to, not GitHub)
+- `.env` — API keys and credentials
+- `*.pem` — SSH keys
+
+### Scripts Must Be Environment-Agnostic
+
+All scripts use environment variables with sensible defaults:
+- `AWS_REGION` — defaults to `ap-northeast-1` but overridable
+- `AWS_ACCOUNT_ID` — dynamically resolved via `aws sts get-caller-identity`
+- `ONTAP_MGMT_IP` — required, no default (user must set)
+- `SVM_UUID` — required, no default (user must set)
+- `BASTION_IP` / `BASTION_KEY` — optional (only if ONTAP is behind bastion)
 
 ## Key Files
 
-- `integrations/datadog/lambda/handler.py` — Reference implementation (fully working)
-- `integrations/datadog/template.yaml` — Reference CloudFormation template
+- `integrations/datadog/lambda/handler.py` — Reference implementation (audit log path)
+- `integrations/datadog/lambda/fpolicy_handler.py` — FPolicy handler (SQS + EventBridge dual-format)
+- `integrations/datadog/template.yaml` — Reference CloudFormation template (audit log)
+- `integrations/datadog/template-ems-fpolicy.yaml` — EMS + FPolicy Lambda (with SQS event source mapping)
 - `shared/lambda-layers/log-parser/python/fsxn_log_parser/parser.py` — EVTX/XML parser
 - `shared/lambda-layers/s3ap-reader/python/s3ap_reader/reader.py` — S3 AP utility
 - `shared/templates/iam-base-roles.yaml` — IAM role pattern
-- `.kiro/steering/vendor-integration.md` — New vendor checklist
+- `shared/templates/fpolicy-server-fargate.yaml` — FPolicy Fargate stack (ECS + SQS)
+- `shared/fpolicy-server/build-and-push.sh` — ECR image build (linux/amd64 required)
+- `shared/scripts/pre-push-security-check.sh` — Security scan before push
+- `shared/scripts/fpolicy-fargate-control.sh` — FPolicy Fargate start/stop/status
+- `shared/scripts/fpolicy-update-engine-ip.sh` — ONTAP Engine IP auto-update
+- `docs/screenshots/mask_screenshots.py` — Screenshot masking (PII removal)
 
 ## Deploying Prerequisites
 
@@ -292,9 +372,10 @@ aws cloudformation deploy \
 
 **Architecture:**
 - EMS: ONTAP EMS → Webhook (HTTPS) → API Gateway → Lambda → Vendor
-- FPolicy: ONTAP → TCP:9898 → ECS Fargate → SQS → EventBridge → Lambda → Vendor
+- FPolicy: ONTAP → TCP:9898 → ECS Fargate → SQS → Lambda → Vendor (SQS event source mapping)
 - FPolicy uses a proprietary binary protocol over TCP (NOT HTTP/HTTPS)
-- ONTAP connects directly to Fargate task IP (NLB is health-check only)
+- ONTAP connects directly to Fargate task IP (not via NLB)
+- Fargate task IP changes on restart — ONTAP External Engine must be updated
 
 Two patterns exist:
 - **Pattern A (existing FSx ONTAP)**: Deploy prerequisites.yaml → enable audit → deploy vendor stack

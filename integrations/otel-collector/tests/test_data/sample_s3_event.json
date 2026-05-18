@@ -1,0 +1,21 @@
+{
+  "Records": [
+    {
+      "eventVersion": "2.1",
+      "eventSource": "aws:s3",
+      "awsRegion": "ap-northeast-1",
+      "eventTime": "2026-01-15T12:00:00.000Z",
+      "eventName": "ObjectCreated:Put",
+      "s3": {
+        "bucket": {
+          "name": "fsxn-audit-logs-bucket",
+          "arn": "arn:aws:s3:::fsxn-audit-logs-bucket"
+        },
+        "object": {
+          "key": "audit/svm1/2026/01/15/audit_log_001.json",
+          "size": 1024
+        }
+      }
+    }
+  ]
+}

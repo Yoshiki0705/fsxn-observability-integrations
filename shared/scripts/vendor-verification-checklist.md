@@ -40,7 +40,7 @@ Based on lessons learned from the Datadog integration (3-part blog series) E2E v
 - [ ] **Lambda network placement** confirmed:
   - VPC-external Lambda (simplest for S3 AP only) ✅
   - VPC + NAT Gateway (if ONTAP REST API also needed) ✅
-  - VPC + S3 Gateway Endpoint ❌ DOES NOT WORK with FSx ONTAP S3 AP
+  - VPC + S3 Gateway Endpoint only (Internet-origin AP) ⚠️ TIMEOUT — use NAT or VPC-origin AP
 
 ### Vendor API Pre-checks
 
@@ -208,7 +208,7 @@ Based on lessons learned from the Datadog integration (3-part blog series) E2E v
 
 | Pitfall | Symptom | Solution |
 |---------|---------|----------|
-| S3 Gateway VPC Endpoint | Lambda timeout reading S3 AP | Use VPC-external Lambda or NAT Gateway |
+| S3 Gateway EP only (Internet-origin AP) | Lambda timeout reading S3 AP | Use VPC-external Lambda, NAT Gateway, or VPC-origin AP |
 | No time-based rotation | No new log files appear | Set 5-min rotation for verification |
 | Missing SACL | Audit events not generated | Configure SACL on target files |
 | AuditLogPrefix mismatch | Lambda processes 0 files | Verify with `list-objects-v2` |
