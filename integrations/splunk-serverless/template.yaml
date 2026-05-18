@@ -59,6 +59,11 @@ Parameters:
     MinValue: 30
     MaxValue: 900
 
+  EmsApiKeySecretArn:
+    Type: String
+    Description: ARN of the Secrets Manager secret containing the EMS webhook API key
+    AllowedPattern: 'arn:aws:secretsmanager:[a-z0-9-]+:\d{12}:secret:.+'
+
 Resources:
   DeadLetterQueue:
     Type: AWS::SQS::Queue
@@ -185,11 +190,161 @@ Resources:
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
 
+  # ============================================================
+  # EMS Webhook Resources
+  # ============================================================
+
+  # Dead Letter Queue for EMS handler
+  EmsDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${AWS::StackName}-ems-dlq'
+      MessageRetentionPeriod: 1209600
+      KmsMasterKeyId: alias/aws/sqs
+
+  # EMS Lambda Execution Role
+  EmsLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-ems-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SecretsManagerRead
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref EmsApiKeySecretArn
+                  - !Ref SplunkHecTokenSecretArn
+        - PolicyName: CloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-ems-webhook:*'
+        - PolicyName: SQSSendMessage
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt EmsDeadLetterQueue.Arn
+
+  # EMS Webhook Lambda Function
+  EmsWebhookFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ems-webhook'
+      Runtime: python3.12
+      Handler: ems_handler.lambda_handler
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              raise NotImplementedError("Deploy actual EMS handler code")
+      Role: !GetAtt EmsLambdaExecutionRole.Arn
+      MemorySize: 256
+      Timeout: 30
+      DeadLetterConfig:
+        TargetArn: !GetAtt EmsDeadLetterQueue.Arn
+      Environment:
+        Variables:
+          SPLUNK_HEC_ENDPOINT: !Ref SplunkHecEndpoint
+          EMS_API_KEY_SECRET_ARN: !Ref EmsApiKeySecretArn
+          HEC_TOKEN_SECRET_ARN: !Ref SplunkHecTokenSecretArn
+
+  # EMS Lambda CloudWatch Log Group
+  EmsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-ems-webhook'
+      RetentionInDays: 30
+
+  # API Gateway HTTP API for EMS Webhook
+  EmsHttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-ems-api'
+      ProtocolType: HTTP
+      Description: HTTP API for receiving ONTAP EMS webhook events
+
+  EmsHttpApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref EmsHttpApi
+      StageName: '$default'
+      AutoDeploy: true
+
+  EmsHttpApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref EmsHttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt EmsWebhookFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  EmsHttpApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref EmsHttpApi
+      RouteKey: 'POST /ems'
+      Target: !Sub 'integrations/${EmsHttpApiIntegration}'
+
+  # Lambda permission for API Gateway invocation
+  EmsLambdaApiGatewayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EmsWebhookFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${EmsHttpApi}/*/*/ems'
+
+  # CloudWatch Alarm for EMS handler errors
+  EmsErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-ems-errors'
+      AlarmDescription: EMS webhook handler errors detected
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref EmsWebhookFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
 Outputs:
   LambdaFunctionArn:
     Value: !GetAtt LogShipperFunction.Arn
   DeadLetterQueueArn:
     Value: !GetAtt DeadLetterQueue.Arn
+  EmsWebhookFunctionArn:
+    Description: ARN of the EMS webhook Lambda function
+    Value: !GetAtt EmsWebhookFunction.Arn
+  EmsApiEndpoint:
+    Description: EMS webhook API Gateway endpoint URL
+    Value: !Sub 'https://${EmsHttpApi}.execute-api.${AWS::Region}.amazonaws.com/ems'
+  EmsDeadLetterQueueArn:
+    Description: ARN of the EMS Dead Letter Queue
+    Value: !GetAtt EmsDeadLetterQueue.Arn
+  EmsErrorAlarmArn:
+    Description: ARN of the EMS error CloudWatch alarm
+    Value: !GetAtt EmsErrorAlarm.Arn
   ArchitectureNote:
     Description: Serverless alternative to EC2-based syslog-ng + Universal Forwarder
     Value: 'FSx ONTAP -> S3 AP -> EventBridge -> Lambda -> Splunk HEC'

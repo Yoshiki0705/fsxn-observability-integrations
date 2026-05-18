@@ -1,0 +1,12 @@
+{
+  "time": "2024-01-15T16:00:00+09:00",
+  "messageName": "sms.vol.full",
+  "severity": "error",
+  "node": "fsxn-node-01",
+  "svmName": "svm-prod-01",
+  "message": "Volume vol_backup is full (98% used)",
+  "parameters": {
+    "volume_name": "vol_backup",
+    "used_percent": 98
+  }
+}

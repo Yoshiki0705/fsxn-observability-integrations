@@ -19,15 +19,15 @@ ONTAP FPolicy → TCP:9898 → ECS Fargate → SQS (FPolicy_Q) → Bridge Lambda
 |--------------|-----|
 | コンピュートモード | ECS Fargate (ARM64) |
 | CPU / Memory | 256 CPU / 512 MB |
-| コンテナイメージ | `178625946981.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix` |
+| コンテナイメージ | `123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix` |
 | リスンポート | TCP 9898 |
-| VPC | `vpc-0ae01826f906191af` |
+| VPC | `vpc-0123456789abcdef0` |
 | サブネット | `subnet-0307ebbd55b35c842` (プライベート) |
 | FPolicy Server SG | `sg-0a5472cd966cd7905` (TCP 9898 inbound) |
-| FSxN SVM SG | `sg-04b2fedb571860818` |
-| SVM | `FPolicySMB` (svm-037cedb30df493c1e) |
-| SVM UUID | `2c3f92e2-4ee2-11f1-acbd-21ab1e8e6bf5` |
-| SVM 管理 IP | `10.0.15.0` |
+| FSxN SVM SG | `sg-0123456789abcdef0` |
+| SVM | `FPolicySMB` (svm-0123456789abcdef0) |
+| SVM UUID | `<svm-uuid>` |
+| SVM 管理 IP | `10.0.x.x` |
 | Secrets | `fsx-ontap-fsxadmin-credentials` |
 
 ---
@@ -110,8 +110,8 @@ KeepAlive が見えない場合:
 ### 症状
 ECS ログに以下のエラーが表示される:
 ```
-AccessDenied: User: arn:aws:sts::178625946981:assumed-role/xxx is not authorized
-to perform: sqs:SendMessage on resource: arn:aws:sqs:ap-northeast-1:178625946981:FPolicy_Q
+AccessDenied: User: arn:aws:sts::123456789012:assumed-role/xxx is not authorized
+to perform: sqs:SendMessage on resource: arn:aws:sqs:ap-northeast-1:123456789012:FPolicy_Q
 ```
 
 ### 原因
@@ -130,7 +130,7 @@ ECS タスクロールに以下のポリシーを追加:
         "sqs:SendMessage",
         "sqs:GetQueueUrl"
       ],
-      "Resource": "arn:aws:sqs:ap-northeast-1:178625946981:*-fpolicy-ingestion"
+      "Resource": "arn:aws:sqs:ap-northeast-1:123456789012:*-fpolicy-ingestion"
     }
   ]
 }
@@ -145,7 +145,7 @@ ECS タスクロールに以下のポリシーを追加:
 
 ### 現在のイメージ
 ```
-178625946981.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix
+123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix
 ```
 
 ### タグの意味
@@ -165,11 +165,11 @@ ECS タスクロールに以下のポリシーを追加:
 # 1. ECR 認証
 aws ecr get-login-password --region ap-northeast-1 | \
   docker login --username AWS --password-stdin \
-  178625946981.dkr.ecr.ap-northeast-1.amazonaws.com
+  123456789012.dkr.ecr.ap-northeast-1.amazonaws.com
 
 # 2. ビルド & プッシュ (ARM64)
 docker buildx build --platform linux/arm64 \
-  -t 178625946981.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:<new-tag> \
+  -t 123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:<new-tag> \
   --push .
 
 # 3. ECS サービスを更新（新イメージでタスク再起動）
@@ -249,7 +249,7 @@ aws logs filter-log-events \
 ```bash
 # キューの状態確認
 aws sqs get-queue-attributes \
-  --queue-url https://sqs.ap-northeast-1.amazonaws.com/178625946981/FPolicy_Q \
+  --queue-url https://sqs.ap-northeast-1.amazonaws.com/123456789012/FPolicy_Q \
   --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
 ```
 

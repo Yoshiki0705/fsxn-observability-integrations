@@ -67,5 +67,5 @@ aws cloudformation deploy \
 ## Important Notes
 
 - **FSx ONTAP S3 APs do NOT support S3 Event Notifications.** Lambda is invoked on a schedule (EventBridge Scheduler) and uses checkpointing to process only newly rotated files.
-- **S3 Gateway VPC Endpoints do NOT work** for FSx ONTAP S3 Access Points. If Lambda is in a VPC, use NAT Gateway.
+- **Internet-origin S3 APs** timed out with only a Gateway Endpoint in our environment. If Lambda is in a VPC, use NAT Gateway or create a VPC-origin AP.
 - Audit log format: EVTX or XML (configured via `vserver audit create -format {evtx|xml}`)

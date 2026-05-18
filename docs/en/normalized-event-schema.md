@@ -107,3 +107,24 @@ All vendor integrations normalize ONTAP audit events into a common internal sche
 | `parameters.state` | `@attributes.parameters.state` | `netapp.ontap.arp.state` | `arp_state` | `netapp.ontap.arp.state` |
 | `timestamp` | `date` | `time_unix_nano` | `_time` | `@timestamp` |
 | `message` | `message` | `body` | `_raw` | `message` |
+
+
+## FPolicy File Operation Event Mapping
+
+| Internal Field | Datadog | OpenTelemetry | Splunk | Elastic ECS |
+|---------------|---------|---------------|--------|-------------|
+| `operation_type` | `@attributes.operation_type` | `event.action` | `operation_type` | `event.action` |
+| `file_path` | `@attributes.file_path` | `file.path` | `file_path` | `file.path` |
+| `client_ip` | `@attributes.client_ip` | `source.ip` | `client_ip` | `source.ip` |
+| `volume_name` | `@attributes.volume_name` | `netapp.ontap.volume` | `volume_name` | `netapp.ontap.volume` |
+| `svm` | `@attributes.svm` | `netapp.ontap.svm` | `svm` | `netapp.ontap.svm` |
+| `user` | `@attributes.user` | `user.name` | `user` | `user.name` |
+| `protocol` | `@attributes.protocol` | `network.protocol` | `protocol` | `network.protocol` |
+| `timestamp` | `date` | `time_unix_nano` | `_time` | `@timestamp` |
+| `event_id` | `@attributes.event_id` | `event.id` | `event_id` | `event.id` |
+
+### Notes
+
+- FPolicy uses `operation_type` (create, write, rename, delete) while audit logs use `operation` (ReadData, WriteData, etc.). This is intentional — they represent different abstraction levels.
+- The `svm` field may show "unknown" if the FPolicy server cannot resolve the SVM name from the handshake context.
+- The `user` field may be empty for some operations depending on ONTAP's FPolicy notification content.

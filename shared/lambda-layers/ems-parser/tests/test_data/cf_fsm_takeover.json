@@ -1,0 +1,12 @@
+{
+  "time": "2024-01-15T18:00:00+09:00",
+  "messageName": "cf.fsm.takeoverStarted",
+  "severity": "alert",
+  "node": "fsxn-node-01",
+  "svmName": "svm-prod-01",
+  "message": "Takeover of partner node fsxn-node-02 started: hardware failure detected",
+  "parameters": {
+    "partner_node": "fsxn-node-02",
+    "reason": "hardware failure detected"
+  }
+}

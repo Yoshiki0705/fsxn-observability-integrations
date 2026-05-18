@@ -59,7 +59,7 @@
 
 | Datadog Attribute | FPolicy Field | Description |
 |-------------------|--------------|-------------|
-| `attributes.operation` | operation | File operation (create, write, delete, rename, open) |
+| `attributes.operation_type` | operation_type | File operation (create, write, delete, rename) |
 | `attributes.file_path` | file_path | Full file path |
 | `attributes.user` | user | User identity |
 | `attributes.client_ip` | client_ip | Client IP address |

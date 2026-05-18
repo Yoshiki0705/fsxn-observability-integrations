@@ -1,0 +1,15 @@
+{
+  "time": "2024-01-15T14:00:00+09:00",
+  "messageName": "wafl.quota.softlimit.exceeded",
+  "severity": "warning",
+  "node": "fsxn-node-01",
+  "svmName": "svm-prod-01",
+  "message": "Quota soft limit exceeded on volume vol_data, qtree qtree1, target user1: used 62914560 bytes exceeds soft limit 52428800 bytes",
+  "parameters": {
+    "volume_name": "vol_data",
+    "qtree": "qtree1",
+    "quota_target": "user1",
+    "used_bytes": 62914560,
+    "limit_bytes": 52428800
+  }
+}

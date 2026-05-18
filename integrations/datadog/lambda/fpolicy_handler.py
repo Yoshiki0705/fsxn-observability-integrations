@@ -148,20 +148,40 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
 
 def _extract_fpolicy_events(event: dict[str, Any]) -> list[dict[str, Any]]:
-    """Extract FPolicy file operation event(s) from EventBridge event.
+    """Extract FPolicy file operation event(s) from EventBridge or SQS event.
 
-    EventBridge delivers a single event per invocation with the FPolicy
-    data in the ``detail`` field.
+    Supports two invocation patterns:
+    1. EventBridge: single event with FPolicy data in ``detail`` field.
+    2. SQS: batch of records with FPolicy JSON in ``body`` field.
 
     Args:
-        event: EventBridge event dict.
+        event: EventBridge event dict or SQS batch event dict.
 
     Returns:
-        List of FPolicy event dictionaries (typically one per invocation).
+        List of FPolicy event dictionaries.
 
     Raises:
-        ValueError: If the event detail is missing or invalid.
+        ValueError: If the event format is unrecognized or invalid.
     """
+    # SQS event source mapping format
+    if "Records" in event:
+        events: list[dict[str, Any]] = []
+        for record in event["Records"]:
+            if record.get("eventSource") == "aws:sqs":
+                body = record.get("body", "")
+                try:
+                    parsed = json.loads(body)
+                    if isinstance(parsed, dict):
+                        events.append(parsed)
+                    else:
+                        logger.warning("SQS message body is not a dict: %s", type(parsed).__name__)
+                except json.JSONDecodeError as e:
+                    logger.error("Failed to parse SQS message body: %s", str(e))
+        if events:
+            return events
+        raise ValueError("No valid FPolicy events found in SQS records")
+
+    # EventBridge format
     detail = event.get("detail")
 
     if detail is None:
@@ -196,11 +216,12 @@ def _format_for_datadog(
     dd_logs: list[dict[str, Any]] = []
 
     for event in events:
-        operation = event.get("operation", "unknown")
+        # Support both field names: "operation" (EventBridge) and "operation_type" (SQS/FPolicy server)
+        operation = event.get("operation_type", event.get("operation", "unknown"))
         file_path = event.get("file_path", "")
         user = event.get("user", "")
         client_ip = event.get("client_ip", "")
-        vserver = event.get("vserver", "fsxn-ontap")
+        vserver = event.get("vserver", event.get("svm_name", "fsxn-ontap"))
         protocol = event.get("protocol", "")
 
         # Build human-readable message
@@ -229,11 +250,11 @@ def _format_for_datadog(
 
         # Structured attributes for Facet-based searching
         dd_log["attributes"] = {
-            "operation": operation,
+            "operation_type": operation,
             "file_path": file_path,
             "user": user,
             "client_ip": client_ip,
-            "vserver": vserver,
+            "svm": vserver,
             "protocol": protocol,
         }
 

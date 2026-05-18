@@ -10,18 +10,18 @@ Specification, constraints, and troubleshooting knowledge for FSx for ONTAP S3 A
 
 ### Root Cause
 
-**FSx ONTAP S3 Access Points are NOT accessible via S3 Gateway VPC Endpoints.**
+**Internet-origin FSx ONTAP S3 Access Points timed out when accessed from VPC Lambda with only a Gateway Endpoint (observed in our environment).**
 
-FSx ONTAP S3 APs route through the FSx data plane, not the standard S3 service endpoint (`com.amazonaws.<region>.s3`).
+AWS [documents](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html) that VPC-origin access points work with Gateway Endpoints for traffic originating within the bound VPC. For Internet-origin APs, NAT Gateway or VPC-external Lambda is required.
 
 ### Lambda Placement Patterns
 
 | Lambda Placement | S3 AP Access | ONTAP REST API | Recommended Use |
 |-----------------|-------------|---------------|----------------|
 | Outside VPC | ✅ Works | ❌ Cannot | S3 AP read-only (primary pattern for this project) |
-| In VPC + S3 Gateway EP | ❌ **TIMEOUT** | ✅ Works | ⚠️ Do NOT use |
+| In VPC + S3 Gateway EP (Internet-origin AP) | ⚠️ **TIMEOUT** | ✅ Works | Use NAT or VPC-origin AP |
 | In VPC + NAT Gateway | ✅ Works | ✅ Works | Production recommended |
-| In VPC + Interface EP only | ❌ **TIMEOUT** | ✅ Works | ⚠️ Do NOT use |
+| In VPC + VPC-origin AP + Gateway EP | ✅ Expected per AWS docs | ✅ Works | Requires VPC-origin AP |
 
 ### Design Decision for This Project
 

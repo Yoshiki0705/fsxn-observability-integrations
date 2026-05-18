@@ -20,7 +20,11 @@ Parameters:
 
   ContainerImage:
     Type: String
-    Description: FPolicy Server container image URI (ECR)
+    Description: >-
+      FPolicy Server container image URI (ECR).
+      IMPORTANT: Image MUST be built for linux/amd64 platform.
+      Use: docker buildx build --platform linux/amd64 -t <uri> --push .
+      Apple Silicon builds produce arm64-only images which will FAIL on Fargate.
 
   FPolicyPort:
     Type: Number
@@ -210,20 +214,25 @@ Resources:
             - !Ref FPolicyServerSecurityGroup
 
   # ============================================================
-  # EventBridge Rule: SQS → EventBridge (for vendor Lambda routing)
+  # EventBridge Rule: FPolicy events (for future EventBridge Pipe routing)
+  # NOTE: The PRIMARY event flow is SQS → Lambda (event source mapping).
+  # This rule exists for future use cases where EventBridge routing
+  # to multiple consumers is needed.
   # ============================================================
   SqsToEventBridgeRule:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub "${AWS::StackName}-fpolicy-events"
-      Description: Route FPolicy events from SQS to vendor Lambdas
+      Description: >-
+        FPolicy event pattern for future EventBridge-based routing.
+        Primary flow uses SQS event source mapping to Lambda directly.
       EventBusName: !Ref EventBusName
       EventPattern:
         source:
           - fpolicy.fsxn
         detail-type:
           - FPolicy File Operation
-      State: ENABLED
+      State: DISABLED
 
 Outputs:
   ClusterArn:

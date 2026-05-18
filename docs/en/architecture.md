@@ -15,6 +15,8 @@
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
+> **What "serverless" means in this series**: Minimizing server management and undifferentiated collector operations — not forcing every component into Lambda. FPolicy requires a persistent TCP listener, so we use ECS Fargate (serverless containers). Event decoupling uses SQS. Short-lived processing uses Lambda. Each AWS service is chosen for its operational characteristics, not to satisfy a "Lambda-only" constraint.
+
 ## ONTAP Telemetry Source Selection Guide
 
 | Requirement | Best Source | Latency |
@@ -45,7 +47,7 @@ An S3 Access Point attached to an FSx for ONTAP volume.
 - **Purpose**: Serverless access boundary for Lambda to read audit logs without NFS/SMB mounts
 - **Characteristics**: Data remains on the FSx file system, accessible via S3 API
 - **Limitation**: S3 Event Notifications / EventBridge notifications are NOT supported
-- **VPC Constraint**: NOT accessible via S3 Gateway VPC Endpoints (NAT Gateway required)
+- **VPC Constraint**: Internet-origin S3 AP timed out with only Gateway Endpoint in our environment (NAT Gateway or VPC-origin AP required)
 
 ### 3. Trigger Mechanism
 
@@ -119,7 +121,7 @@ This project uses Lambda → Vendor API direct because:
 ### Network
 
 - Access FSx for ONTAP S3 Access Point via NAT Gateway (when Lambda is in VPC)
-- **Note**: S3 Gateway VPC Endpoints do NOT work for FSx ONTAP S3 APs
+- **Note**: Internet-origin S3 APs require NAT Gateway or VPC-external Lambda for VPC-internal access
 - Lambda placed outside VPC can access FSx ONTAP S3 AP without issues (recommended for read-only)
 - Security groups allow minimal outbound only
 

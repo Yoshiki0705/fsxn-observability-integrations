@@ -1,0 +1,12 @@
+{
+  "time": "2024-01-15T10:30:00+09:00",
+  "messageName": "arw.volume.state",
+  "severity": "alert",
+  "node": "fsxn-node-01",
+  "svmName": "svm-prod-01",
+  "message": "Anti-ransomware: Volume vol_data state changed to enabled",
+  "parameters": {
+    "volume_name": "vol_data",
+    "state": "enabled"
+  }
+}

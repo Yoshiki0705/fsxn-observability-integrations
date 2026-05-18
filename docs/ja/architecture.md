@@ -3,17 +3,65 @@
 ## 全体構成
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  FSx for ONTAP  │────▶│  FSx ONTAP       │────▶│  EventBridge    │
-│  (監査ログ)      │     │  S3 Access Point │     │  Scheduler      │
-└─────────────────┘     └──────────────────┘     └────────┬────────┘
-                                                           │
-                                                           ▼
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  Observability  │◀────│     Lambda       │◀────│  定期起動        │
-│  Vendor API     │     │  (ログ変換・配信)  │     │  + checkpoint   │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        FSx for NetApp ONTAP                             │
+├─────────────────┬──────────────────┬────────────────────────────────────┤
+│  監査ログ        │  EMS イベント     │  FPolicy ファイル操作通知            │
+│  (EVTX/XML)     │  (ARP, Quota等)  │  (create/write/rename/delete)      │
+└────────┬────────┴────────┬─────────┴──────────────┬─────────────────────┘
+         │                  │                         │
+         ▼                  ▼                         ▼
+┌─────────────────┐  ┌──────────────┐  ┌──────────────────────────────────┐
+│ S3 Access Point │  │ EMS Webhook  │  │ FPolicy TCP:9898                 │
+│ + EventBridge   │  │ (HTTPS POST) │  │ (proprietary binary protocol)    │
+│   Scheduler     │  │              │  │                                  │
+└────────┬────────┘  └──────┬───────┘  └──────────────┬───────────────────┘
+         │                  │                          │
+         ▼                  ▼                          ▼
+┌─────────────────┐  ┌──────────────┐  ┌──────────────────────────────────┐
+│ Lambda          │  │ API Gateway  │  │ ECS Fargate                      │
+│ (ログパース・配信) │  │ → Lambda     │  │ (FPolicy Server → SQS → Lambda)  │
+└────────┬────────┘  └──────┬───────┘  └──────────────┬───────────────────┘
+         │                  │                          │
+         └──────────────────┼──────────────────────────┘
+                            ▼
+                 ┌──────────────────────┐
+                 │  Observability       │
+                 │  Vendor API          │
+                 │  (Datadog, Splunk等)  │
+                 └──────────────────────┘
 ```
+
+## 3つのテレメトリパス
+
+本プロジェクトは ONTAP の3つのテレメトリソースに対応します:
+
+### パス 1: 監査ログ（S3 AP + EventBridge Scheduler）
+```
+ONTAP 監査ログ → S3 Access Point → EventBridge Scheduler → Lambda → Vendor API
+```
+- **用途**: コンプライアンス向けファイルアクセス履歴
+- **レイテンシ**: ニアリアルタイム（Scheduler 間隔依存、通常5分）
+- **形式**: EVTX / XML
+
+### パス 2: EMS イベント（Webhook）
+```
+ONTAP EMS → Webhook (HTTPS) → API Gateway → Lambda → Vendor API
+```
+- **用途**: ARP ランサムウェア検知、クォータ超過、HA フェイルオーバー等
+- **レイテンシ**: リアルタイム（~30秒）
+- **形式**: JSON
+
+### パス 3: FPolicy ファイル操作（ECS Fargate）
+```
+ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Vendor API
+```
+- **用途**: リアルタイムファイル操作監視（create, write, rename, delete）
+- **レイテンシ**: リアルタイム（~6-8秒）
+- **形式**: FPolicy バイナリプロトコル → JSON 正規化
+- **注意**: FPolicy は独自バイナリプロトコルのため Lambda 不可、ECS Fargate が必要
+
+> **本シリーズにおける「サーバーレス」の意味**: サーバー管理や差別化されないコレクター運用を最小化すること — 全てを Lambda に押し込むことではありません。FPolicy は永続的な TCP リスナーが必要なため ECS Fargate（サーバーレスコンテナ）を使用し、イベントのデカップリングには SQS、短時間処理には Lambda を使用します。各 AWS サービスはその運用特性に応じて選択しています。
 
 ## ONTAP テレメトリソース選択ガイド
 
@@ -45,7 +93,7 @@ FSx for ONTAP ボリュームにアタッチされる S3 Access Point です。
 - **目的**: Lambda が NFS/SMB マウントなしで監査ログを読み取るためのアクセス境界
 - **特性**: データは FSx ファイルシステム上に残り、S3 API でアクセス可能
 - **制約**: S3 Event Notifications / EventBridge 通知は非対応
-- **VPC 制約**: S3 Gateway VPC Endpoint 経由ではアクセス不可（NAT Gateway が必要）
+- **VPC 制約**: Internet-origin S3 AP の場合、VPC 内 Lambda + Gateway Endpoint のみではタイムアウト（NAT Gateway または VPC-origin AP が必要）
 
 ### 3. トリガー方式
 
@@ -119,7 +167,7 @@ FSx S3 AP → Lambda (変換) → Kinesis Data Firehose → ベンダー API
 ### ネットワーク
 
 - FSx for ONTAP S3 Access Point へのアクセスは NAT Gateway 経由（VPC 内配置時）
-- **注意**: S3 Gateway VPC Endpoint では FSx ONTAP S3 AP にアクセス不可
+- **注意**: Internet-origin S3 AP は VPC 内から Gateway Endpoint のみではアクセス不可（NAT Gateway 必要）
 - Lambda を VPC 外に配置する場合は問題なくアクセス可能（推奨: 読み取り専用の場合）
 - セキュリティグループで最小限のアウトバウンドのみ許可
 
