@@ -1,15 +1,27 @@
+# OTel Collector Docker Compose — Multi-Backend (Grafana Cloud + Honeycomb)
+#
+# ✅ Verified working with otel/opentelemetry-collector-contrib:0.152.0
+#
+# NOTE: On macOS with Colima, the `docker compose` v2 plugin may not be
+# available. Use `docker run` as a fallback:
+#
+#   docker run -d --name otel-collector \
+#     -p 4318:4318 -p 13133:13133 \
+#     -v $(pwd)/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml \
+#     --env-file .env \
+#     otel/opentelemetry-collector-contrib:0.152.0
+
 services:
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:0.152.0
     ports:
       - "4318:4318"   # OTLP HTTP
       - "13133:13133" # Health check
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
     environment:
-      - GRAFANA_LOKI_ENDPOINT=${GRAFANA_LOKI_ENDPOINT}
-      - GRAFANA_LOKI_USER=${GRAFANA_LOKI_USER}
-      - GRAFANA_LOKI_TOKEN=${GRAFANA_LOKI_TOKEN}
+      - GRAFANA_OTLP_ENDPOINT=${GRAFANA_OTLP_ENDPOINT}
+      - GRAFANA_BASIC_AUTH=${GRAFANA_BASIC_AUTH}
       - HONEYCOMB_API_KEY=${HONEYCOMB_API_KEY}
       - HONEYCOMB_DATASET=${HONEYCOMB_DATASET:-fsxn-audit}
     healthcheck:

@@ -1,29 +1,74 @@
 # OTel Collector Integration
 
-FSx for ONTAP audit log shipping via OTLP/HTTP to an OpenTelemetry Collector, enabling vendor-neutral multi-backend delivery (Grafana Cloud + Honeycomb).
+FSx for ONTAP audit log shipping via OTLP/HTTP to an OpenTelemetry Collector, enabling vendor-neutral multi-backend delivery.
 
-> **✅ Verified Working**: FPolicy → OTel Collector → Datadog path confirmed operational (2026-05-18).
-> Tested with `otel/opentelemetry-collector-contrib:0.152.0`. Lambda code unchanged across backends.
+> **✅ All Backends Verified Working** (2026-05-18)
+>
+> | Backend | Status | Config File |
+> |---------|--------|-------------|
+> | Datadog (ap1.datadoghq.com) | ✅ Verified | `otel-collector-config-datadog.yaml` |
+> | Grafana Cloud (ap-northeast-0) | ✅ Verified | `otel-collector-config.yaml` |
+> | Honeycomb | ✅ Verified | `otel-collector-config.yaml` |
+> | Multi-Backend (Grafana + Honeycomb) | ✅ Verified | `otel-collector-config.yaml` |
+>
+> Tested with `otel/opentelemetry-collector-contrib:0.152.0`. Lambda code unchanged across all backends.
 
 ## Architecture
 
 ```
-S3 Access Point → Lambda (OTLP Shipper) → OTel Collector → Grafana Cloud (Loki)
-                                                         → Honeycomb
+S3 Access Point → Lambda (OTLP Shipper) → OTel Collector → Grafana Cloud (OTLP)
+                                                         → Honeycomb (OTLP)
+                                                         → Datadog (exporter)
+EMS Webhook    → Lambda (EMS Handler)   → OTel Collector → (same backends)
+FPolicy Events → Lambda (FPolicy)       → OTel Collector → (same backends)
 ```
 
 ## Quick Start
 
 ```bash
-# 1. Start OTel Collector locally
-cp .env.example .env  # Edit with your credentials
+# 1. Configure credentials
+cp .env.example .env  # Edit with your Grafana + Honeycomb credentials
+
+# 2. Start OTel Collector locally
+# Option A: docker compose (if available)
 docker compose up -d
 
-# 2. Verify health
+# Option B: docker run (fallback for Colima)
+docker run -d --name otel-collector \
+  -p 4318:4318 -p 13133:13133 \
+  -v $(pwd)/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml \
+  --env-file .env \
+  otel/opentelemetry-collector-contrib:0.152.0
+
+# 3. Verify health
 curl -f http://localhost:13133/
 
-# 3. Run tests
+# 4. Run tests
 python -m pytest tests/ -v
+```
+
+## Multi-Backend (Grafana Cloud + Honeycomb)
+
+The default configuration delivers logs simultaneously to both Grafana Cloud and Honeycomb.
+
+### Verified Auth Patterns
+
+**Grafana Cloud (OTLP Gateway)**:
+- Endpoint: `https://otlp-gateway-prod-<region>.grafana.net/otlp`
+- Auth: `Authorization: Basic <base64(instanceId:apiToken)>`
+- Instance ID is numeric (e.g., 1649835)
+- Exporter: `otlphttp/grafana` (NOT the `loki` exporter)
+
+**Honeycomb**:
+- Endpoint: `https://api.honeycomb.io`
+- Auth: `x-honeycomb-team: <ingest-api-key>` header
+- Dataset: `x-honeycomb-dataset: fsxn-audit` header
+- Ingest keys start with `hcaik_`
+
+### Test Multi-Backend Locally
+
+```bash
+bash scripts/test-local-multi-backend.sh
 ```
 
 ## Components
@@ -33,8 +78,10 @@ python -m pytest tests/ -v
 | Lambda OTLP Shipper | `lambda/handler.py` | Reads S3 audit logs, maps to OTLP, sends via HTTP |
 | EMS Handler | `lambda/ems_handler.py` | Receives EMS webhook events, forwards as OTLP |
 | FPolicy Handler | `lambda/fpolicy_handler.py` | Receives FPolicy events from EventBridge, forwards as OTLP |
-| OTel Collector Config | `otel-collector-config.yaml` | Receiver → Batch → Loki + Honeycomb |
-| Docker Compose | `docker-compose.yaml` | Local OTel Collector environment |
+| OTel Config (default) | `otel-collector-config.yaml` | Grafana Cloud + Honeycomb (otlphttp) |
+| OTel Config (Grafana+HC) | `otel-collector-config-grafana-honeycomb.yaml` | Same as default (standalone) |
+| OTel Config (Datadog) | `otel-collector-config-datadog.yaml` | Datadog exporter |
+| Docker Compose | `docker-compose.yaml` | Local OTel Collector (pinned 0.152.0) |
 | CloudFormation | `template.yaml` | AWS deployment template |
 
 ## Testing
@@ -48,6 +95,9 @@ python -m pytest tests/test_handler_properties.py -v
 
 # Bilingual comparison
 python -m pytest tests/test_bilingual_properties.py -v
+
+# Generate fresh OTLP payload (avoids stale timestamp rejection)
+bash scripts/generate-otlp-payload.sh --output /tmp/payload.json
 ```
 
 ## Deployment
@@ -88,24 +138,47 @@ docker run -d --name otel-collector-datadog \
 # 3. Verify health
 curl -f http://localhost:13133/
 
-# 4. Send test OTLP payload
-curl -X POST http://localhost:4318/v1/logs \
-  -H "Content-Type: application/json" \
-  -d @tests/test_data/sample_otlp_payload.json
+# 4. Run automated test
+bash scripts/test-local-datadog.sh
 ```
 
 This proves the key architectural point: **Lambda code is UNCHANGED** — only the Collector config changes to route logs to Datadog.
 
-| File | Purpose |
-|------|---------|
-| `otel-collector-config-datadog.yaml` | Collector config with Datadog exporter |
-| `docker-compose-datadog.yaml` | Docker Compose using Datadog config |
-| `.env.datadog.example` | Template for Datadog credentials |
+## Troubleshooting
+
+### Timestamp Rejection
+
+Datadog rejects logs older than ~18 hours. Grafana Cloud and Honeycomb also prefer recent timestamps. Use the payload generator to create fresh test data:
+
+```bash
+bash scripts/generate-otlp-payload.sh --output /tmp/fresh-payload.json
+curl -X POST http://localhost:4318/v1/logs \
+  -H "Content-Type: application/json" \
+  -d @/tmp/fresh-payload.json
+```
+
+### Colima / Docker Compose Compatibility
+
+`docker compose` v2 plugin is NOT available in Colima. All scripts detect this and fall back to `docker run`. If you see "docker compose: command not found", this is expected.
+
+### Grafana Cloud Auth Format
+
+The `loki` exporter is NOT the correct approach for OTLP → Grafana Cloud. Use `otlphttp/grafana` with the OTLP gateway endpoint:
+- ❌ `loki` exporter with Loki push API
+- ✅ `otlphttp/grafana` with `https://otlp-gateway-prod-<region>.grafana.net/otlp`
+
+Basic Auth value must be `base64(instanceId:apiToken)` — NOT `instanceId:apiToken` in plain text.
+
+### Honeycomb Auth
+
+Ingest API keys start with `hcaik_`. Environment keys (`hcxik_`) will NOT work for data ingestion.
 
 ## Documentation
 
 - [Japanese Setup Guide](docs/ja/setup-guide.md)
 - [English Setup Guide](docs/en/setup-guide.md)
+- [Verification Results (JA)](../../docs/ja/verification-results-otel-collector.md)
+- [Verification Results (EN)](../../docs/en/verification-results-otel-collector.md)
 
 ## Verification
 

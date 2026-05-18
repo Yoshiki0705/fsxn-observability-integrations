@@ -126,6 +126,73 @@
 | S3 監査ログ → OTLP → Datadog | ✅ PASS | 2件確認済み。構造化属性: event.type, user.name, fsxn.operation, client.address, fsxn.result, fsxn.path, fsxn.svm |
 | EMS → OTLP → Datadog | ✅ PASS | 2件確認済み。ARP アラート + クォータ超過。属性: event_name, severity, source_node, svm, volume_name |
 | FPolicy → OTLP → Datadog | ✅ PASS | 24件確認済み。構造化属性: client_ip, file_path, operation_type, volume_name, event_id, timestamp |
+| OTLP → Grafana Cloud (マルチバックエンド) | ✅ PASS | 4件確認済み。otlphttp/grafana エクスポーター。Basic Auth 認証 |
+| OTLP → Honeycomb (マルチバックエンド) | ✅ PASS | 4件確認済み。otlphttp/honeycomb エクスポーター。x-honeycomb-team ヘッダー認証 |
+
+## マルチバックエンド（Grafana Cloud + Honeycomb）パス検証
+
+### 検証概要
+
+| 項目 | 値 |
+|------|-----|
+| 検証日 | 2026-05-18 |
+| バックエンド | Grafana Cloud (ap-northeast-0) + Honeycomb (test 環境) |
+| OTel Collector バージョン | otel/opentelemetry-collector-contrib:0.152.0 |
+| 設定ファイル | `otel-collector-config-grafana-honeycomb.yaml` |
+
+### ステップ 1: OTel Collector 起動（マルチバックエンド設定）
+
+| 項目 | 内容 |
+|------|------|
+| コマンド | `docker run -d --name otel-collector-multi -p 4318:4318 -p 13133:13133 -v $(pwd)/otel-collector-config-grafana-honeycomb.yaml:/etc/otelcol-contrib/config.yaml --env-file .env.grafana-honeycomb otel/opentelemetry-collector-contrib:0.152.0` |
+| 期待結果 | コンテナが healthy 状態で起動、両バックエンドへのエクスポーターが設定される |
+| 実際の結果 | コンテナ正常起動。`otlphttp` → `otlp_http` の非推奨警告のみ（機能に影響なし） |
+| 判定 | ✅ PASS |
+
+### ステップ 2: ヘルスチェック確認
+
+| 項目 | 内容 |
+|------|------|
+| コマンド | `curl -f http://localhost:13133/` |
+| 期待結果 | HTTP 200 |
+| 実際の結果 | HTTP 200 — `{"status":"Server available","upSince":"2026-05-18T14:02:03Z","uptime":"..."}` |
+| 判定 | ✅ PASS |
+
+### ステップ 3: OTLP ペイロード送信
+
+| 項目 | 内容 |
+|------|------|
+| コマンド | `curl -X POST http://localhost:4318/v1/logs -H "Content-Type: application/json" -d @payload.json` |
+| 期待結果 | HTTP 200、4件のログレコードが受理される |
+| 実際の結果 | HTTP 200 — `{"partialSuccess":{}}` (全件成功) |
+| 判定 | ✅ PASS |
+
+### ステップ 4: Grafana Cloud ログ到着確認
+
+| 項目 | 内容 |
+|------|------|
+| 確認方法 | Grafana Cloud Explore → Loki データソース → `{service_name="fsxn-audit"}` クエリ |
+| 期待結果 | 4件のログが Grafana Cloud Loki に到着。構造化属性が含まれる |
+| 実際の結果 | **4件のログを確認**。Service: `fsxn-audit`。Common labels: `cloud_platform=aws_fsx`, `cloud_provider=aws`, `deployment_environment=e2e-verification`。構造化属性: `client_address`, `event_type`, `fsxn_operation`, `fsxn_path`, `fsxn_result`, `fsxn_svm`, `user_name`。ログレベル正常マッピング: INFO (2件) + WARN (2件) |
+| 判定 | ✅ PASS |
+| スクリーンショット | `docs/screenshots/06-grafana-cloud-otel-logs.png` |
+
+### ステップ 5: Honeycomb ログ到着確認
+
+| 項目 | 内容 |
+|------|------|
+| 確認方法 | Honeycomb UI → fsxn-audit データセット → COUNT クエリ実行 |
+| 期待結果 | 4件のイベントが Honeycomb に到着。スキーマに構造化属性が含まれる |
+| 実際の結果 | **COUNT = 4 (examined 4 rows)**。スキーマ確認: `body`, `client.address`, `cloud.platform`, `cloud.provider`, `deployment.environment`, `event.type`, `fsxn.operation`, `fsxn.path`, `fsxn.result`, `fsxn.svm`, `library.name`, `library.version`, `meta.signal_type` |
+| 判定 | ✅ PASS |
+| スクリーンショット | `docs/screenshots/07-honeycomb-otel-logs.png` |
+
+### マルチバックエンド検証サマリー
+
+| バックエンド | ステータス | 受信件数 | 備考 |
+|-------------|-----------|---------|------|
+| Grafana Cloud (Loki) | ✅ PASS | 4件 | OTLP/HTTP → otlphttp/grafana エクスポーター。Basic Auth (Instance ID + API Token) |
+| Honeycomb | ✅ PASS | 4件 | OTLP/HTTP → otlphttp/honeycomb エクスポーター。x-honeycomb-team ヘッダー認証 |
 
 ## アーキテクチャ上の重要ポイント
 

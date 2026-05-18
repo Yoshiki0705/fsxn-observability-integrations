@@ -126,6 +126,73 @@
 | S3 Audit Log → OTLP → Datadog | ✅ PASS | 2 logs confirmed. Structured attributes: event.type, user.name, fsxn.operation, client.address, fsxn.result, fsxn.path, fsxn.svm |
 | EMS → OTLP → Datadog | ✅ PASS | 2 logs confirmed. ARP alert + quota exceeded. Attributes: event_name, severity, source_node, svm, volume_name |
 | FPolicy → OTLP → Datadog | ✅ PASS | 24 logs confirmed. Structured attributes: client_ip, file_path, operation_type, volume_name, event_id, timestamp |
+| OTLP → Grafana Cloud (Multi-Backend) | ✅ PASS | 4 logs confirmed. otlphttp/grafana exporter. Basic Auth |
+| OTLP → Honeycomb (Multi-Backend) | ✅ PASS | 4 events confirmed. otlphttp/honeycomb exporter. x-honeycomb-team header auth |
+
+## Multi-Backend (Grafana Cloud + Honeycomb) Path Verification
+
+### Verification Overview
+
+| Item | Value |
+|------|-------|
+| Date | 2026-05-18 |
+| Backends | Grafana Cloud (ap-northeast-0) + Honeycomb (test environment) |
+| OTel Collector Version | otel/opentelemetry-collector-contrib:0.152.0 |
+| Config File | `otel-collector-config-grafana-honeycomb.yaml` |
+
+### Step 1: Start OTel Collector (Multi-Backend Config)
+
+| Item | Details |
+|------|---------|
+| Command | `docker run -d --name otel-collector-multi -p 4318:4318 -p 13133:13133 -v $(pwd)/otel-collector-config-grafana-honeycomb.yaml:/etc/otelcol-contrib/config.yaml --env-file .env.grafana-honeycomb otel/opentelemetry-collector-contrib:0.152.0` |
+| Expected | Container starts in healthy state with both backend exporters configured |
+| Actual | Container started successfully. Only deprecation warning for `otlphttp` → `otlp_http` naming (non-blocking). |
+| Verdict | ✅ PASS |
+
+### Step 2: Health Check Verification
+
+| Item | Details |
+|------|---------|
+| Command | `curl -f http://localhost:13133/` |
+| Expected | HTTP 200 |
+| Actual | HTTP 200 — `{"status":"Server available","upSince":"2026-05-18T14:02:03Z","uptime":"..."}` |
+| Verdict | ✅ PASS |
+
+### Step 3: OTLP Payload Delivery
+
+| Item | Details |
+|------|---------|
+| Command | `curl -X POST http://localhost:4318/v1/logs -H "Content-Type: application/json" -d @payload.json` |
+| Expected | HTTP 200, 4 log records accepted |
+| Actual | HTTP 200 — `{"partialSuccess":{}}` (empty partialSuccess = full success) |
+| Verdict | ✅ PASS |
+
+### Step 4: Grafana Cloud Log Arrival Confirmation
+
+| Item | Details |
+|------|---------|
+| Method | Grafana Cloud Explore → Loki data source → `{service_name="fsxn-audit"}` query |
+| Expected | 4 logs arrive in Grafana Cloud Loki with structured attributes |
+| Actual | **4 logs confirmed**. Service: `fsxn-audit`. Common labels: `cloud_platform=aws_fsx`, `cloud_provider=aws`, `deployment_environment=e2e-verification`. Structured attributes: `client_address`, `event_type`, `fsxn_operation`, `fsxn_path`, `fsxn_result`, `fsxn_svm`, `user_name`. Log levels correctly mapped: INFO (2) + WARN (2). |
+| Verdict | ✅ PASS |
+| Screenshot | `docs/screenshots/06-grafana-cloud-otel-logs.png` |
+
+### Step 5: Honeycomb Log Arrival Confirmation
+
+| Item | Details |
+|------|---------|
+| Method | Honeycomb UI → fsxn-audit dataset → COUNT query |
+| Expected | 4 events arrive in Honeycomb with structured attributes in schema |
+| Actual | **COUNT = 4 (examined 4 rows)**. Schema confirmed: `body`, `client.address`, `cloud.platform`, `cloud.provider`, `deployment.environment`, `event.type`, `fsxn.operation`, `fsxn.path`, `fsxn.result`, `fsxn.svm`, `library.name`, `library.version`, `meta.signal_type` |
+| Verdict | ✅ PASS |
+| Screenshot | `docs/screenshots/07-honeycomb-otel-logs.png` |
+
+### Multi-Backend Verification Summary
+
+| Backend | Status | Events Received | Notes |
+|---------|--------|----------------|-------|
+| Grafana Cloud (Loki) | ✅ PASS | 4 | OTLP/HTTP → otlphttp/grafana exporter. Basic Auth (Instance ID + API Token) |
+| Honeycomb | ✅ PASS | 4 | OTLP/HTTP → otlphttp/honeycomb exporter. x-honeycomb-team header auth |
 
 ## Key Architectural Points
 

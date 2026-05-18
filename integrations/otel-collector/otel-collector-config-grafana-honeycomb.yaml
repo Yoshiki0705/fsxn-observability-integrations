@@ -1,17 +1,3 @@
-# OTel Collector Configuration — Multi-Backend (Grafana Cloud + Honeycomb)
-#
-# ✅ VERIFIED WORKING (2026-05-18)
-# Image: otel/opentelemetry-collector-contrib:0.152.0
-# Backends: Grafana Cloud (ap-northeast-0) + Honeycomb
-#
-# Auth patterns:
-#   Grafana Cloud: Basic Auth = base64(instanceId:apiToken)
-#   Honeycomb: x-honeycomb-team header with hcaik_* ingest key
-#
-# NOTE: The original config used the `loki` exporter which is NOT the correct
-# approach for OTLP → Grafana Cloud. Use `otlphttp/grafana` instead.
-# The OTLP gateway endpoint handles log ingestion natively.
-
 receivers:
   otlp:
     protocols:
