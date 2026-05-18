@@ -115,7 +115,7 @@ FSx ONTAP EMS → CloudWatch Events → EventBridge Rule → Lambda → Vendor A
 
 ### 対象イベント
 
-FPolicy はファイル操作をリアルタイムで監視し、外部エンジンに通知します。
+FPolicy はファイル操作をイベント駆動で監視し、外部エンジンに通知します。
 
 | プロトコル | 対応操作 |
 |-----------|---------|
@@ -232,6 +232,6 @@ ONTAP は Fargate タスクの ENI IP に直接接続します。
 | コンプライアンス監査 | 監査ログ | S3 → EventBridge → Lambda |
 | ランサムウェア検知アラート | EMS (ARP/AI) | Webhook → API GW → Lambda |
 | 容量管理アラート | EMS (クォータ) | CloudWatch → EventBridge → Lambda |
-| リアルタイムファイル監視 | FPolicy | TCP:9898 → ECS Fargate → SQS → EventBridge → Lambda |
+| イベント駆動ファイル監視 | FPolicy | TCP:9898 → ECS Fargate → SQS → EventBridge → Lambda |
 | DLP (データ漏洩防止) | FPolicy (同期) | TCP:9898 → ECS Fargate → 判定 |
 | セキュリティ SIEM 連携 | 監査ログ + EMS | 複合パターン |

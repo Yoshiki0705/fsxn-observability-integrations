@@ -112,7 +112,7 @@ TASK_IP=$(aws ecs describe-tasks --cluster fsxn-fpolicy-server-cluster \
 - [ ] NFS requires explicit version pinning and careful testing
 - [ ] User field may be empty for some operations
 - [ ] Event loss possible during Fargate task restart (~2 minutes)
-- [ ] FPolicy is a real-time signal, not a full audit replacement
+- [ ] FPolicy is an event-driven signal, not a full audit replacement
 
 ## Rollback Procedure
 
