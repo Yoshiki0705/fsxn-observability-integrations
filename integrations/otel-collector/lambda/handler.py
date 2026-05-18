@@ -10,6 +10,7 @@ requires only OTel Collector config changes, zero Lambda code changes.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -28,6 +29,7 @@ API_KEY_SECRET_ARN = os.environ.get("API_KEY_SECRET_ARN", "")
 S3_ACCESS_POINT_ARN = os.environ.get("S3_ACCESS_POINT_ARN", "")
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 SERVICE_NAME = os.environ.get("SERVICE_NAME", "fsxn-audit")
+AUTH_MODE = os.environ.get("AUTH_MODE", "bearer")  # "bearer" or "basic"
 
 # ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -135,7 +137,9 @@ def map_log_record(log: dict[str, Any]) -> dict[str, Any]:
     severity_number, severity_text = determine_severity(log.get("Result"))
 
     # Convert timestamp
-    time_unix_nano = timestamp_to_unix_nano(log.get("Timestamp"))
+    time_unix_nano = timestamp_to_unix_nano(
+        log.get("timestamp", log.get("Timestamp"))
+    )
 
     # Build attributes — omit absent or empty fields
     attributes: list[dict[str, Any]] = []
@@ -435,7 +439,12 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         try:
             token = get_api_key()
             if token:
-                auth_headers = {"Authorization": f"Bearer {token}"}
+                if AUTH_MODE == "basic":
+                    # For Grafana Cloud OTLP: token should be "instanceId:apiToken"
+                    encoded = base64.b64encode(token.encode("utf-8")).decode("utf-8")
+                    auth_headers = {"Authorization": f"Basic {encoded}"}
+                else:
+                    auth_headers = {"Authorization": f"Bearer {token}"}
         except Exception as e:
             logger.warning("Could not retrieve auth token: %s", str(e))
 
