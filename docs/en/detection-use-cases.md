@@ -42,7 +42,7 @@ Action: Investigate user + client IP
 ### Unusual File Deletion Rate (FPolicy)
 
 ```
-Query: source:fsxn-fpolicy @attributes.operation:delete
+Query: source:fsxn-fpolicy @attributes.operation_type:delete
 Threshold: warning > 50 in 5 minutes, critical > 200 in 5 minutes
 Action: Correlate with user identity
 ```

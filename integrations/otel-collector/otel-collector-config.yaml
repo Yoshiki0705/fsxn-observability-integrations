@@ -1,0 +1,37 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1000
+
+exporters:
+  loki:
+    endpoint: ${env:GRAFANA_LOKI_ENDPOINT}
+    default_labels_enabled:
+      exporter: false
+      job: true
+    headers:
+      Authorization: "Basic ${env:GRAFANA_LOKI_USER}:${env:GRAFANA_LOKI_TOKEN}"
+
+  otlphttp/honeycomb:
+    endpoint: https://api.honeycomb.io
+    headers:
+      x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
+      x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [loki, otlphttp/honeycomb]

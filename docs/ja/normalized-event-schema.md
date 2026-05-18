@@ -107,3 +107,24 @@
 | `parameters.state` | `@attributes.parameters.state` | `netapp.ontap.arp.state` | `arp_state` | `netapp.ontap.arp.state` |
 | `timestamp` | `date` | `time_unix_nano` | `_time` | `@timestamp` |
 | `message` | `message` | `body` | `_raw` | `message` |
+
+
+## FPolicy ファイル操作イベントマッピング
+
+| 内部フィールド | Datadog | OpenTelemetry | Splunk | Elastic ECS |
+|---------------|---------|---------------|--------|-------------|
+| `operation_type` | `@attributes.operation_type` | `event.action` | `operation_type` | `event.action` |
+| `file_path` | `@attributes.file_path` | `file.path` | `file_path` | `file.path` |
+| `client_ip` | `@attributes.client_ip` | `source.ip` | `client_ip` | `source.ip` |
+| `volume_name` | `@attributes.volume_name` | `netapp.ontap.volume` | `volume_name` | `netapp.ontap.volume` |
+| `svm` | `@attributes.svm` | `netapp.ontap.svm` | `svm` | `netapp.ontap.svm` |
+| `user` | `@attributes.user` | `user.name` | `user` | `user.name` |
+| `protocol` | `@attributes.protocol` | `network.protocol` | `protocol` | `network.protocol` |
+| `timestamp` | `date` | `time_unix_nano` | `_time` | `@timestamp` |
+| `event_id` | `@attributes.event_id` | `event.id` | `event_id` | `event.id` |
+
+### 注記
+
+- FPolicy は `operation_type`（create, write, rename, delete）を使用し、監査ログは `operation`（ReadData, WriteData 等）を使用します。これは意図的な設計です — 異なる抽象レベルを表しています。
+- `svm` フィールドは、FPolicy サーバーがハンドシェイクコンテキストから SVM 名を解決できない場合 "unknown" になることがあります。
+- `user` フィールドは、ONTAP の FPolicy 通知内容によっては空になることがあります。

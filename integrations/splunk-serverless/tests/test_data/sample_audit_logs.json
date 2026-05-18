@@ -1,0 +1,5 @@
+{"timestamp":"2026-01-15T12:00:01Z","EventID":"4663","SVMName":"svm-prod-01","UserName":"admin@corp.local","ClientIP":"10.0.1.50","Operation":"ReadData","ObjectName":"/vol/data/reports/quarterly.xlsx","Result":"Success"}
+{"timestamp":"2026-01-15T12:00:02Z","EventID":"4663","SVMName":"svm-prod-01","UserName":"user1@corp.local","ClientIP":"10.0.1.51","Operation":"WriteData","ObjectName":"/vol/data/shared/document.docx","Result":"Success"}
+{"timestamp":"2026-01-15T12:00:03Z","EventID":"4656","SVMName":"svm-prod-01","UserName":"unknown@external.com","ClientIP":"192.168.1.100","Operation":"Open","ObjectName":"/vol/data/confidential/secret.pdf","Result":"Failure"}
+{"timestamp":"2026-01-15T12:00:04Z","EventID":"4670","SVMName":"svm-prod-01","UserName":"admin@corp.local","ClientIP":"10.0.1.50","Operation":"SetSecurityDescriptor","ObjectName":"/vol/data/shared/","Result":"Success"}
+{"timestamp":"2026-01-15T12:00:05Z","EventID":"4663","SVMName":"svm-prod-01","UserName":"service-account@corp.local","ClientIP":"10.0.2.10","Operation":"ReadData","ObjectName":"/vol/data/backups/daily-backup.tar.gz","Result":"Success"}

@@ -42,7 +42,7 @@ Action: ユーザー + クライアント IP の調査
 ### 異常なファイル削除率 (FPolicy)
 
 ```
-Query: source:fsxn-fpolicy @attributes.operation:delete
+Query: source:fsxn-fpolicy @attributes.operation_type:delete
 Threshold: warning > 50 in 5 minutes, critical > 200 in 5 minutes
 Action: ユーザー ID との相関
 ```

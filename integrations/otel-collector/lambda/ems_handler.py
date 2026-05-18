@@ -1,0 +1,342 @@
+"""EMS Webhook → OTel Collector OTLP log forwarder.
+
+Receives ONTAP EMS events via API Gateway, parses them using the
+shared ems-parser layer, formats into OTLP Log Data Model, and
+forwards to the configured OTel Collector endpoint.
+
+Supports ARP (Anti-Ransomware Protection) events, quota exceeded
+events, and all other EMS event types.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import random
+import time
+from datetime import datetime, timezone
+from typing import Any
+
+import urllib3
+
+# Conditionally import ems_parser (available as Lambda Layer)
+try:
+    from ems_parser import EmsParseError, parse_ems_event, format_ems_event
+except ImportError:
+    # Fallback for testing without the layer installed
+    class EmsParseError(Exception):
+        pass
+
+    def parse_ems_event(payload):
+        """Fallback parser for testing."""
+        if payload is None:
+            raise EmsParseError("payload is None")
+        if isinstance(payload, str) and payload == "":
+            raise EmsParseError("payload is empty")
+        if isinstance(payload, str):
+            try:
+                data = json.loads(payload)
+            except json.JSONDecodeError as e:
+                raise EmsParseError(f"invalid JSON: {e}") from e
+        else:
+            data = payload
+        if "messageName" not in data:
+            raise EmsParseError("missing required field: messageName")
+        return {
+            "timestamp": data.get("time", ""),
+            "event_name": data.get("messageName", ""),
+            "severity": data.get("severity", ""),
+            "source_node": data.get("node", ""),
+            "svm": data.get("svmName", ""),
+            "message": data.get("message", ""),
+            "parameters": data.get("parameters", {}),
+            "raw": data,
+        }
+
+    def format_ems_event(normalized):
+        return json.dumps(normalized, ensure_ascii=False, default=str)
+
+
+# ─── Configuration ─────────────────────────────────────────────────────────
+
+OTLP_ENDPOINT = os.environ.get("OTLP_ENDPOINT", "http://localhost:4318")
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
+SERVICE_NAME = os.environ.get("SERVICE_NAME", "fsxn-ems")
+
+# ─── Constants ──────────────────────────────────────────────────────────────
+
+MAX_RETRIES = 3
+BASE_INTERVAL = 2
+
+# EMS severity to OTLP severity mapping
+EMS_SEVERITY_MAP = {
+    "emergency": (21, "FATAL"),
+    "alert": (17, "ERROR"),
+    "critical": (17, "ERROR"),
+    "error": (17, "ERROR"),
+    "warning": (13, "WARN"),
+    "notice": (9, "INFO"),
+    "informational": (9, "INFO"),
+    "debug": (5, "DEBUG"),
+}
+
+# ─── Logger ────────────────────────────────────────────────────────────────
+
+logger = logging.getLogger()
+logger.setLevel(getattr(logging, LOG_LEVEL))
+
+# HTTP client
+http = urllib3.PoolManager(
+    num_pools=4,
+    maxsize=10,
+    retries=urllib3.Retry(total=0),
+)
+
+
+# ─── OTLP payload construction ────────────────────────────────────────────
+
+
+def _ems_severity_to_otlp(severity: str) -> tuple[int, str]:
+    """Map EMS severity string to OTLP severity number and text.
+
+    Args:
+        severity: EMS severity string (e.g., "alert", "warning").
+
+    Returns:
+        Tuple of (severityNumber, severityText).
+    """
+    return EMS_SEVERITY_MAP.get(severity.lower(), (9, "INFO"))
+
+
+def _timestamp_to_unix_nano(timestamp: str) -> str:
+    """Convert ISO 8601 timestamp to Unix nanoseconds string.
+
+    Args:
+        timestamp: ISO 8601 timestamp string.
+
+    Returns:
+        Unix nanoseconds as string. Falls back to current time.
+    """
+    if not timestamp:
+        return str(int(datetime.now(timezone.utc).timestamp() * 1_000_000_000))
+
+    try:
+        ts = timestamp.strip()
+        if ts.endswith("Z"):
+            ts = ts[:-1] + "+00:00"
+        dt = datetime.fromisoformat(ts)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return str(int(dt.timestamp() * 1_000_000_000))
+    except (ValueError, AttributeError):
+        return str(int(datetime.now(timezone.utc).timestamp() * 1_000_000_000))
+
+
+def build_ems_otlp_payload(normalized: dict[str, Any]) -> dict[str, Any]:
+    """Build OTLP Log Data Model payload from a normalized EMS event.
+
+    Args:
+        normalized: Normalized EMS event dict from parse_ems_event().
+
+    Returns:
+        OTLP payload dict with resourceLogs structure.
+    """
+    severity_num, severity_text = _ems_severity_to_otlp(
+        normalized.get("severity", "informational")
+    )
+    time_unix_nano = _timestamp_to_unix_nano(normalized.get("timestamp", ""))
+
+    # Build attributes from EMS event fields
+    attributes: list[dict[str, Any]] = []
+
+    if normalized.get("event_name"):
+        attributes.append({
+            "key": "event_name",
+            "value": {"stringValue": normalized["event_name"]},
+        })
+    if normalized.get("severity"):
+        attributes.append({
+            "key": "severity",
+            "value": {"stringValue": normalized["severity"]},
+        })
+    if normalized.get("source_node"):
+        attributes.append({
+            "key": "source_node",
+            "value": {"stringValue": normalized["source_node"]},
+        })
+    if normalized.get("svm"):
+        attributes.append({
+            "key": "svm",
+            "value": {"stringValue": normalized["svm"]},
+        })
+
+    # Add parameters as attributes
+    params = normalized.get("parameters", {})
+    for key, value in params.items():
+        if value is not None and str(value) != "":
+            attributes.append({
+                "key": key,
+                "value": {"stringValue": str(value)},
+            })
+
+    # Build logRecord
+    log_record: dict[str, Any] = {
+        "timeUnixNano": time_unix_nano,
+        "severityNumber": severity_num,
+        "severityText": severity_text,
+        "body": {
+            "stringValue": format_ems_event(normalized),
+        },
+        "attributes": attributes,
+    }
+
+    # Build full OTLP payload
+    payload: dict[str, Any] = {
+        "resourceLogs": [
+            {
+                "resource": {
+                    "attributes": [
+                        {"key": "service.name", "value": {"stringValue": SERVICE_NAME}},
+                        {"key": "service.namespace", "value": {"stringValue": "fsxn-ontap"}},
+                    ]
+                },
+                "scopeLogs": [
+                    {
+                        "scope": {
+                            "name": "fsxn-ems-shipper",
+                            "version": "1.0.0",
+                        },
+                        "logRecords": [log_record],
+                    }
+                ],
+            }
+        ]
+    }
+
+    return payload
+
+
+# ─── OTLP delivery ────────────────────────────────────────────────────────
+
+
+def _send_otlp_payload(payload: dict[str, Any]) -> bool:
+    """Send OTLP payload to the configured endpoint with retry.
+
+    Args:
+        payload: OTLP JSON payload dict.
+
+    Returns:
+        True if successfully sent, False otherwise.
+    """
+    url = f"{OTLP_ENDPOINT}/v1/logs"
+    headers = {"Content-Type": "application/json"}
+    json_body = json.dumps(payload).encode("utf-8")
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = http.request(
+                "POST",
+                url,
+                body=json_body,
+                headers=headers,
+                timeout=30.0,
+            )
+
+            if response.status < 300:
+                logger.debug("EMS OTLP payload sent successfully (attempt %d)", attempt + 1)
+                return True
+
+            if response.status == 429:
+                retry_after = int(
+                    response.headers.get("Retry-After", BASE_INTERVAL * (2 ** attempt))
+                )
+                logger.warning("OTLP rate limited, retrying in %ds", retry_after)
+                time.sleep(retry_after)
+                continue
+
+            if response.status >= 500:
+                wait_time = BASE_INTERVAL * (2 ** attempt) + random.uniform(0, 1)
+                logger.warning("OTLP server error %d, retrying in %.1fs", response.status, wait_time)
+                time.sleep(wait_time)
+                continue
+
+            logger.error("OTLP error %d: %s", response.status,
+                         response.data.decode("utf-8", errors="replace")[:500])
+            return False
+
+        except urllib3.exceptions.HTTPError as e:
+            wait_time = BASE_INTERVAL * (2 ** attempt) + random.uniform(0, 1)
+            logger.warning("HTTP error (attempt %d/%d): %s", attempt + 1, MAX_RETRIES, str(e))
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(wait_time)
+
+    return False
+
+
+# ─── Lambda handler ────────────────────────────────────────────────────────
+
+
+def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
+    """Handle EMS Webhook event from API Gateway.
+
+    Parses the EMS event, builds an OTLP payload, and forwards to
+    the OTel Collector.
+
+    Args:
+        event: API Gateway proxy event with body containing EMS payload.
+        context: Lambda context object.
+
+    Returns:
+        API Gateway proxy response dict.
+    """
+    body = event.get("body", "")
+    logger.info("EMS event received, body length: %d", len(body) if body else 0)
+
+    try:
+        # Parse EMS event using shared layer
+        normalized = parse_ems_event(body)
+        logger.info(
+            "EMS event parsed: event_name=%s severity=%s svm=%s",
+            normalized["event_name"],
+            normalized["severity"],
+            normalized["svm"],
+        )
+
+        # Build OTLP payload
+        payload = build_ems_otlp_payload(normalized)
+
+        # Forward to OTel Collector
+        success = _send_otlp_payload(payload)
+
+        if success:
+            return {
+                "statusCode": 200,
+                "body": json.dumps({
+                    "status": "ok",
+                    "event_name": normalized["event_name"],
+                    "otlp_delivered": True,
+                }),
+            }
+        else:
+            return {
+                "statusCode": 502,
+                "body": json.dumps({
+                    "status": "error",
+                    "message": "OTLP delivery failed after retries",
+                    "event_name": normalized["event_name"],
+                }),
+            }
+
+    except EmsParseError as e:
+        logger.error("EMS parse failed: %s", str(e))
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"status": "error", "message": str(e)}),
+        }
+    except Exception as e:
+        logger.error("Unexpected error: %s", str(e))
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"status": "error", "message": str(e)}),
+        }

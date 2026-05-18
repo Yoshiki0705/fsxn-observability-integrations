@@ -1,0 +1,15 @@
+{
+  "time": "2024-01-15T14:30:00+09:00",
+  "messageName": "wafl.quota.hardlimit.exceeded",
+  "severity": "error",
+  "node": "fsxn-node-02",
+  "svmName": "svm-prod-01",
+  "message": "Quota hard limit exceeded on volume vol_data, qtree qtree2, target user2: used 104857600 bytes equals hard limit 104857600 bytes",
+  "parameters": {
+    "volume_name": "vol_data",
+    "qtree": "qtree2",
+    "quota_target": "user2",
+    "used_bytes": 104857600,
+    "limit_bytes": 104857600
+  }
+}

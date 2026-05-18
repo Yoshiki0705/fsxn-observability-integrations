@@ -4,37 +4,277 @@
 
 ## 概要
 
-FSx for ONTAP 監査ログを Splunk HEC (HTTP Event Collector) 経由でサーバーレスに配信する統合のセットアップ手順です。
+Amazon FSx for NetApp ONTAP の監査ログを Splunk HEC (HTTP Event Collector) 経由でサーバーレスに配信する統合のセットアップ手順です。
 
-> **既存パターンとの違い**: [AWS ブログ](https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on-amazon-fsx-for-netapp-ontap-using-splunk/)の EC2 ベース（syslog-ng + Universal Forwarder）を完全サーバーレスに置き換えます。
+> **既存パターンとの違い**: [AWS ブログ](https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on-amazon-fsx-for-netapp-ontap-using-splunk/)の EC2 ベース（syslog-ng + Universal Forwarder）を完全サーバーレスアーキテクチャに置き換えます。
 
 ## 前提条件
 
-- Splunk Enterprise / Splunk Cloud（HEC 有効化済み）
-- [前提リソース](../../../docs/ja/prerequisites.md)デプロイ済み
+以下が準備されていることを確認してください:
+
+- **AWS アカウント**: FSx for ONTAP が稼働中であること
+- **Splunk アカウント**: Splunk Enterprise または Splunk Cloud（HEC 機能が有効）
+- **AWS CLI v2**: 設定済み（`aws configure` 完了）
+- **FSx ONTAP 監査ログ**: S3 バケットに出力されていること
+- **前提リソーススタック**: [前提リソース](../../../../docs/ja/prerequisites.md)がデプロイ済み
 
 ## Step 1: Splunk HEC トークンの作成
 
-1. Splunk Web → **Settings** → **Data Inputs** → **HTTP Event Collector**
-2. **New Token** → Name: `fsxn-audit-log-shipper`
-3. Source type: `fsxn:ontap:audit`、Index: `fsxn_audit`
-4. トークンをコピー
+### 1.1 Splunk で HEC トークンを発行
+
+1. Splunk Web にログイン
+2. **Settings** → **Data Inputs** → **HTTP Event Collector** に移動
+3. **Global Settings** で HEC が有効であることを確認
+4. **New Token** をクリック
+5. 設定:
+   - Name: `fsxn-audit-log-shipper`
+   - Source type: `fsxn:ontap:audit`
+   - Index: `fsxn_audit`
+6. 生成された HEC トークン（UUID 形式）をコピー
+
+> **トークン形式**: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`（8-4-4-4-12 の16進数文字列）
+
+### 1.2 Splunk Index の作成
+
+HEC トークン作成時に指定した Index が存在しない場合は作成します:
+
+```bash
+# Splunk CLI（Splunk Enterprise の場合）
+splunk add index fsxn_audit -maxDataSize auto_high_volume
+```
+
+Splunk Cloud の場合は管理コンソールから Index を作成してください。
+
+## Step 2: AWS Secrets Manager への登録
+
+HEC トークンを AWS Secrets Manager に安全に保存します:
 
 ```bash
 aws secretsmanager create-secret \
   --name "splunk/fsxn-hec-token" \
-  --secret-string '{"hec_token":"YOUR_HEC_TOKEN"}' \
+  --description "Splunk HEC Token for FSxN audit log integration" \
+  --secret-string "YOUR_HEC_TOKEN" \
   --region ap-northeast-1
 ```
 
-## Step 2: Splunk Index の作成
+### 登録確認
 
+トークンが正しく保存されたことを確認します:
+
+```bash
+aws secretsmanager get-secret-value \
+  --secret-id "splunk/fsxn-hec-token" \
+  --region ap-northeast-1 \
+  --query 'SecretString' \
+  --output text
 ```
-# Splunk CLI
-splunk add index fsxn_audit -maxDataSize auto_high_volume
-```
+
+出力が UUID 形式（`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`）であることを確認してください。
 
 ## Step 3: CloudFormation デプロイ
+
+### 3.1 スタックのデプロイ
+
+```bash
+aws cloudformation deploy \
+  --template-file integrations/splunk-serverless/template.yaml \
+  --stack-name fsxn-splunk-integration \
+  --parameter-overrides \
+    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
+    SplunkHecTokenSecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:splunk/fsxn-hec-token-XXXXXX \
+    SplunkHecEndpoint=https://your-splunk-instance:8088 \
+    S3BucketName=your-audit-log-bucket \
+  --capabilities CAPABILITY_IAM \
+  --region ap-northeast-1
+```
+
+### 3.2 デプロイ確認
+
+```bash
+aws cloudformation describe-stacks \
+  --stack-name fsxn-splunk-integration \
+  --region ap-northeast-1 \
+  --query 'Stacks[0].StackStatus' \
+  --output text
+```
+
+出力が `CREATE_COMPLETE` または `UPDATE_COMPLETE` であることを確認してください。
+
+### パラメータ説明
+
+| パラメータ | 説明 |
+|-----------|------|
+| `S3AccessPointArn` | FSx ONTAP 監査ログ用 S3 Access Point の ARN |
+| `SplunkHecTokenSecretArn` | Secrets Manager に保存した HEC トークンの ARN |
+| `SplunkHecEndpoint` | Splunk HEC エンドポイント URL（ポート 8088） |
+| `S3BucketName` | 監査ログが出力される S3 バケット名 |
+
+## Step 4: テストイベント送信
+
+### 4.1 Lambda 関数の手動呼び出し
+
+サンプルの S3 イベントを使用して Lambda を呼び出します:
+
+```bash
+aws lambda invoke \
+  --function-name fsxn-splunk-integration-shipper \
+  --payload file://integrations/splunk-serverless/tests/test_data/sample_s3_event.json \
+  --cli-binary-format raw-in-base64-out \
+  --region ap-northeast-1 \
+  response.json
+
+cat response.json
+```
+
+期待される出力:
+
+```json
+{"statusCode": 200, "body": {"total_logs": 5, "total_shipped": 5}}
+```
+
+### 4.2 CloudWatch Logs の確認
+
+```bash
+aws logs tail \
+  /aws/lambda/fsxn-splunk-integration-shipper \
+  --since 5m \
+  --region ap-northeast-1
+```
+
+ログに `Successfully shipped` が含まれていることを確認してください。
+
+## Step 5: Splunk Search でのログ到着確認
+
+### 5.1 SPL クエリの実行
+
+Splunk Search で以下のクエリを実行します:
+
+```spl
+index=fsxn_audit sourcetype=fsxn:ontap:audit earliest=-15m
+```
+
+### 5.2 フィールド確認チェックリスト
+
+到着したイベントに以下のフィールドが含まれていることを確認します:
+
+| フィールド | 説明 | 必須 |
+|-----------|------|------|
+| `host` | SVM 名 | ✅ |
+| `source` | ソース識別子 | ✅ |
+| `sourcetype` | `fsxn:ontap:audit` | ✅ |
+| `index` | `fsxn_audit` | ✅ |
+| `event_type` | イベント種別 | ✅ |
+| `user` | 操作ユーザー | ✅ |
+| `operation` | 操作種別 | ✅ |
+| `path` | ファイルパス | ✅ |
+| `result` | 操作結果 | ✅ |
+| `svm` | SVM 名 | ✅ |
+
+## Step 6: E2E 検証手順
+
+以下の手順で End-to-End の動作を検証します。各ステップの最大待機時間は **5分** です。
+
+### 6.1 テストイベント送信
+
+```bash
+aws lambda invoke \
+  --function-name fsxn-splunk-integration-shipper \
+  --payload file://integrations/splunk-serverless/tests/test_data/sample_s3_event.json \
+  --cli-binary-format raw-in-base64-out \
+  --region ap-northeast-1 \
+  response.json
+```
+
+**期待結果**: `statusCode` が `200` であること
+
+### 6.2 CloudWatch Logs 確認（最大待機: 1分）
+
+```bash
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/fsxn-splunk-integration-shipper \
+  --start-time $(date -d '5 minutes ago' +%s000 2>/dev/null || date -v-5M +%s000) \
+  --filter-pattern "Successfully shipped" \
+  --region ap-northeast-1
+```
+
+**期待結果**: `Successfully shipped` を含むログエントリが表示されること
+
+### 6.3 Splunk Search 確認（最大待機: 5分）
+
+```spl
+index=fsxn_audit sourcetype=fsxn:ontap:audit earliest=-15m
+```
+
+**期待結果**: 1件以上のイベントが返されること
+
+### 6.4 レイテンシ測定
+
+S3 オブジェクト作成時刻と Splunk の `_indextime` の差分を記録します。通常 30〜120 秒以内にログが検索可能になります。
+
+### 6.5 スクリーンショット撮影
+
+以下のスクリーンショットを撮影し、`docs/screenshots/splunk/` に保存します:
+
+- Lambda CloudWatch Logs（`Successfully shipped` が表示されている状態）
+- Splunk Search 結果（SPL クエリ、結果件数、展開されたイベント）
+- Splunk ダッシュボード（FSxN 監査ログデータを表示するパネル）
+
+![Splunk Search 結果](../../../../docs/screenshots/splunk/splunk-search-results-20260101.png)
+
+## トラブルシューティング
+
+### ネットワーク接続の問題
+
+**症状**: Lambda が Splunk HEC エンドポイントに接続できない
+
+**診断**:
+
+```bash
+# HEC エンドポイントへの接続テスト
+curl -k -s -o /dev/null -w "%{http_code}" \
+  https://your-splunk-instance:8088/services/collector/health
+```
+
+**期待結果**: HTTP `200` が返ること
+
+**解決策**:
+- Splunk が VPC 内にある場合: Lambda を同じ VPC に配置し、NAT Gateway を設定
+- Splunk Cloud の場合: HEC エンドポイントがパブリックアクセス可能であることを確認
+- セキュリティグループで Lambda からポート 8088 へのアウトバウンドが許可されていることを確認
+
+### 無効なトークン
+
+**症状**: Lambda ログに `Invalid token format` または Splunk から HTTP 403 が返る
+
+**診断**:
+
+```bash
+# トークン形式の確認（UUID: 8-4-4-4-12）
+aws secretsmanager get-secret-value \
+  --secret-id "splunk/fsxn-hec-token" \
+  --region ap-northeast-1 \
+  --query 'SecretString' \
+  --output text | grep -E '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+```
+
+**解決策**:
+- トークンが UUID 形式（`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`）であることを確認
+- Splunk 側で HEC トークンが有効（Enabled）であることを確認
+- トークンに割り当てられた Index が正しいことを確認
+
+### SSL 証明書の問題
+
+**症状**: Lambda ログに `SSL: CERTIFICATE_VERIFY_FAILED` エラー
+
+**診断**:
+
+```bash
+# SSL 証明書の確認
+openssl s_client -connect your-splunk-instance:8088 -showcerts </dev/null 2>/dev/null | openssl x509 -noout -dates
+```
+
+**解決策**:
+- 自己署名証明書を使用している場合: CloudFormation パラメータで `VerifySSL=false` を設定
 
 ```bash
 aws cloudformation deploy \
@@ -42,33 +282,58 @@ aws cloudformation deploy \
   --stack-name fsxn-splunk-integration \
   --parameter-overrides \
     S3AccessPointArn=$AP_ARN \
-    SplunkHecTokenSecretArn=arn:aws:secretsmanager:...:secret:splunk/fsxn-hec-token-XXXXX \
-    SplunkHecEndpoint=https://splunk.example.com:8088 \
+    SplunkHecTokenSecretArn=$SECRET_ARN \
+    SplunkHecEndpoint=https://your-splunk-instance:8088 \
     S3BucketName=$BUCKET_NAME \
-    SplunkIndex=fsxn_audit \
-  --capabilities CAPABILITY_IAM
+    VerifySSL=false \
+  --capabilities CAPABILITY_IAM \
+  --region ap-northeast-1
 ```
 
-## Step 4: 動作確認
+> **注意**: 本番環境では正規の SSL 証明書を使用することを強く推奨します。`VerifySSL=false` は検証環境でのみ使用してください。
 
-Splunk Search:
-```spl
-index=fsxn_audit sourcetype=fsxn:ontap:audit | head 10
+### IAM 権限の問題
+
+**症状**: Lambda ログに `AccessDenied` エラー
+
+**診断**:
+
+```bash
+# CloudWatch Logs で AccessDenied を検索
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/fsxn-splunk-integration-shipper \
+  --filter-pattern "AccessDenied" \
+  --region ap-northeast-1
 ```
 
-## EC2 ベースとの比較
+**解決策**:
+- Lambda 実行ロールに以下の権限が付与されていることを確認:
+  - `secretsmanager:GetSecretValue`（HEC トークン取得）
+  - `s3:GetObject`（S3 Access Point 経由のオブジェクト読み取り）
+  - `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`（CloudWatch Logs）
+- S3 Access Point のリソースポリシーが Lambda ロールを許可していることを確認
+- IAM ポリシーのリソース ARN に `/object/*` サフィックスが含まれていることを確認:
 
-| 項目 | EC2 ベース (既存) | サーバーレス (本プロジェクト) |
-|------|-----------------|--------------------------|
-| インフラ | EC2 × 2台 (syslog-ng + UF) | Lambda + EventBridge |
-| 月額コスト | ~$150+ (EC2 + EBS) | ~$5 (従量課金) |
-| スケーリング | 手動 | 自動 |
-| パッチ管理 | 必要 | 不要 |
-| 可用性 | 手動 HA 構成 | AWS マネージド |
-| レイテンシ | ~10秒 | ~30秒 |
+```
+arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap/object/*
+```
 
-## ネットワーク考慮事項
+### ログが Splunk に届かない場合の総合チェックリスト
 
-- Splunk が VPC 内: Lambda を同じ VPC に配置 + NAT Gateway
-- Splunk Cloud: HEC エンドポイントがパブリックアクセス可能であること確認
-- 自己署名証明書: `VerifySSL=false` パラメータを設定
+1. Lambda が正常に呼び出されているか（CloudWatch Logs 確認）
+2. HEC エンドポイントに接続できるか（curl テスト）
+3. HEC トークンが有効か（UUID 形式 + Splunk 側で Enabled）
+4. SSL 証明書が有効か（自己署名の場合は `VerifySSL=false`）
+5. IAM 権限が正しいか（AccessDenied がないか確認）
+6. DLQ にメッセージが溜まっていないか確認:
+
+```bash
+aws sqs get-queue-attributes \
+  --queue-url $(aws cloudformation describe-stack-resource \
+    --stack-name fsxn-splunk-integration \
+    --logical-resource-id DeadLetterQueue \
+    --query 'StackResourceDetail.PhysicalResourceId' \
+    --output text) \
+  --attribute-names ApproximateNumberOfMessages \
+  --region ap-northeast-1
+```

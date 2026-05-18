@@ -12,8 +12,8 @@
 | 項目 | 値 |
 |------|-----|
 | **AWS リージョン** | `ap-northeast-1` |
-| **FSx ONTAP ファイルシステム ID** | `fs-09ffe72a3b2b7dbbd` (SINGLE_AZ_1) |
-| **SVM 名** | `FPolicySMB` (svm-037cedb30df493c1e), `FSxN_OnPre` (svm-0d5f81cd0146af242) |
+| **FSx ONTAP ファイルシステム ID** | `fs-0123456789abcdef0` (SINGLE_AZ_1) |
+| **SVM 名** | `FPolicySMB` (svm-0123456789abcdef0), `FSxN_OnPre` (svm-0abcdef123456789a) |
 | **ONTAP バージョン** | `9.17.1P6` |
 
 ### CloudFormation スタック名
@@ -62,7 +62,7 @@ aws cloudformation deploy \
 | 項目 | 内容 |
 |------|------|
 | **期待結果** | スタックが CREATE_COMPLETE となり、Outputs に `ApiEndpointUrl`、`ApiGatewayId`、`DeadLetterQueueArn` が出力される |
-| **実際の結果** | スタック `fsxn-ems-webhook` が CREATE_COMPLETE。Outputs: ApiEndpointUrl=`https://2tpkso4jge.execute-api.ap-northeast-1.amazonaws.com/prod/ems`, ApiGatewayId=`2tpkso4jge`, DeadLetterQueueArn=`arn:aws:sqs:ap-northeast-1:178625946981:fsxn-ems-webhook-ems-dlq` |
+| **実際の結果** | スタック `fsxn-ems-webhook` が CREATE_COMPLETE。Outputs: ApiEndpointUrl=`https://2tpkso4jge.execute-api.ap-northeast-1.amazonaws.com/prod/ems`, ApiGatewayId=`2tpkso4jge`, DeadLetterQueueArn=`arn:aws:sqs:ap-northeast-1:123456789012:fsxn-ems-webhook-ems-dlq` |
 | **判定** | ✅ PASS |
 
 ---
@@ -200,13 +200,13 @@ aws cloudformation deploy \
   --stack-name fsxn-fp-srv \
   --parameter-overrides \
     ComputeType=fargate \
-    VpcId=vpc-0ae01826f906191af \
+    VpcId=vpc-0123456789abcdef0 \
     SubnetIds=subnet-0307ebbd55b35c842,subnet-0af86ebd3c65481b8 \
-    FsxnSvmSecurityGroupId=sg-04b2fedb571860818 \
-    ContainerImage=178625946981.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix \
+    FsxnSvmSecurityGroupId=sg-0123456789abcdef0 \
+    ContainerImage=123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix \
     FPolicyPort=9898 \
-    FsxnMgmtIp=10.0.15.0 \
-    FsxnSvmUuid=2c3f92e2-4ee2-11f1-acbd-21ab1e8e6bf5 \
+    FsxnMgmtIp=10.0.x.x \
+    FsxnSvmUuid=<svm-uuid> \
     FsxnEngineName=fpolicy_lambda_engine \
     FsxnPolicyName=fpolicy_lambda_policy \
     FsxnCredentialsSecret=<Secrets Manager ARN> \
@@ -302,7 +302,7 @@ aws logs filter-log-events \
 
 # 2. SQS キューのメッセージ数を確認
 aws sqs get-queue-attributes \
-  --queue-url https://sqs.ap-northeast-1.amazonaws.com/178625946981/<キュー名> \
+  --queue-url https://sqs.ap-northeast-1.amazonaws.com/123456789012/<キュー名> \
   --attribute-names ApproximateNumberOfMessages \
   --region ap-northeast-1
 ```

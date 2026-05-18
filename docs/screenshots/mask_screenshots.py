@@ -180,6 +180,111 @@ def mask_aws_ems_lambda_logs():
     print(f"  ℹ️  {filepath.name}: 個人情報なし（マスク不要）")
 
 
+def mask_datadog_fpolicy_full_path():
+    """datadog-fpolicy-full-path.png のマスク処理。
+
+    マスク対象:
+      1. 上部ウェルカムバナー（ユーザー名 + トライアル情報）
+      2. サイドバー下部プロファイル（メールアドレス + 組織名）
+    """
+    filepath = SCRIPT_DIR / "datadog-fpolicy-full-path.png"
+    if not filepath.exists():
+        print(f"  ⏭️  {filepath.name}: ファイルが見つかりません")
+        return
+
+    img = Image.open(filepath)
+    width, height = img.size
+    print(f"  📐 {filepath.name}: {width}x{height}")
+
+    sidebar_width = 105
+
+    # 1. 上部バナー
+    mask_datadog_top_banner(img, sidebar_width)
+
+    # 2. サイドバー下部プロファイル
+    mask_datadog_sidebar_profile(img, sidebar_width)
+
+    img.save(filepath)
+    print(f"  ✅ {filepath.name}: マスク完了")
+
+
+def mask_datadog_fpolicy_detail():
+    """datadog-fpolicy-detail.png のマスク処理。
+
+    マスク対象:
+      1. 上部ウェルカムバナー（ユーザー名 + トライアル情報）
+      2. サイドバー下部プロファイル（メールアドレス + 組織名）
+    """
+    filepath = SCRIPT_DIR / "datadog-fpolicy-detail.png"
+    if not filepath.exists():
+        print(f"  ⏭️  {filepath.name}: ファイルが見つかりません")
+        return
+
+    img = Image.open(filepath)
+    width, height = img.size
+    print(f"  📐 {filepath.name}: {width}x{height}")
+
+    sidebar_width = 105
+
+    # 1. 上部バナー
+    mask_datadog_top_banner(img, sidebar_width)
+
+    # 2. サイドバー下部プロファイル
+    mask_datadog_sidebar_profile(img, sidebar_width)
+
+    img.save(filepath)
+    print(f"  ✅ {filepath.name}: マスク完了")
+
+
+def mask_aws_ecs_fpolicy_logs():
+    """aws-ecs-fpolicy-logs.png のマスク処理。
+
+    AWS CloudWatch コンソールのスクリーンショット。
+    マスク対象:
+      1. 上部ナビバーのアカウント情報
+    """
+    filepath = SCRIPT_DIR / "aws-ecs-fpolicy-logs.png"
+    if not filepath.exists():
+        print(f"  ⏭️  {filepath.name}: ファイルが見つかりません")
+        return
+
+    img = Image.open(filepath)
+    width, height = img.size
+    print(f"  📐 {filepath.name}: {width}x{height}")
+
+    # AWS コンソール上部ナビバー右側（アカウント名、リージョン選択の左）
+    # 通常 y=0〜40, x=width-400〜width
+    account_box = (width - 400, 0, width, 40)
+    mask_region(img, account_box, color=(35, 47, 62))
+
+    img.save(filepath)
+    print(f"  ✅ {filepath.name}: マスク完了")
+
+
+def mask_aws_lambda_fpolicy_logs():
+    """aws-lambda-fpolicy-logs.png のマスク処理。
+
+    AWS CloudWatch コンソールのスクリーンショット。
+    マスク対象:
+      1. 上部ナビバーのアカウント情報
+    """
+    filepath = SCRIPT_DIR / "aws-lambda-fpolicy-logs.png"
+    if not filepath.exists():
+        print(f"  ⏭️  {filepath.name}: ファイルが見つかりません")
+        return
+
+    img = Image.open(filepath)
+    width, height = img.size
+    print(f"  📐 {filepath.name}: {width}x{height}")
+
+    # AWS コンソール上部ナビバー右側
+    account_box = (width - 400, 0, width, 40)
+    mask_region(img, account_box, color=(35, 47, 62))
+
+    img.save(filepath)
+    print(f"  ✅ {filepath.name}: マスク完了")
+
+
 def mask_datadog_dashboard():
     """datadog-dashboard.png のマスク処理。
 
@@ -289,6 +394,13 @@ if __name__ == "__main__":
     mask_datadog_arp_log_detail()
     mask_datadog_fpolicy_suspect_activity()
     mask_aws_ems_lambda_logs()
+
+    print()
+    print("--- FPolicy フルパス検証分 ---")
+    mask_datadog_fpolicy_full_path()
+    mask_datadog_fpolicy_detail()
+    mask_aws_ecs_fpolicy_logs()
+    mask_aws_lambda_fpolicy_logs()
 
     print()
     print("--- 既存スクリーンショット ---")

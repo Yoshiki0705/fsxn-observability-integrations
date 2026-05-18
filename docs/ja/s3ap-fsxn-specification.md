@@ -10,18 +10,18 @@
 
 ### 根本原因
 
-**FSx ONTAP S3 Access Points は S3 Gateway VPC Endpoint 経由ではアクセスできません。**
+**Internet-origin の FSx ONTAP S3 Access Points は、VPC 内から Gateway Endpoint のみではアクセスできませんでした（本環境での観察結果）。**
 
-FSx ONTAP S3 AP は FSx のデータプレーンを経由するため、通常の S3 サービスエンドポイント (`com.amazonaws.<region>.s3`) とは異なるルーティングが必要です。
+AWS [ドキュメント](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)によると、VPC-origin の S3 AP は Gateway Endpoint で動作します。Internet-origin AP の場合は NAT Gateway または VPC 外 Lambda が必要です。
 
 ### Lambda 配置パターン
 
 | Lambda 配置 | S3 AP アクセス | ONTAP REST API | 推奨用途 |
 |------------|-------------|---------------|---------|
 | VPC 外 | ✅ 成功 | ❌ 不可 | S3 AP 読み取り専用（本プロジェクトの主要パターン） |
-| VPC 内 + S3 Gateway EP | ❌ **タイムアウト** | ✅ 成功 | ⚠️ 使用禁止 |
+| VPC 内 + S3 Gateway EP (Internet-origin AP) | ⚠️ **タイムアウト** | ✅ 成功 | NAT Gateway または VPC-origin AP が必要 |
 | VPC 内 + NAT Gateway | ✅ 成功 | ✅ 成功 | 本番環境推奨 |
-| VPC 内 + Interface EP のみ | ❌ **タイムアウト** | ✅ 成功 | ⚠️ 使用禁止 |
+| VPC 内 + VPC-origin AP + Gateway EP | ✅ AWS ドキュメント記載 | ✅ 成功 | VPC-origin AP の作成が必要 |
 
 ### 本プロジェクトでの設計判断
 

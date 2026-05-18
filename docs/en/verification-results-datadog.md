@@ -9,8 +9,8 @@
 - **CloudFormation Stack Name**: fsxn-datadog-integration
 - **Lambda Function Name**: fsxn-datadog-integration-shipper
 - **Datadog Site**: ap1.datadoghq.com (AP1 Tokyo)
-- **FSx ONTAP File System**: fs-09ffe72a3b2b7dbbd
-- **S3 Access Point**: arn:aws:s3:ap-northeast-1:178625946981:accesspoint/fsxn-audit-observability
+- **FSx ONTAP File System**: fs-0123456789abcdef0
+- **S3 Access Point**: arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-observability
 
 ---
 
@@ -25,8 +25,8 @@ aws cloudformation deploy \
   --template-file integrations/datadog/template.yaml \
   --stack-name fsxn-datadog-integration \
   --parameter-overrides \
-    S3AccessPointArn=arn:aws:s3:ap-northeast-1:178625946981:accesspoint/fsxn-audit-observability \
-    DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:178625946981:secret:fsxn-datadog-api-key-7Ti8iQ \
+    S3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-observability \
+    DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:fsxn-datadog-api-key-XXXXXX \
     DatadogSite=ap1.datadoghq.com \
     S3BucketName=fsxn-audit-obser-cbsi8mwwgahuh7sans3bbtxijig4sapn1b-ext-s3alias \
   --capabilities CAPABILITY_NAMED_IAM \
@@ -232,7 +232,7 @@ aws cloudformation deploy \
   --template-file integrations/datadog/template-ems-fpolicy.yaml \
   --stack-name fsxn-datadog-ems-fpolicy \
   --parameter-overrides \
-    DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:178625946981:secret:fsxn-datadog-api-key-7Ti8iQ \
+    DatadogApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:fsxn-datadog-api-key-XXXXXX \
     DatadogSite=ap1.datadoghq.com \
   --capabilities CAPABILITY_NAMED_IAM \
   --region ap-northeast-1
@@ -309,3 +309,144 @@ aws lambda invoke \
 | E4 | FPolicy File Operation Test | ✅ Success |
 
 **EMS/FPolicy Overall Judgment**: ✅ PASS
+
+---
+
+## FPolicy Full-Path E2E Verification (via ECS Fargate)
+
+- **Verification Date**: 2026-05-17T23:35–23:50 JST
+- **Stacks**: fsxn-fpolicy-server (Fargate) + fsxn-datadog-ems-fpolicy (Lambda)
+- **Pipeline**: ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Datadog
+
+### Environment
+
+| Component | Value |
+|-----------|-------|
+| ECS Cluster | fsxn-fpolicy-server-cluster |
+| Fargate Task IP | 10.0.x.x |
+| SQS Queue | fsxn-fpolicy-server-fpolicy-queue |
+| Lambda Function | fsxn-datadog-ems-fpolicy-fpolicy |
+| FSx ONTAP SVM | FPolicySMB (svm-0123456789abcdef0) |
+| FPolicy Engine | fpolicy_aws_engine |
+| FPolicy Policy | fpolicy_aws (async, cifs) |
+| Monitored Volume | smb_test_vol |
+| SMB Share | //10.0.x.x/smb_test |
+
+### Step F1: Fargate Deployment
+
+- **Result**: ✅ Success
+- **Key Finding**: ECR image MUST be built for `linux/amd64` (Apple Silicon builds produce arm64-only images, causing Fargate task pull failures)
+- **Command**:
+```bash
+docker buildx build --platform linux/amd64 \
+  -t <account>.dkr.ecr.<region>.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix \
+  --push shared/fpolicy-server/
+```
+
+### Step F2: ONTAP FPolicy Connection
+
+- **Result**: ✅ Success
+- **Connection Verified**: KeepAlive messages received (2 ONTAP nodes connected)
+- **Key Finding**: Updating External Engine IP requires temporarily disabling the FPolicy policy
+
+```
+[INFO] fpolicy-server: [+] Connection from ('10.0.x.x', 44107)
+[INFO] fpolicy-server: [+] Connection from ('10.0.x.x', 24523)
+[INFO] fpolicy-server: [Handshake] Policy=fpolicy_aws | Version=1.2
+[INFO] fpolicy-server: [KeepAlive] Received — connection healthy
+```
+
+### Step F3: File Operation → Datadog Arrival
+
+- **Result**: ✅ Success
+- **Test Operation**: SMB file create via smbclient
+- **End-to-End Latency**: ~6–8 seconds
+
+```bash
+smbclient //10.0.x.x/smb_test -U 'FPOLSMB\Administrator%<password>' \
+  -c 'put /etc/hostname fpolicy_e2e_test.txt'
+```
+
+**ECS Logs**:
+```
+[Event] create fpolicy_e2e_test.txt
+[SQS] Sent: fpolicy_e2e_test.txt (create)
+```
+
+**Lambda Logs**:
+```
+FPolicy handler invoked: source=unknown
+Extracted 1 FPolicy event(s)
+Processing complete: {"statusCode": 200, "body": {"shipped": 1}}
+```
+
+**Datadog Confirmation**: 7 logs arrived with `source:fsxn-fpolicy`
+
+### Step F4: Structured Attributes Verification
+
+| Field | Value | Status |
+|-------|-------|--------|
+| source | fsxn-fpolicy | ✅ |
+| file_path | e2e_write_test.txt | ✅ |
+| @attributes.operation_type | create | ✅ |
+| client_ip | 10.0.x.x | ✅ |
+| volume_name | vol1 | ✅ |
+| timestamp | 2026-05-17T14:43:51+00:00 | ✅ |
+
+### Issues Discovered and Resolutions
+
+| # | Issue | Root Cause | Resolution |
+|---|-------|-----------|------------|
+| 1 | Fargate task pull failure | ECR image was arm64-only | Rebuild with `--platform linux/amd64` |
+| 2 | SQS → Lambda not connected | Only EventBridge rule existed, no SQS mapping | Added SQS support to Lambda + event source mapping |
+| 3 | fsxadmin account locked | Too many password attempts | Reset via `aws fsx update-file-system` |
+| 4 | SMB password must change | First-login forced change | Set password via ONTAP CLI `set-password` |
+| 5 | rename/delete not captured | FPolicy async mode behavior | Future: test with sync mode |
+
+### FPolicy Full-Path Verification Summary
+
+| Step | Name | Result | Latency |
+|------|------|--------|---------|
+| F1 | Fargate Deployment | ✅ Success | — |
+| F2 | ONTAP Connection | ✅ Success | — |
+| F3 | File Op → Datadog | ✅ Success | ~6-8s |
+| F4 | Structured Attributes | ✅ Success | — |
+
+**FPolicy Full-Path Overall Judgment**: ✅ PASS (create event full-path verified)
+
+### Screenshots
+
+![FPolicy Log List — Datadog Log Explorer](../screenshots/datadog-fpolicy-full-path.png)
+
+![FPolicy Event Detail](../screenshots/datadog-fpolicy-detail.png)
+
+
+---
+
+### Step F5: Fargate Task Restart Resilience Test
+
+- **Result**: ✅ Success
+- **Test Procedure**:
+  1. Start Fargate → Task IP: 10.0.x.x → ONTAP connection confirmed → Event flow confirmed
+  2. Stop Fargate (scale to 0) → Task stopped
+  3. Restart Fargate (scale to 1) → New task IP: 10.0.x.x
+  4. Update ONTAP External Engine IP → Reconnection confirmed
+  5. File operation → Event flow resumed
+
+**Detailed Results**:
+
+| Step | Result | Notes |
+|------|--------|-------|
+| Initial start → connection | ✅ | IP: 10.0.x.x, connected in ~20s |
+| Event flow (pre-restart) | ✅ | pre_restart_test.txt → SQS → Datadog |
+| Task stop | ✅ | Stopped in ~30s |
+| Task restart | ✅ | New IP: 10.0.x.x |
+| ONTAP reconnection | ✅ | Reconnected ~20s after Engine IP update |
+| Event flow (post-restart) | ✅ | post_restart_test.txt → SQS → Datadog |
+| Lambda retry | ✅ | Initial connection error → retry succeeded |
+
+**Key Findings**:
+- Fargate task IP changes on restart (10.0.x.x → 10.0.x.x)
+- ONTAP External Engine IP update is mandatory (automated via script)
+- Lambda retry logic correctly handles transient connection errors
+- Full recovery from restart: ~2 minutes (task start 45s + Engine update + connection 20s)

@@ -1,0 +1,13 @@
+{
+  "time": "2024-01-15T20:00:00+09:00",
+  "messageName": "net.linkDown",
+  "severity": "alert",
+  "node": "fsxn-node-01",
+  "svmName": "svm-prod-01",
+  "message": "Network link e0a on node fsxn-node-01 is down: cable unplugged",
+  "parameters": {
+    "node": "fsxn-node-01",
+    "port": "e0a",
+    "reason": "cable unplugged"
+  }
+}
