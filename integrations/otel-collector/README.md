@@ -24,6 +24,36 @@ EMS Webhook    → Lambda (EMS Handler)   → OTel Collector → (same backends)
 FPolicy Events → Lambda (FPolicy)       → OTel Collector → (same backends)
 ```
 
+## 5-Minute Local Validation
+
+Validate the entire pipeline locally in under 5 minutes with a single backend:
+
+```bash
+# 1. Configure credentials (one backend only)
+cp .env.example .env
+# Edit .env with ONE backend credential (e.g., Honeycomb API key)
+
+# 2. Start OTel Collector
+docker run -d --name otel-collector \
+  -p 4318:4318 -p 13133:13133 \
+  -v $(pwd)/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml \
+  --env-file .env \
+  otel/opentelemetry-collector-contrib:0.152.0
+
+# 3. Generate a fresh OTLP payload (avoids stale timestamp rejection)
+bash scripts/generate-otlp-payload.sh --output /tmp/p.json
+
+# 4. Send payload to Collector
+curl -X POST http://localhost:4318/v1/logs \
+  -H "Content-Type: application/json" \
+  -d @/tmp/p.json
+
+# 5. Check your backend for service_name=fsxn-audit
+#    Grafana: {job="fsxn-audit"} | Honeycomb: dataset=fsxn-audit | Datadog: service:fsxn-audit
+```
+
+If step 4 returns HTTP 200, the Collector accepted the payload. Check your backend within 1-2 minutes.
+
 ## Quick Start
 
 ```bash
