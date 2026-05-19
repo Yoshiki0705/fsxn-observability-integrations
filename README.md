@@ -28,7 +28,7 @@ FPolicy: ONTAP → TCP:9898 → ECS Fargate → SQS → Lambda → ベンダー 
 | [Datadog](integrations/datadog/) | ✅ E2E verified | Logs API v2 via Lambda |
 | [New Relic](integrations/new-relic/) | 🧪 Implementation ready | Log API v1 via Lambda |
 | [Splunk (Serverless)](integrations/splunk-serverless/) | 🧪 Implementation ready | HEC via Lambda (replaces EC2 pattern) |
-| [OTel Collector](integrations/otel-collector/) | 🧪 Implementation ready | Vendor-neutral OTLP/HTTP |
+| [OTel Collector](integrations/otel-collector/) | ✅ E2E verified | Vendor-neutral OTLP/HTTP (Datadog + Grafana + Honeycomb) |
 | [Grafana Cloud](integrations/grafana/) | 🧪 Implementation ready | Loki Push API via Lambda |
 | [Elastic](integrations/elastic/) | 🧪 Implementation ready | Elasticsearch Bulk API |
 | [Dynatrace](integrations/dynatrace/) | 🧪 Implementation ready | Log Ingest API v2 |
