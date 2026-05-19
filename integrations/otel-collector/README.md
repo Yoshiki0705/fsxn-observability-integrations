@@ -57,7 +57,7 @@ The default configuration delivers logs simultaneously to both Grafana Cloud and
 - Endpoint: `https://otlp-gateway-prod-<region>.grafana.net/otlp`
 - Auth: `Authorization: Basic <base64(instanceId:apiToken)>`
 - Instance ID is numeric (e.g., 1649835)
-- Exporter: `otlphttp/grafana` (NOT the `loki` exporter)
+- Exporter: `otlp_http/grafana` (NOT the `loki` exporter)
 
 **Honeycomb**:
 - Endpoint: `https://api.honeycomb.io`
@@ -78,7 +78,7 @@ bash scripts/test-local-multi-backend.sh
 | Lambda OTLP Shipper | `lambda/handler.py` | Reads S3 audit logs, maps to OTLP, sends via HTTP |
 | EMS Handler | `lambda/ems_handler.py` | Receives EMS webhook events, forwards as OTLP |
 | FPolicy Handler | `lambda/fpolicy_handler.py` | Receives FPolicy events from EventBridge, forwards as OTLP |
-| OTel Config (default) | `otel-collector-config.yaml` | Grafana Cloud + Honeycomb (otlphttp) |
+| OTel Config (default) | `otel-collector-config.yaml` | Grafana Cloud + Honeycomb (otlp_http) |
 | OTel Config (Datadog) | `otel-collector-config-datadog.yaml` | Datadog exporter |
 | Docker Compose | `docker-compose.yaml` | Local OTel Collector (pinned 0.152.0) |
 | CloudFormation | `template.yaml` | AWS deployment template |
@@ -162,9 +162,9 @@ curl -X POST http://localhost:4318/v1/logs \
 
 ### Grafana Cloud Auth Format
 
-The `loki` exporter is NOT the correct approach for OTLP → Grafana Cloud. Use `otlphttp/grafana` with the OTLP gateway endpoint:
+The `loki` exporter is NOT the correct approach for OTLP → Grafana Cloud. Use `otlp_http/grafana` with the OTLP gateway endpoint:
 - ❌ `loki` exporter with Loki push API
-- ✅ `otlphttp/grafana` with `https://otlp-gateway-prod-<region>.grafana.net/otlp`
+- ✅ `otlp_http/grafana` with `https://otlp-gateway-prod-<region>.grafana.net/otlp`
 
 Basic Auth value must be `base64(instanceId:apiToken)` — NOT `instanceId:apiToken` in plain text.
 

@@ -126,8 +126,8 @@
 | S3 監査ログ → OTLP → Datadog | ✅ PASS | 2件確認済み。構造化属性: event.type, user.name, fsxn.operation, client.address, fsxn.result, fsxn.path, fsxn.svm |
 | EMS → OTLP → Datadog | ✅ PASS | 2件確認済み。ARP アラート + クォータ超過。属性: event_name, severity, source_node, svm, volume_name |
 | FPolicy → OTLP → Datadog | ✅ PASS | 24件確認済み。構造化属性: client_ip, file_path, operation_type, volume_name, event_id, timestamp |
-| OTLP → Grafana Cloud (マルチバックエンド) | ✅ PASS | 4件確認済み。otlphttp/grafana エクスポーター。Basic Auth 認証 |
-| OTLP → Honeycomb (マルチバックエンド) | ✅ PASS | 4件確認済み。otlphttp/honeycomb エクスポーター。x-honeycomb-team ヘッダー認証 |
+| OTLP → Grafana Cloud (マルチバックエンド) | ✅ PASS | 4件確認済み。otlp_http/grafana エクスポーター。Basic Auth 認証 |
+| OTLP → Honeycomb (マルチバックエンド) | ✅ PASS | 4件確認済み。otlp_http/honeycomb エクスポーター。x-honeycomb-team ヘッダー認証 |
 
 ## マルチバックエンド（Grafana Cloud + Honeycomb）パス検証
 
@@ -191,8 +191,8 @@
 
 | バックエンド | ステータス | 受信件数 | 備考 |
 |-------------|-----------|---------|------|
-| Grafana Cloud (Loki) | ✅ PASS | 4件 | OTLP/HTTP → otlphttp/grafana エクスポーター。Basic Auth (Instance ID + API Token) |
-| Honeycomb | ✅ PASS | 4件 | OTLP/HTTP → otlphttp/honeycomb エクスポーター。x-honeycomb-team ヘッダー認証 |
+| Grafana Cloud (Loki) | ✅ PASS | 4件 | OTLP/HTTP → otlp_http/grafana エクスポーター。Basic Auth (Instance ID + API Token) |
+| Honeycomb | ✅ PASS | 4件 | OTLP/HTTP → otlp_http/honeycomb エクスポーター。x-honeycomb-team ヘッダー認証 |
 
 ## アーキテクチャ上の重要ポイント
 

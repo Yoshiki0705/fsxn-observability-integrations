@@ -126,8 +126,8 @@
 | S3 Audit Log → OTLP → Datadog | ✅ PASS | 2 logs confirmed. Structured attributes: event.type, user.name, fsxn.operation, client.address, fsxn.result, fsxn.path, fsxn.svm |
 | EMS → OTLP → Datadog | ✅ PASS | 2 logs confirmed. ARP alert + quota exceeded. Attributes: event_name, severity, source_node, svm, volume_name |
 | FPolicy → OTLP → Datadog | ✅ PASS | 24 logs confirmed. Structured attributes: client_ip, file_path, operation_type, volume_name, event_id, timestamp |
-| OTLP → Grafana Cloud (Multi-Backend) | ✅ PASS | 4 logs confirmed. otlphttp/grafana exporter. Basic Auth |
-| OTLP → Honeycomb (Multi-Backend) | ✅ PASS | 4 events confirmed. otlphttp/honeycomb exporter. x-honeycomb-team header auth |
+| OTLP → Grafana Cloud (Multi-Backend) | ✅ PASS | 4 logs confirmed. otlp_http/grafana exporter. Basic Auth |
+| OTLP → Honeycomb (Multi-Backend) | ✅ PASS | 4 events confirmed. otlp_http/honeycomb exporter. x-honeycomb-team header auth |
 
 ## Multi-Backend (Grafana Cloud + Honeycomb) Path Verification
 
@@ -191,8 +191,8 @@
 
 | Backend | Status | Events Received | Notes |
 |---------|--------|----------------|-------|
-| Grafana Cloud (Loki) | ✅ PASS | 4 | OTLP/HTTP → otlphttp/grafana exporter. Basic Auth (Instance ID + API Token) |
-| Honeycomb | ✅ PASS | 4 | OTLP/HTTP → otlphttp/honeycomb exporter. x-honeycomb-team header auth |
+| Grafana Cloud (Loki) | ✅ PASS | 4 | OTLP/HTTP → otlp_http/grafana exporter. Basic Auth (Instance ID + API Token) |
+| Honeycomb | ✅ PASS | 4 | OTLP/HTTP → otlp_http/honeycomb exporter. x-honeycomb-team header auth |
 
 ## Key Architectural Points
 

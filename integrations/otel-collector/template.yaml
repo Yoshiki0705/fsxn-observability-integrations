@@ -2,10 +2,10 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: FSxN OTel Collector Integration - OTLP/HTTP audit log shipping via S3 Access Point
 # Tested OTel Collector image: otel/opentelemetry-collector-contrib:0.152.0
 # Verified working with Datadog exporter (AP1 region: ap1.datadoghq.com)
-# Verified working with Grafana Cloud (otlphttp exporter, ap-northeast-0 region)
+# Verified working with Grafana Cloud (otlp_http exporter, ap-northeast-0 region)
 #   Endpoint: https://otlp-gateway-prod-<region>.grafana.net/otlp
 #   Auth: Basic Auth = base64(instanceId:apiToken)
-# Verified working with Honeycomb (otlphttp exporter)
+# Verified working with Honeycomb (otlp_http exporter)
 #   Endpoint: https://api.honeycomb.io
 #   Auth: x-honeycomb-team header (hcaik_* ingest key)
 # Multi-backend (Grafana + Honeycomb simultaneous) verified 2026-05-18

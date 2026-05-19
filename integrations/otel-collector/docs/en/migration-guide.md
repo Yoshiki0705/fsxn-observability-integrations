@@ -52,7 +52,7 @@ exporters:
       site: ${env:DD_SITE}
 
   # New backend (e.g., Grafana Cloud)
-  otlphttp/grafana:
+  otlp_http/grafana:
     endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
     headers:
       Authorization: "Basic ${env:GRAFANA_BASIC_AUTH}"
@@ -62,7 +62,7 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [datadog, otlphttp/grafana]  # Deliver to both
+      exporters: [datadog, otlp_http/grafana]  # Deliver to both
 ```
 
 ### Step 3: Deploy New Lambda
@@ -146,7 +146,7 @@ exporters:
   #     key: ${env:DD_API_KEY}
   #     site: ${env:DD_SITE}
 
-  otlphttp/grafana:
+  otlp_http/grafana:
     endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
     headers:
       Authorization: "Basic ${env:GRAFANA_BASIC_AUTH}"
@@ -156,7 +156,7 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlphttp/grafana]  # New backend only
+      exporters: [otlp_http/grafana]  # New backend only
 ```
 
 ```bash
