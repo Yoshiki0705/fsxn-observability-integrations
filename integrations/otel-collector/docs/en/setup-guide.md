@@ -367,6 +367,34 @@ This script automatically:
 - Cleans up
 
 
+## Triple Backend (Datadog + Grafana Cloud + Honeycomb)
+
+To deliver logs simultaneously to **all three backends** (Datadog, Grafana Cloud, and Honeycomb) from a single OTLP stream, use the triple-backend config. No Lambda code changes are required.
+
+### Start the Triple-Backend Collector
+
+```bash
+# Start with triple-backend config
+docker run -d --name otel-collector-triple \
+  -p 4318:4318 -p 13133:13133 \
+  -v $(pwd)/otel-collector-config-triple.yaml:/etc/otelcol-contrib/config.yaml \
+  --env-file .env.triple \
+  otel/opentelemetry-collector-contrib:0.152.0
+```
+
+### Environment Variables
+
+```bash
+cp .env.triple.example .env.triple
+# Edit .env.triple with your credentials for all 3 backends
+```
+
+### service.name Mapping
+
+S3 audit logs use `service.name=fsxn-audit`, EMS uses `service.name=fsxn-ems`, and FPolicy uses `service.name=fsxn-fpolicy`.
+
+> Depending on your Honeycomb environment and dataset model, `x-honeycomb-dataset` may be optional or handled differently. Refer to your Honeycomb OTLP setup page.
+
 ## Firehose Buffering Path (High Volume)
 
 For high-volume scenarios exceeding 1,000 events/second, consider using Kinesis Data Firehose as an intermediate buffer instead of sending directly from Lambda to the OTel Collector.

@@ -367,6 +367,34 @@ bash scripts/test-local-datadog.sh
 - クリーンアップ
 
 
+## 3バックエンド同時配信（Datadog + Grafana Cloud + Honeycomb）
+
+単一の OTLP ストリームから **3つのバックエンド**（Datadog、Grafana Cloud、Honeycomb）に同時配信するには、トリプルバックエンド設定を使用します。Lambda コードの変更は不要です。
+
+### トリプルバックエンド Collector の起動
+
+```bash
+# Start with triple-backend config
+docker run -d --name otel-collector-triple \
+  -p 4318:4318 -p 13133:13133 \
+  -v $(pwd)/otel-collector-config-triple.yaml:/etc/otelcol-contrib/config.yaml \
+  --env-file .env.triple \
+  otel/opentelemetry-collector-contrib:0.152.0
+```
+
+### 環境変数
+
+```bash
+cp .env.triple.example .env.triple
+# Edit .env.triple with your credentials for all 3 backends
+```
+
+### service.name マッピング
+
+S3 監査ログは `service.name=fsxn-audit`、EMS は `service.name=fsxn-ems`、FPolicy は `service.name=fsxn-fpolicy` を使用します。
+
+> Honeycomb の環境やデータセットモデルによっては、`x-honeycomb-dataset` がオプションまたは異なる扱いになる場合があります。Honeycomb の OTLP セットアップページを参照してください。
+
 ## Firehose バッファリングパス（高ボリューム向け）
 
 1,000 イベント/秒を超える高ボリュームシナリオでは、Lambda から直接 OTel Collector に送信する代わりに、Kinesis Data Firehose を中間バッファとして使用することを検討してください。
