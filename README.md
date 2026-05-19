@@ -54,32 +54,32 @@ Status:
 
 ## Partner Positioning / パートナー向け
 
-This project helps partners modernize EC2-based FSx for ONTAP audit log collectors into an EC2-free, vendor-neutral observability pipeline.
+本プロジェクトは、EC2 ベースの FSx for ONTAP 監査ログコレクターを、EC2 不要かつベンダーニュートラルな Observability パイプラインへモダナイズするためのパターンを提供します。
 
-Common customer scenarios:
-- Replacing Splunk Universal Forwarder on EC2
-- Modernizing audit visibility for enterprise file shares (departmental file servers, application interface directories such as SAP/Oracle/SQL Server adjacent shares, VDI/EUC home directories, engineering and design repositories)
-- Integrating FSx for ONTAP with existing SIEM / observability platforms
-- Preparing for ransomware detection workflows using ONTAP telemetry
+想定されるお客様シナリオ:
+- EC2 上の Splunk Universal Forwarder の置き換え
+- エンタープライズファイル共有の監査可視性モダナイゼーション（部門ファイルサーバー、SAP/Oracle/SQL Server 連携ディレクトリ、VDI/EUC ホームディレクトリ、設計・開発リポジトリ）
+- FSx for ONTAP と既存 SIEM / Observability プラットフォームの統合
+- ONTAP テレメトリを活用したランサムウェア検知ワークフローの準備
 
 ## Quick Validation / 動作確認手順
 
-After deploying a vendor integration stack:
+ベンダー統合スタックのデプロイ後、以下のコマンドで動作確認できます:
 
 ```bash
-# 1. Confirm Scheduler is invoking Lambda
+# 1. Scheduler が Lambda を呼び出していることを確認
 aws logs filter-log-events \
   --log-group-name /aws/lambda/fsxn-datadog-integration-shipper \
   --start-time $(python3 -c "import time; print(int((time.time()-300)*1000))") \
   --region ap-northeast-1
 
-# 2. Confirm DLQ is empty (no failed events)
+# 2. DLQ が空であることを確認（失敗イベントなし）
 aws sqs get-queue-attributes \
   --queue-url <dlq-url> \
   --attribute-names All \
   --query 'Attributes.ApproximateNumberOfMessages'
 
-# 3. Search in your observability platform
+# 3. Observability プラットフォームで検索
 #    Datadog: source:fsxn
 #    Splunk:  index=fsxn_audit
 #    Grafana: {source="fsxn"}
@@ -88,21 +88,21 @@ aws sqs get-queue-attributes \
 ## Teardown / スタック削除
 
 ```bash
-# Remove vendor integration stack
+# ベンダー統合スタックの削除
 aws cloudformation delete-stack \
   --stack-name fsxn-datadog-integration \
   --region ap-northeast-1
 
-# Remove prerequisites stack (if no other vendor stacks depend on it)
+# 前提条件スタックの削除（他のベンダースタックが依存していない場合のみ）
 aws cloudformation delete-stack \
   --stack-name fsxn-observability-prerequisites \
   --region ap-northeast-1
 
-# ONTAP audit logging remains active — disable separately if needed:
+# ONTAP 監査ログは引き続き有効 — 必要に応じて別途無効化:
 # vserver audit disable -vserver <svm-name>
 ```
 
-> **Note**: Deleting the stack does not affect ONTAP audit logging or existing data on the FSx volume. Audit logs continue to be written to the audit volume.
+> **注意**: スタックを削除しても、ONTAP の監査ログ設定や FSx ボリューム上の既存データには影響しません。監査ログは引き続き audit volume に書き込まれます。
 
 ## Quick Start / クイックスタート
 
