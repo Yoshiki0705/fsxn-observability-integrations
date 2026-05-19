@@ -75,7 +75,7 @@ curl -f http://localhost:13133/
 
 The OTel Collector config defines an OTLP receiver, batch processor, and dual exporters for Grafana Cloud and Honeycomb.
 
-> **Important**: Use the `otlphttp/grafana` exporter (NOT the `loki` exporter) for OTLP → Grafana Cloud. The OTLP gateway endpoint handles log ingestion natively.
+> **Important**: Use the `otlp_http/grafana` exporter (NOT the `loki` exporter) for OTLP → Grafana Cloud. The OTLP gateway endpoint handles log ingestion natively.
 
 ```yaml
 receivers:
@@ -90,12 +90,12 @@ processors:
     send_batch_size: 1000
 
 exporters:
-  otlphttp/grafana:
+  otlp_http/grafana:
     endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
     headers:
       Authorization: "Basic ${env:GRAFANA_BASIC_AUTH}"
 
-  otlphttp/honeycomb:
+  otlp_http/honeycomb:
     endpoint: https://api.honeycomb.io
     headers:
       x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
@@ -111,7 +111,7 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlphttp/grafana, otlphttp/honeycomb]
+      exporters: [otlp_http/grafana, otlp_http/honeycomb]
 ```
 
 This configuration automatically fans out OTLP logs from the Lambda to both Grafana Cloud and Honeycomb simultaneously.
@@ -235,7 +235,7 @@ processors:
     send_batch_size: 1000
 
 exporters:
-  otlphttp/honeycomb:
+  otlp_http/honeycomb:
     endpoint: https://api.honeycomb.io
     headers:
       x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
@@ -251,7 +251,7 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlphttp/honeycomb]
+      exporters: [otlp_http/honeycomb]
 ```
 
 ### Environment Variables

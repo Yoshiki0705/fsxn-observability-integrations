@@ -9,8 +9,11 @@
 #   Honeycomb: x-honeycomb-team header with hcaik_* ingest key
 #
 # NOTE: The original config used the `loki` exporter which is NOT the correct
-# approach for OTLP → Grafana Cloud. Use `otlphttp/grafana` instead.
+# approach for OTLP → Grafana Cloud. Use `otlp_http/grafana` instead.
 # The OTLP gateway endpoint handles log ingestion natively.
+#
+# NOTE: This config uses `otlp_http` (forward-compatible component name).
+# If using Collector versions before 0.120.0, use `otlphttp` instead.
 
 receivers:
   otlp:
@@ -24,12 +27,12 @@ processors:
     send_batch_size: 1000
 
 exporters:
-  otlphttp/grafana:
+  otlp_http/grafana:
     endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
     headers:
       Authorization: "Basic ${env:GRAFANA_BASIC_AUTH}"
 
-  otlphttp/honeycomb:
+  otlp_http/honeycomb:
     endpoint: https://api.honeycomb.io
     headers:
       x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
@@ -45,4 +48,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlphttp/grafana, otlphttp/honeycomb]
+      exporters: [otlp_http/grafana, otlp_http/honeycomb]

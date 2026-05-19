@@ -96,14 +96,14 @@ OTel Collector を使って、同一の監査ログを Grafana Cloud と Honeyco
    exporters:
      loki:
        endpoint: https://logs-prod.grafana.net/loki/api/v1/push
-     otlphttp/honeycomb:
+     otlp_http/honeycomb:
        endpoint: https://api.honeycomb.io
        headers:
          x-honeycomb-team: ${HONEYCOMB_KEY}
    service:
      pipelines:
        logs:
-         exporters: [loki, otlphttp/honeycomb]
+         exporters: [loki, otlp_http/honeycomb]
    ```
 2. **操作**: FSx ONTAP でファイル操作
 3. **確認**:

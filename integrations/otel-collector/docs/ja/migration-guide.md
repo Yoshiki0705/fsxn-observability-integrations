@@ -52,7 +52,7 @@ exporters:
       site: ${env:DD_SITE}
 
   # 新バックエンド（例: Grafana Cloud）
-  otlphttp/grafana:
+  otlp_http/grafana:
     endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
     headers:
       Authorization: "Basic ${env:GRAFANA_BASIC_AUTH}"
@@ -62,7 +62,7 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [datadog, otlphttp/grafana]  # 両方に配信
+      exporters: [datadog, otlp_http/grafana]  # 両方に配信
 ```
 
 ### Step 3: Lambda エンドポイントの更新
@@ -148,7 +148,7 @@ exporters:
   #     key: ${env:DD_API_KEY}
   #     site: ${env:DD_SITE}
 
-  otlphttp/grafana:
+  otlp_http/grafana:
     endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
     headers:
       Authorization: "Basic ${env:GRAFANA_BASIC_AUTH}"
@@ -158,7 +158,7 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlphttp/grafana]  # 新バックエンドのみ
+      exporters: [otlp_http/grafana]  # 新バックエンドのみ
 ```
 
 ```bash

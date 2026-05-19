@@ -75,7 +75,7 @@ curl -f http://localhost:13133/
 
 OTel Collector の設定ファイルは、OTLP レシーバー、バッチプロセッサー、および Grafana Cloud + Honeycomb エクスポーターを定義します。
 
-> **重要**: Grafana Cloud への OTLP 送信には `loki` エクスポーターではなく `otlphttp/grafana` を使用します。OTLP Gateway エンドポイントがネイティブにログ取り込みを処理します。
+> **重要**: Grafana Cloud への OTLP 送信には `loki` エクスポーターではなく `otlp_http/grafana` を使用します。OTLP Gateway エンドポイントがネイティブにログ取り込みを処理します。
 
 ```yaml
 receivers:
@@ -90,12 +90,12 @@ processors:
     send_batch_size: 1000
 
 exporters:
-  otlphttp/grafana:
+  otlp_http/grafana:
     endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
     headers:
       Authorization: "Basic ${env:GRAFANA_BASIC_AUTH}"
 
-  otlphttp/honeycomb:
+  otlp_http/honeycomb:
     endpoint: https://api.honeycomb.io
     headers:
       x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
@@ -111,7 +111,7 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlphttp/grafana, otlphttp/honeycomb]
+      exporters: [otlp_http/grafana, otlp_http/honeycomb]
 ```
 
 この設定により、Lambda から送信された OTLP ログが自動的に Grafana Cloud と Honeycomb の両方に配信されます。
@@ -235,7 +235,7 @@ processors:
     send_batch_size: 1000
 
 exporters:
-  otlphttp/honeycomb:
+  otlp_http/honeycomb:
     endpoint: https://api.honeycomb.io
     headers:
       x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
@@ -251,7 +251,7 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlphttp/honeycomb]
+      exporters: [otlp_http/honeycomb]
 ```
 
 ### 環境変数
