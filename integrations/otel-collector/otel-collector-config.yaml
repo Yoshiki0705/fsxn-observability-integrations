@@ -13,7 +13,8 @@
 # The OTLP gateway endpoint handles log ingestion natively.
 #
 # NOTE: This config uses `otlp_http` (forward-compatible component name).
-# If using Collector versions before 0.120.0, use `otlphttp` instead.
+# If your Collector version does not recognize it, use the older `otlphttp` alias
+# or upgrade the Collector.
 
 receivers:
   otlp:
