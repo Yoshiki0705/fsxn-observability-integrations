@@ -286,6 +286,26 @@ service:
       exporters: []  # Intentionally empty - events are dropped
 ```
 
+## Pattern: Sensitive Path → Restricted Backend Only
+
+```yaml
+processors:
+  filter/sensitive_path:
+    logs:
+      include:
+        match_type: regexp
+        record_attributes:
+          - key: fsxn.path
+            value: "^/vol.*/confidential/.*"
+
+service:
+  pipelines:
+    logs/restricted:
+      receivers: [otlp]
+      processors: [filter/sensitive_path, batch]
+      exporters: [otlp_http/siem]  # Only to security backend
+```
+
 ## Complete Multi-Pattern Example
 
 A production-ready configuration combining all patterns:

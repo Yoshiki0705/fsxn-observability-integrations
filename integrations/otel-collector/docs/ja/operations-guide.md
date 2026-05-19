@@ -164,6 +164,66 @@ processors:
     send_batch_max_size: 5000
 ```
 
+### Processor Ordering
+
+本番環境では、プロセッサーリストで `memory_limiter` を `batch` の**前**に配置する。これにより、追加データをバッファリングする前にメモリ圧力を検出できる:
+
+```yaml
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  batch:
+    timeout: 5s
+    send_batch_size: 1000
+
+service:
+  pipelines:
+    logs:
+      processors: [memory_limiter, batch]  # memory_limiter FIRST
+```
+
+`memory_limiter` プロセッサーは Collector のメモリ使用量を監視し、ソフトリミットを超えた場合に新しいデータの受信を拒否してガベージコレクションをトリガーする。これにより OOM kill を防止する。
+
+### Exporter Resilience: sending_queue and retry_on_failure
+
+本番環境では、各エクスポーターにリトライとキュー設定を構成する:
+
+```yaml
+exporters:
+  otlp_http/grafana:
+    endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
+    headers:
+      Authorization: "Basic ${env:GRAFANA_BASIC_AUTH}"
+    sending_queue:
+      enabled: true
+      num_consumers: 10
+      queue_size: 5000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+```
+
+**主要な動作**:
+- **In-memory queue** — 短時間のバックエンド障害を吸収（秒〜分単位）
+- **Queue full** → 新しいデータはドロップされる（`otelcol_exporter_enqueue_failed_log_records` を監視）
+- **Retry timeout exceeded**（`max_elapsed_time`）→ キュー内の最古データがドロップされる
+- **Persistent storage**（ファイルベースキュー）— Collector 再起動に耐える。本番では storage エクステンション経由で構成:
+
+```yaml
+extensions:
+  file_storage:
+    directory: /var/lib/otelcol/queue
+
+exporters:
+  otlp_http/grafana:
+    sending_queue:
+      storage: file_storage
+```
+
 ## 障害モードとリカバリ
 
 ### 障害パターン一覧

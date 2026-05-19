@@ -51,12 +51,19 @@ jobs:
 ### Local Validation
 
 ```bash
-# Validate before committing
+# Validate config syntax
 docker run --rm \
-  -v $(pwd):/config \
+  -v $(pwd)/integrations/otel-collector:/config \
   otel/opentelemetry-collector-contrib:0.152.0 \
   validate --config /config/otel-collector-config.yaml
+
+# Note: The binary is `otelcol-contrib` in the contrib distribution.
+# For the core distribution, use `otelcol validate --config=<path>`.
+# Validation may report errors for unresolved ${env:...} variables —
+# this is expected when secrets are not available in CI.
 ```
+
+> **Note**: Config validation with `validate` checks YAML syntax and component references, but may report errors for unresolved `${env:...}` variables. This is expected when validating outside the runtime environment.
 
 ## Environment Separation
 

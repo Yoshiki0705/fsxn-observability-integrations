@@ -123,6 +123,27 @@ aws cloudformation deploy \
 # 3. Compare counts (tolerance: ±1%)
 ```
 
+### Backend Parity Verification Matrix
+
+| Check | Datadog | Grafana Cloud | Honeycomb |
+|-------|---------|---------------|-----------|
+| Event count matches source | ✅ | ✅ | ✅ |
+| `service.name` visible/searchable | ✅ | ✅ | ✅ |
+| `fsxn.svm` searchable | ✅ | ✅ | ✅ |
+| `fsxn.operation` searchable | ✅ | ✅ | ✅ |
+| `severityText` visible | ✅ | ✅ | ✅ |
+| Timestamp accepted (< 18h old) | ✅ | ✅ | ✅ |
+| `user.name` searchable | ✅ | ✅ | ✅ |
+| `client.address` searchable | ✅ | ✅ | ✅ |
+
+> **Note**: While OTLP standardizes the wire format, each backend may differ in:
+> - How resource attributes are indexed and displayed
+> - Severity level handling and visualization
+> - Timestamp acceptance windows
+> - Query syntax for searching attributes
+> - Default retention periods
+> - Ingestion delay (seconds to minutes)
+
 ### Success Criteria
 
 - [ ] Event count difference < 1% between paths
