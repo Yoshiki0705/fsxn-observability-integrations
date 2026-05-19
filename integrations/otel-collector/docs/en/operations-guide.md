@@ -1,5 +1,93 @@
 # OTel Collector Operations Guide
 
+## Minimum Collector Health Checks
+
+A production Collector deployment must monitor these signals at minimum:
+
+| Check | Method | Healthy State | Alert Condition |
+|-------|--------|---------------|-----------------|
+| Collector process health | `health_check` extension on :13133 | HTTP 200 | Non-200 or timeout |
+| OTLP receiver availability | HTTP GET `http://<collector>:4318` | Connection accepted | Connection refused |
+| Exporter error count | Internal metric `otelcol_exporter_send_failed_log_records` | 0 | > 0 for 5 minutes |
+| Exporter queue length | Internal metric `otelcol_exporter_queue_size` | < 80% capacity | > 80% capacity |
+| Batch send latency | Internal metric `otelcol_exporter_send_latency` | < 5s p99 | > 10s p99 |
+| Backend-specific response errors | Internal metric `otelcol_exporter_send_failed_*` per exporter | 0 | > 0 sustained |
+| Last successful export timestamp | Derived from `otelcol_exporter_sent_log_records` rate | Rate > 0 | Rate = 0 for 5 minutes |
+
+### Health Check Configuration
+
+```yaml
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+    path: /
+    check_collector_pipeline:
+      enabled: true
+      exporter_failure_threshold: 5
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics:
+      address: 0.0.0.0:8888
+      level: detailed
+```
+
+### Monitoring Script
+
+```bash
+#!/bin/bash
+# Minimum health check script for cron or monitoring agent
+
+COLLECTOR_HOST="${COLLECTOR_HOST:-localhost}"
+
+# 1. Process health
+if ! curl -sf "http://${COLLECTOR_HOST}:13133/" > /dev/null 2>&1; then
+  echo "CRITICAL: Collector health check failed"
+  exit 2
+fi
+
+# 2. OTLP receiver availability
+if ! curl -sf -o /dev/null -w "%{http_code}" \
+  "http://${COLLECTOR_HOST}:4318/v1/logs" 2>/dev/null | grep -q "405\|200"; then
+  echo "WARNING: OTLP receiver not responding"
+  exit 1
+fi
+
+# 3. Check internal metrics for exporter errors
+FAILED=$(curl -sf "http://${COLLECTOR_HOST}:8888/metrics" 2>/dev/null \
+  | grep 'otelcol_exporter_send_failed_log_records' \
+  | awk '{sum += $2} END {print sum+0}')
+
+if [ "${FAILED}" -gt 0 ]; then
+  echo "WARNING: Exporter has ${FAILED} failed sends"
+  exit 1
+fi
+
+echo "OK: Collector healthy"
+exit 0
+```
+
+### CloudWatch Alarm for Health Check
+
+```yaml
+CollectorHealthAlarm:
+  Type: AWS::CloudWatch::Alarm
+  Properties:
+    AlarmName: otel-collector-unhealthy
+    MetricName: HealthCheckStatus
+    Namespace: ECS/ContainerInsights
+    Statistic: Minimum
+    Period: 60
+    EvaluationPeriods: 3
+    Threshold: 1
+    ComparisonOperator: LessThanThreshold
+    AlarmActions:
+      - !Ref AlertSNSTopic
+```
+
+---
+
 ## Health Checks and Monitoring
 
 ### Health Check Endpoint

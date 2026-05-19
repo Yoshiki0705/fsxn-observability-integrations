@@ -1,5 +1,93 @@
 # OTel Collector 運用ガイド
 
+## 最小限の Collector ヘルスチェック
+
+本番 Collector デプロイメントでは、最低限以下のシグナルを監視する必要がある:
+
+| チェック | 方法 | 正常状態 | アラート条件 |
+|---------|------|---------|-------------|
+| Collector プロセスヘルス | `health_check` エクステンション :13133 | HTTP 200 | Non-200 またはタイムアウト |
+| OTLP レシーバー可用性 | HTTP GET `http://<collector>:4318` | 接続受付 | 接続拒否 |
+| エクスポーターエラー数 | 内部メトリクス `otelcol_exporter_send_failed_log_records` | 0 | 5 分間 > 0 |
+| エクスポーターキュー長 | 内部メトリクス `otelcol_exporter_queue_size` | < 80% 容量 | > 80% 容量 |
+| バッチ送信レイテンシ | 内部メトリクス `otelcol_exporter_send_latency` | < 5s p99 | > 10s p99 |
+| バックエンド固有レスポンスエラー | 内部メトリクス `otelcol_exporter_send_failed_*` エクスポーターごと | 0 | 持続的に > 0 |
+| 最終成功エクスポートタイムスタンプ | `otelcol_exporter_sent_log_records` レートから導出 | レート > 0 | 5 分間レート = 0 |
+
+### ヘルスチェック設定
+
+```yaml
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+    path: /
+    check_collector_pipeline:
+      enabled: true
+      exporter_failure_threshold: 5
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics:
+      address: 0.0.0.0:8888
+      level: detailed
+```
+
+### モニタリングスクリプト
+
+```bash
+#!/bin/bash
+# Minimum health check script for cron or monitoring agent
+
+COLLECTOR_HOST="${COLLECTOR_HOST:-localhost}"
+
+# 1. Process health
+if ! curl -sf "http://${COLLECTOR_HOST}:13133/" > /dev/null 2>&1; then
+  echo "CRITICAL: Collector health check failed"
+  exit 2
+fi
+
+# 2. OTLP receiver availability
+if ! curl -sf -o /dev/null -w "%{http_code}" \
+  "http://${COLLECTOR_HOST}:4318/v1/logs" 2>/dev/null | grep -q "405\|200"; then
+  echo "WARNING: OTLP receiver not responding"
+  exit 1
+fi
+
+# 3. Check internal metrics for exporter errors
+FAILED=$(curl -sf "http://${COLLECTOR_HOST}:8888/metrics" 2>/dev/null \
+  | grep 'otelcol_exporter_send_failed_log_records' \
+  | awk '{sum += $2} END {print sum+0}')
+
+if [ "${FAILED}" -gt 0 ]; then
+  echo "WARNING: Exporter has ${FAILED} failed sends"
+  exit 1
+fi
+
+echo "OK: Collector healthy"
+exit 0
+```
+
+### ヘルスチェック用 CloudWatch Alarm
+
+```yaml
+CollectorHealthAlarm:
+  Type: AWS::CloudWatch::Alarm
+  Properties:
+    AlarmName: otel-collector-unhealthy
+    MetricName: HealthCheckStatus
+    Namespace: ECS/ContainerInsights
+    Statistic: Minimum
+    Period: 60
+    EvaluationPeriods: 3
+    Threshold: 1
+    ComparisonOperator: LessThanThreshold
+    AlarmActions:
+      - !Ref AlertSNSTopic
+```
+
+---
+
 ## ヘルスチェックとモニタリング
 
 ### ヘルスチェックエンドポイント
