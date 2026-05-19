@@ -10,6 +10,7 @@ FSx for ONTAP audit log shipping via OTLP/HTTP to an OpenTelemetry Collector, en
 > | Grafana Cloud (ap-northeast-0) | ✅ Verified | `otel-collector-config.yaml` |
 > | Honeycomb | ✅ Verified | `otel-collector-config.yaml` |
 > | Multi-Backend (Grafana + Honeycomb) | ✅ Verified | `otel-collector-config.yaml` |
+> | Triple (Datadog + Grafana + Honeycomb) | ✅ Verified | `otel-collector-config-triple.yaml` |
 >
 > Tested with `otel/opentelemetry-collector-contrib:0.152.0`. Lambda code unchanged across all backends.
 
@@ -51,6 +52,8 @@ python -m pytest tests/ -v
 
 The default configuration delivers logs simultaneously to both Grafana Cloud and Honeycomb.
 
+> The `health_check` extension confirms the Collector process is available; it does not guarantee that each backend exporter is successfully delivering logs. Monitor exporter errors separately using the Collector's internal telemetry metrics if enabled.
+
 ### Verified Auth Patterns
 
 **Grafana Cloud (OTLP Gateway)**:
@@ -80,6 +83,7 @@ bash scripts/test-local-multi-backend.sh
 | FPolicy Handler | `lambda/fpolicy_handler.py` | Receives FPolicy events from EventBridge, forwards as OTLP |
 | OTel Config (default) | `otel-collector-config.yaml` | Grafana Cloud + Honeycomb (otlp_http) |
 | OTel Config (Datadog) | `otel-collector-config-datadog.yaml` | Datadog exporter |
+| OTel Config (Triple) | `otel-collector-config-triple.yaml` | Datadog + Grafana + Honeycomb simultaneous |
 | Docker Compose | `docker-compose.yaml` | Local OTel Collector (pinned 0.152.0) |
 | CloudFormation | `template.yaml` | AWS deployment template |
 

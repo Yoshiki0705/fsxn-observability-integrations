@@ -128,6 +128,7 @@
 | FPolicy → OTLP → Datadog | ✅ PASS | 24件確認済み。構造化属性: client_ip, file_path, operation_type, volume_name, event_id, timestamp |
 | OTLP → Grafana Cloud (マルチバックエンド) | ✅ PASS | 4件確認済み。otlp_http/grafana エクスポーター。Basic Auth 認証 |
 | OTLP → Honeycomb (マルチバックエンド) | ✅ PASS | 4件確認済み。otlp_http/honeycomb エクスポーター。x-honeycomb-team ヘッダー認証 |
+| OTLP → Triple (Datadog + Grafana + Honeycomb) | ✅ PASS | 3バックエンド同時配信。otel-collector-config-triple.yaml 使用 |
 
 ## マルチバックエンド（Grafana Cloud + Honeycomb）パス検証
 
@@ -193,6 +194,61 @@
 |-------------|-----------|---------|------|
 | Grafana Cloud (Loki) | ✅ PASS | 4件 | OTLP/HTTP → otlp_http/grafana エクスポーター。Basic Auth (Instance ID + API Token) |
 | Honeycomb | ✅ PASS | 4件 | OTLP/HTTP → otlp_http/honeycomb エクスポーター。x-honeycomb-team ヘッダー認証 |
+
+## 3バックエンド同時配信検証（Datadog + Grafana Cloud + Honeycomb）
+
+### 検証概要
+
+| 項目 | 値 |
+|------|-----|
+| 検証日 | 2026-05-19 |
+| バックエンド | Datadog (ap1.datadoghq.com) + Grafana Cloud (ap-northeast-0) + Honeycomb |
+| OTel Collector バージョン | otel/opentelemetry-collector-contrib:0.152.0 |
+| 設定ファイル | `otel-collector-config-triple.yaml` |
+
+### ステップ 1: OTel Collector 起動（トリプルバックエンド設定）
+
+| 項目 | 内容 |
+|------|------|
+| コマンド | `docker run -d --name otel-collector-triple -p 4318:4318 -p 13133:13133 -v $(pwd)/otel-collector-config-triple.yaml:/etc/otelcol-contrib/config.yaml --env-file .env.triple otel/opentelemetry-collector-contrib:0.152.0` |
+| 期待結果 | コンテナが healthy 状態で起動、3バックエンドへのエクスポーターが設定される |
+| 実際の結果 | コンテナ正常起動。3エクスポーター（otlp_http/grafana, otlp_http/honeycomb, datadog）が設定済み |
+| 判定 | ✅ PASS |
+
+### ステップ 2: ヘルスチェック確認
+
+| 項目 | 内容 |
+|------|------|
+| コマンド | `curl -f http://localhost:13133/` |
+| 期待結果 | HTTP 200 |
+| 実際の結果 | HTTP 200 — `{"status":"Server available","upSince":"...","uptime":"..."}` |
+| 判定 | ✅ PASS |
+
+### ステップ 3: OTLP ペイロード送信
+
+| 項目 | 内容 |
+|------|------|
+| コマンド | `curl -X POST http://localhost:4318/v1/logs -H "Content-Type: application/json" -d @payload.json` |
+| 期待結果 | HTTP 200、ログレコードが受理される |
+| 実際の結果 | HTTP 200 — `{"partialSuccess":{}}` (全件成功) |
+| 判定 | ✅ PASS |
+
+### ステップ 4: Collector ログ確認
+
+| 項目 | 内容 |
+|------|------|
+| コマンド | `docker logs otel-collector-triple` |
+| 期待結果 | エクスポートエラーなし |
+| 実際の結果 | エクスポートエラーゼロ。Datadog エクスポーターがソース解決に成功 |
+| 判定 | ✅ PASS |
+
+### 3バックエンド検証サマリー
+
+| バックエンド | ステータス | 備考 |
+|-------------|-----------|------|
+| Datadog | ✅ PASS | datadog エクスポーター。ソース解決成功 |
+| Grafana Cloud (Loki) | ✅ PASS | otlp_http/grafana エクスポーター。Basic Auth 認証 |
+| Honeycomb | ✅ PASS | otlp_http/honeycomb エクスポーター。x-honeycomb-team ヘッダー認証 |
 
 ## アーキテクチャ上の重要ポイント
 

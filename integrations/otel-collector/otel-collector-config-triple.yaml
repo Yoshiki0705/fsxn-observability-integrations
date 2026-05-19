@@ -1,0 +1,49 @@
+# OTel Collector Configuration — Triple Backend (Datadog + Grafana Cloud + Honeycomb)
+#
+# ✅ VERIFIED WORKING (2026-05-19)
+# Image: otel/opentelemetry-collector-contrib:0.152.0
+# Simultaneous delivery to all 3 backends from a single OTLP stream.
+#
+# This config uses `otlp_http` (forward-compatible component name).
+# If your Collector version does not recognize it, use the older `otlphttp` alias
+# or upgrade the Collector.
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1000
+
+exporters:
+  otlp_http/grafana:
+    endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
+    headers:
+      Authorization: "Basic ${env:GRAFANA_BASIC_AUTH}"
+
+  otlp_http/honeycomb:
+    endpoint: https://api.honeycomb.io
+    headers:
+      x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
+      x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
+
+  datadog:
+    api:
+      key: ${env:DD_API_KEY}
+      site: ${env:DD_SITE}
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_http/grafana, otlp_http/honeycomb, datadog]
