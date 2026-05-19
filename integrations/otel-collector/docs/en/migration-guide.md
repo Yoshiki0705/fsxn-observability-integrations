@@ -105,6 +105,20 @@ Verification checklist:
 - [ ] Logs still arriving at existing backend
 - [ ] Latency within acceptable range
 
+### Recommended Parallel Run Duration
+
+For enterprise and mission-critical workloads:
+
+- **Minimum**: One full audit rotation cycle (typically 1-7 days depending on ONTAP audit rotation schedule)
+- **Recommended**: 2-4 weeks for production workloads
+- **Mission-critical**: 4+ weeks with formal operational sign-off
+
+During parallel run, validate:
+- Event count parity between old and new paths (tolerance: ±1%)
+- All critical attributes present and searchable in new backend
+- Alerting and runbooks function correctly with Collector-delivered data
+- No unexpected latency or data loss patterns
+
 ### Step 5: Switch EventBridge Rule Target
 
 After verification, switch the EventBridge rule target to the new Lambda.

@@ -231,3 +231,16 @@ aws cloudformation delete-stack \
 | コスト差分が許容範囲 | < 20% 増加 | ___ | ☐ |
 
 **判断**: すべての基準が "Go" であることが本番カットオーバーの条件。1 つでも "No-Go" がある場合は、再試行前に是正が必要。
+
+## エグゼクティブ Go/No-Go 基準
+
+エンタープライズおよびパートナー主導のデプロイメントでは、以下のガバナンス基準を追加します:
+
+| Criterion | Go | No-Go |
+|-----------|-----|-------|
+| Backend parity | Event count and critical fields match across selected backends | Material field loss or unexplained count mismatch |
+| Operations ownership | Collector owner and change process defined | No clear owner |
+| Rollback | Direct-send or previous exporter path documented and tested | No rollback path |
+| Security | Secrets, network boundary, and access control reviewed | Shared credentials or public Collector endpoint |
+| Compliance | Raw audit evidence retention defined separately from backend copies | Normalized logs treated as sole evidence without approval |
+| Change management | Collector config changes follow approval process | Ad-hoc config changes without review |
