@@ -286,6 +286,26 @@ service:
       exporters: []  # Intentionally empty - events are dropped
 ```
 
+## パターン: 機密パス → 制限付きバックエンドのみ
+
+```yaml
+processors:
+  filter/sensitive_path:
+    logs:
+      include:
+        match_type: regexp
+        record_attributes:
+          - key: fsxn.path
+            value: "^/vol.*/confidential/.*"
+
+service:
+  pipelines:
+    logs/restricted:
+      receivers: [otlp]
+      processors: [filter/sensitive_path, batch]
+      exporters: [otlp_http/siem]  # Only to security backend
+```
+
 ## 完全なマルチパターン例
 
 すべてのパターンを組み合わせた本番対応設定:

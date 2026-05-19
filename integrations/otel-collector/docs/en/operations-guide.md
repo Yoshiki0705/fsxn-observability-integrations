@@ -164,6 +164,66 @@ processors:
     send_batch_max_size: 5000
 ```
 
+### Processor Ordering
+
+For production, place `memory_limiter` **before** `batch` in the processor list. This ensures memory pressure is detected before buffering additional data:
+
+```yaml
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  batch:
+    timeout: 5s
+    send_batch_size: 1000
+
+service:
+  pipelines:
+    logs:
+      processors: [memory_limiter, batch]  # memory_limiter FIRST
+```
+
+The `memory_limiter` processor monitors Collector memory usage and refuses new data when the soft limit is exceeded, triggering garbage collection. This prevents OOM kills.
+
+### Exporter Resilience: sending_queue and retry_on_failure
+
+For production, configure each exporter with retry and queue settings:
+
+```yaml
+exporters:
+  otlp_http/grafana:
+    endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
+    headers:
+      Authorization: "Basic ${env:GRAFANA_BASIC_AUTH}"
+    sending_queue:
+      enabled: true
+      num_consumers: 10
+      queue_size: 5000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+```
+
+**Key behaviors**:
+- **In-memory queue** absorbs short backend outages (seconds to minutes)
+- **Queue full** → new data is dropped (monitor `otelcol_exporter_enqueue_failed_log_records`)
+- **Retry timeout exceeded** (`max_elapsed_time`) → oldest queued data is dropped
+- **Persistent storage** (file-based queue) survives Collector restarts — configure via storage extension for production:
+
+```yaml
+extensions:
+  file_storage:
+    directory: /var/lib/otelcol/queue
+
+exporters:
+  otlp_http/grafana:
+    sending_queue:
+      storage: file_storage
+```
+
 ## Failure Modes and Recovery
 
 ### Failure Pattern Summary
