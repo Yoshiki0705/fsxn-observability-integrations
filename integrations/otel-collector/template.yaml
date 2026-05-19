@@ -1,66 +1,101 @@
-# Production deployment notes:
-# - For production, use otel-collector-config-production.yaml (includes
-#   memory_limiter, sending_queue, retry_on_failure)
-# - Collector endpoint must be reachable from Lambda (VPC or public)
-# - See docs/en/security-hardening.md for IAM and network hardening
-# - See docs/en/operations-runbook.md for failure recovery procedures
-
 AWSTemplateFormatVersion: '2010-09-09'
-Description: FSxN OTel Collector Integration - OTLP/HTTP audit log shipping via S3 Access Point
-# Tested OTel Collector image: otel/opentelemetry-collector-contrib:0.152.0
-# Verified working with Datadog exporter (AP1 region: ap1.datadoghq.com)
-# Verified working with Grafana Cloud (otlp_http exporter, ap-northeast-0 region)
-#   Endpoint: https://otlp-gateway-prod-<region>.grafana.net/otlp
-#   Auth: Basic Auth = base64(instanceId:apiToken)
-# Verified working with Honeycomb (otlp_http exporter)
-#   Endpoint: https://api.honeycomb.io
-#   Auth: x-honeycomb-team header (hcaik_* ingest key)
-# Multi-backend (Grafana + Honeycomb simultaneous) verified 2026-05-18
+Description: >-
+  FSxN OTel Collector Unified Integration - Audit log, EMS, and FPolicy
+  shipping via OTLP/HTTP. Single stack for all three Lambda functions.
+  Stack name: fsxn-otel-integration
+
+# DEPLOYMENT:
+#   aws cloudformation deploy \
+#     --template-file integrations/otel-collector/template.yaml \
+#     --stack-name fsxn-otel-integration \
+#     --parameter-overrides \
+#       S3BucketName=fsxn-audit-logs-observability-test \
+#       OtlpEndpoint=https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp \
+#       ApiKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:fsxn-otel-grafana-token-XXXXXX \
+#       AuthMode=basic \
+#       ServiceName=fsxn-audit \
+#       LambdaCodeS3Bucket=my-lambda-code-bucket \
+#       LambdaCodeS3Key=otel-collector/lambda.zip \
+#     --capabilities CAPABILITY_NAMED_IAM
+#
+# DELETE:
+#   aws cloudformation delete-stack --stack-name fsxn-otel-integration
 
 Parameters:
-  S3AccessPointArn:
+  S3BucketName:
     Type: String
     Description: >-
-      ARN of the FSx for ONTAP S3 Access Point or S3 bucket name.
-      Accepts either full ARN (arn:aws:s3:<region>:<account-id>:accesspoint/<name>)
-      or a plain S3 bucket name for simpler deployments.
+      Name of the S3 bucket containing FSx ONTAP audit log files.
+      Used for EventBridge trigger and S3 Access Point creation.
+    AllowedPattern: '[a-z0-9][a-z0-9.-]*[a-z0-9]'
+
+  OtlpEndpoint:
+    Type: String
+    Description: >-
+      OTel Collector OTLP/HTTP endpoint URL (e.g., https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp).
+      Lambda POSTs to <endpoint>/v1/logs.
 
   ApiKeySecretArn:
     Type: String
     Default: ''
     Description: >-
-      ARN of the Secrets Manager secret containing optional auth token
-      for the OTLP endpoint. Leave empty if no authentication is required.
+      ARN of the Secrets Manager secret containing auth credentials for the OTLP endpoint.
+      Leave empty if no authentication is required.
+      For Grafana Cloud: store "instanceId:apiToken" as plain string.
+      For Honeycomb: store the hcaik_* ingest key as plain string.
 
-  OtlpEndpoint:
+  AuthMode:
     Type: String
+    Default: none
+    AllowedValues:
+      - none
+      - bearer
+      - basic
     Description: >-
-      OTel Collector OTLP/HTTP endpoint URL (e.g., http://collector:4318).
-      The Lambda will POST to <endpoint>/v1/logs.
+      Authentication mode for the OTLP endpoint.
+      none: No auth header. bearer: Authorization Bearer <token>.
+      basic: Authorization Basic base64(<secret>).
 
   ServiceName:
     Type: String
     Default: fsxn-audit
     Description: Value for the OTLP resource attribute service.name
 
-  S3BucketName:
+  LambdaCodeS3Bucket:
     Type: String
-    Description: Name of the S3 bucket containing audit log files
+    Description: S3 bucket containing the Lambda deployment package (ZIP)
+
+  LambdaCodeS3Key:
+    Type: String
+    Default: otel-collector/lambda.zip
+    Description: S3 key for the Lambda deployment package (ZIP)
+
+  LambdaCodeS3Version:
+    Type: String
+    Default: ''
+    Description: S3 object version ID for the Lambda package (optional)
 
   S3KeyPrefix:
     Type: String
     Default: 'audit/'
     Description: Key prefix for audit log files within the S3 bucket
 
-  DatadogSite:
+  EventBridgeBusName:
     Type: String
-    Default: datadoghq.com
+    Default: default
+    Description: EventBridge bus name for FPolicy events
+
+  FPolicySqsQueueArn:
+    Type: String
+    Default: ''
     Description: >-
-      Datadog site for the OTel Collector Datadog exporter.
-      Common values: datadoghq.com (US1), datadoghq.eu (EU),
-      ap1.datadoghq.com (AP1/Japan), us3.datadoghq.com (US3),
-      us5.datadoghq.com (US5). Only used when deploying with
-      the Datadog backend configuration.
+      ARN of the SQS queue receiving FPolicy events from Fargate server.
+      If provided, creates an SQS event source mapping (primary trigger).
+
+  EmsParserLayerArn:
+    Type: String
+    Default: ''
+    Description: ARN of the shared EMS Parser Lambda Layer (optional)
 
   LogLevel:
     Type: String
@@ -70,7 +105,7 @@ Parameters:
       - INFO
       - WARNING
       - ERROR
-    Description: Lambda function log level
+    Description: Lambda function log level (applies to all functions)
 
   LambdaMemorySize:
     Type: Number
@@ -79,18 +114,58 @@ Parameters:
     MaxValue: 3008
     Description: Lambda function memory size in MB
 
-  LambdaTimeout:
+  AuditLambdaTimeout:
     Type: Number
     Default: 300
     MinValue: 30
     MaxValue: 900
-    Description: Lambda function timeout in seconds
+    Description: Audit log shipper Lambda timeout in seconds
+
+  EmsLambdaTimeout:
+    Type: Number
+    Default: 30
+    MinValue: 5
+    MaxValue: 300
+    Description: EMS handler Lambda timeout in seconds
+
+  FPolicyLambdaTimeout:
+    Type: Number
+    Default: 30
+    MinValue: 5
+    MaxValue: 300
+    Description: FPolicy handler Lambda timeout in seconds
 
 Conditions:
   HasApiKeySecret: !Not [!Equals [!Ref ApiKeySecretArn, '']]
+  HasEmsParserLayer: !Not [!Equals [!Ref EmsParserLayerArn, '']]
+  HasFPolicySqsQueue: !Not [!Equals [!Ref FPolicySqsQueueArn, '']]
+  HasLambdaCodeVersion: !Not [!Equals [!Ref LambdaCodeS3Version, '']]
 
 Resources:
-  # Dead Letter Queue
+  # ============================================================
+  # S3 Access Point
+  # ============================================================
+  AuditLogAccessPoint:
+    Type: AWS::S3::AccessPoint
+    Properties:
+      Name: fsxn-audit-otel
+      Bucket: !Ref S3BucketName
+      Policy:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !GetAtt LambdaExecutionRole.Arn
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Sub 'arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/fsxn-audit-otel'
+              - !Sub 'arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/fsxn-audit-otel/object/*'
+
+  # ============================================================
+  # Dead Letter Queue (shared)
+  # ============================================================
   DeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -103,11 +178,13 @@ Resources:
         - Key: Vendor
           Value: otel-collector
 
-  # Lambda Execution Role
+  # ============================================================
+  # IAM Role (shared across all three Lambda functions)
+  # ============================================================
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub '${AWS::StackName}-lambda-role'
+      RoleName: fsxn-otel-lambda-role
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -125,8 +202,8 @@ Resources:
                   - s3:GetObject
                   - s3:ListBucket
                 Resource:
-                  - !Sub '${S3AccessPointArn}'
-                  - !Sub '${S3AccessPointArn}/object/*'
+                  - !Sub 'arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/fsxn-audit-otel'
+                  - !Sub 'arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/fsxn-audit-otel/object/*'
 
         - PolicyName: CloudWatchLogs
           PolicyDocument:
@@ -138,7 +215,7 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-shipper:*'
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/fsxn-otel-*:*'
 
         - PolicyName: SQSSendMessage
           PolicyDocument:
@@ -161,30 +238,92 @@ Resources:
                     - secretsmanager:GetSecretValue
                   Resource:
                     - !Ref ApiKeySecretArn
-          - !Ref AWS::NoValue
+          - !Ref 'AWS::NoValue'
 
-  # Lambda Function
-  LogShipperFunction:
+        - !If
+          - HasFPolicySqsQueue
+          - PolicyName: SQSFPolicyReceive
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - sqs:ReceiveMessage
+                    - sqs:DeleteMessage
+                    - sqs:GetQueueAttributes
+                  Resource:
+                    - !Ref FPolicySqsQueueArn
+          - !Ref 'AWS::NoValue'
+      Tags:
+        - Key: Project
+          Value: fsxn-observability
+        - Key: Vendor
+          Value: otel-collector
+
+  # ============================================================
+  # CloudWatch Log Groups
+  # ============================================================
+  AuditLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/fsxn-otel-log-shipper
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: fsxn-observability
+        - Key: Vendor
+          Value: otel-collector
+
+  EmsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/fsxn-otel-ems-shipper
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: fsxn-observability
+        - Key: Vendor
+          Value: otel-collector
+
+  FPolicyLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/fsxn-otel-fpolicy-shipper
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: fsxn-observability
+        - Key: Vendor
+          Value: otel-collector
+
+  # ============================================================
+  # Lambda 1: Audit Log Shipper (S3 → EventBridge → Lambda → OTLP)
+  # ============================================================
+  AuditLogShipperFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub '${AWS::StackName}-shipper'
+      FunctionName: fsxn-otel-log-shipper
       Runtime: python3.12
       Handler: handler.lambda_handler
+      Architectures:
+        - arm64
       Code:
-        ZipFile: |
-          # Placeholder - deploy actual code via CI/CD or S3
-          def lambda_handler(event, context):
-              raise NotImplementedError("Deploy actual handler code")
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+        S3ObjectVersion: !If [HasLambdaCodeVersion, !Ref LambdaCodeS3Version, !Ref 'AWS::NoValue']
       Role: !GetAtt LambdaExecutionRole.Arn
       MemorySize: !Ref LambdaMemorySize
-      Timeout: !Ref LambdaTimeout
+      Timeout: !Ref AuditLambdaTimeout
       DeadLetterConfig:
         TargetArn: !GetAtt DeadLetterQueue.Arn
+      LoggingConfig:
+        LogGroup: !Ref AuditLogGroup
       Environment:
         Variables:
           OTLP_ENDPOINT: !Ref OtlpEndpoint
           API_KEY_SECRET_ARN: !If [HasApiKeySecret, !Ref ApiKeySecretArn, '']
-          S3_ACCESS_POINT_ARN: !Ref S3AccessPointArn
+          AUTH_MODE: !Ref AuthMode
+          S3_ACCESS_POINT_ARN: !Sub 'arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/fsxn-audit-otel'
           LOG_LEVEL: !Ref LogLevel
           SERVICE_NAME: !Ref ServiceName
       Tags:
@@ -193,12 +332,89 @@ Resources:
         - Key: Vendor
           Value: otel-collector
 
-  # EventBridge Rule - S3 Object Created
-  EventBridgeRule:
+  # ============================================================
+  # Lambda 2: EMS Shipper (API Gateway → Lambda → OTLP)
+  # ============================================================
+  EmsShipperFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: fsxn-otel-ems-shipper
+      Runtime: python3.12
+      Handler: ems_handler.lambda_handler
+      Architectures:
+        - arm64
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+        S3ObjectVersion: !If [HasLambdaCodeVersion, !Ref LambdaCodeS3Version, !Ref 'AWS::NoValue']
+      Role: !GetAtt LambdaExecutionRole.Arn
+      MemorySize: !Ref LambdaMemorySize
+      Timeout: !Ref EmsLambdaTimeout
+      DeadLetterConfig:
+        TargetArn: !GetAtt DeadLetterQueue.Arn
+      Layers: !If
+        - HasEmsParserLayer
+        - - !Ref EmsParserLayerArn
+        - !Ref 'AWS::NoValue'
+      LoggingConfig:
+        LogGroup: !Ref EmsLogGroup
+      Environment:
+        Variables:
+          OTLP_ENDPOINT: !Ref OtlpEndpoint
+          API_KEY_SECRET_ARN: !If [HasApiKeySecret, !Ref ApiKeySecretArn, '']
+          AUTH_MODE: !Ref AuthMode
+          LOG_LEVEL: !Ref LogLevel
+          SERVICE_NAME: fsxn-ems
+      Tags:
+        - Key: Project
+          Value: fsxn-observability
+        - Key: Vendor
+          Value: otel-collector
+
+  # ============================================================
+  # Lambda 3: FPolicy Shipper (SQS/EventBridge → Lambda → OTLP)
+  # ============================================================
+  FPolicyShipperFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: FPolicyLogGroup
+    Properties:
+      FunctionName: fsxn-otel-fpolicy-shipper
+      Runtime: python3.12
+      Handler: fpolicy_handler.lambda_handler
+      Architectures:
+        - arm64
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+        S3ObjectVersion: !If [HasLambdaCodeVersion, !Ref LambdaCodeS3Version, !Ref 'AWS::NoValue']
+      Role: !GetAtt LambdaExecutionRole.Arn
+      MemorySize: !Ref LambdaMemorySize
+      Timeout: !Ref FPolicyLambdaTimeout
+      DeadLetterConfig:
+        TargetArn: !GetAtt DeadLetterQueue.Arn
+      LoggingConfig:
+        LogGroup: !Ref FPolicyLogGroup
+      Environment:
+        Variables:
+          OTLP_ENDPOINT: !Ref OtlpEndpoint
+          API_KEY_SECRET_ARN: !If [HasApiKeySecret, !Ref ApiKeySecretArn, '']
+          AUTH_MODE: !Ref AuthMode
+          LOG_LEVEL: !Ref LogLevel
+          SERVICE_NAME: fsxn-fpolicy
+      Tags:
+        - Key: Project
+          Value: fsxn-observability
+        - Key: Vendor
+          Value: otel-collector
+
+  # ============================================================
+  # EventBridge Rule — S3 Object Created → Audit Log Shipper
+  # ============================================================
+  AuditEventBridgeRule:
     Type: AWS::Events::Rule
     Properties:
-      Name: !Sub '${AWS::StackName}-s3-trigger'
-      Description: Trigger Lambda on new audit log files in S3
+      Name: !Sub '${AWS::StackName}-s3-audit-trigger'
+      Description: Trigger audit log shipper on new files in S3 bucket
       State: ENABLED
       EventPattern:
         source:
@@ -213,36 +429,113 @@ Resources:
             key:
               - prefix: !Ref S3KeyPrefix
       Targets:
-        - Id: LogShipperLambda
-          Arn: !GetAtt LogShipperFunction.Arn
+        - Id: AuditLogShipperLambda
+          Arn: !GetAtt AuditLogShipperFunction.Arn
 
-  # Permission for EventBridge to invoke Lambda
-  EventBridgeLambdaPermission:
+  AuditLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !Ref LogShipperFunction
+      FunctionName: !Ref AuditLogShipperFunction
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt EventBridgeRule.Arn
+      SourceArn: !GetAtt AuditEventBridgeRule.Arn
 
-  # CloudWatch Log Group
-  LogGroup:
-    Type: AWS::Logs::LogGroup
+  # ============================================================
+  # API Gateway — EMS Webhook → EMS Shipper
+  # ============================================================
+  EmsApiGateway:
+    Type: AWS::ApiGateway::RestApi
     Properties:
-      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-shipper'
-      RetentionInDays: 30
+      Name: !Sub '${AWS::StackName}-ems-api'
+      Description: EMS Webhook receiver for OTel Collector integration
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
 
-  # CloudWatch Alarm - Errors
-  ErrorAlarm:
+  EmsApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EmsApiGateway
+      ParentId: !GetAtt EmsApiGateway.RootResourceId
+      PathPart: ems
+
+  EmsApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EmsApiGateway
+      ResourceId: !Ref EmsApiResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EmsShipperFunction.Arn}/invocations'
+
+  EmsApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: EmsApiMethod
+    Properties:
+      RestApiId: !Ref EmsApiGateway
+      StageName: prod
+
+  EmsApiGatewayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EmsShipperFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${EmsApiGateway}/*'
+
+  # ============================================================
+  # EventBridge Rule — FPolicy events → FPolicy Shipper
+  # ============================================================
+  FPolicyEventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${AWS::StackName}-fpolicy-trigger'
+      Description: Route FPolicy file operation events to OTel shipper Lambda
+      EventBusName: !Ref EventBridgeBusName
+      State: ENABLED
+      EventPattern:
+        source:
+          - fpolicy.fsxn
+      Targets:
+        - Id: FPolicyOtelLambda
+          Arn: !GetAtt FPolicyShipperFunction.Arn
+
+  FPolicyLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref FPolicyShipperFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt FPolicyEventBridgeRule.Arn
+
+  # ============================================================
+  # SQS Event Source Mapping — FPolicy SQS → FPolicy Lambda
+  # ============================================================
+  FPolicySqsEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Condition: HasFPolicySqsQueue
+    Properties:
+      EventSourceArn: !Ref FPolicySqsQueueArn
+      FunctionName: !GetAtt FPolicyShipperFunction.Arn
+      BatchSize: 10
+      Enabled: true
+
+  # ============================================================
+  # CloudWatch Alarms
+  # ============================================================
+  AuditErrorAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub '${AWS::StackName}-errors'
-      AlarmDescription: FSxN OTel log shipper error rate exceeded threshold
+      AlarmName: !Sub '${AWS::StackName}-audit-errors'
+      AlarmDescription: Audit log shipper error rate exceeded threshold
       Namespace: AWS/Lambda
       MetricName: Errors
       Dimensions:
         - Name: FunctionName
-          Value: !Ref LogShipperFunction
+          Value: !Ref AuditLogShipperFunction
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 2
@@ -250,25 +543,40 @@ Resources:
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
 
-  # CloudWatch Alarm - Throttles
-  ThrottleAlarm:
+  EmsErrorAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub '${AWS::StackName}-throttles'
-      AlarmDescription: FSxN OTel log shipper throttling detected
+      AlarmName: !Sub '${AWS::StackName}-ems-errors'
+      AlarmDescription: EMS shipper error rate exceeded threshold
       Namespace: AWS/Lambda
-      MetricName: Throttles
+      MetricName: Errors
       Dimensions:
         - Name: FunctionName
-          Value: !Ref LogShipperFunction
+          Value: !Ref EmsShipperFunction
       Statistic: Sum
       Period: 300
-      EvaluationPeriods: 1
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 2
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
 
-  # CloudWatch Alarm - DLQ Messages
+  FPolicyErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-fpolicy-errors'
+      AlarmDescription: FPolicy shipper error rate exceeded threshold
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref FPolicyShipperFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
   DLQAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -287,26 +595,52 @@ Resources:
       TreatMissingData: notBreaching
 
 Outputs:
-  LambdaFunctionArn:
-    Description: ARN of the OTLP log shipper Lambda function
-    Value: !GetAtt LogShipperFunction.Arn
+  # Lambda Functions
+  AuditLogShipperArn:
+    Description: ARN of the audit log shipper Lambda function
+    Value: !GetAtt AuditLogShipperFunction.Arn
 
-  LambdaFunctionName:
-    Description: Name of the OTLP log shipper Lambda function
-    Value: !Ref LogShipperFunction
+  EmsShipperArn:
+    Description: ARN of the EMS shipper Lambda function
+    Value: !GetAtt EmsShipperFunction.Arn
 
+  FPolicyShipperArn:
+    Description: ARN of the FPolicy shipper Lambda function
+    Value: !GetAtt FPolicyShipperFunction.Arn
+
+  # IAM Role
+  LambdaExecutionRoleArn:
+    Description: ARN of the shared Lambda execution role
+    Value: !GetAtt LambdaExecutionRole.Arn
+
+  # S3 Access Point
+  S3AccessPointArn:
+    Description: ARN of the S3 Access Point for audit logs
+    Value: !Sub 'arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/fsxn-audit-otel'
+
+  S3AccessPointAlias:
+    Description: Alias of the S3 Access Point
+    Value: !GetAtt AuditLogAccessPoint.Alias
+
+  # EMS API Gateway
+  EmsWebhookEndpoint:
+    Description: EMS Webhook endpoint URL (POST to this from ONTAP EMS)
+    Value: !Sub 'https://${EmsApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/ems'
+
+  # DLQ
   DeadLetterQueueUrl:
-    Description: URL of the Dead Letter Queue
+    Description: URL of the shared Dead Letter Queue
     Value: !Ref DeadLetterQueue
 
   DeadLetterQueueArn:
-    Description: ARN of the Dead Letter Queue
+    Description: ARN of the shared Dead Letter Queue
     Value: !GetAtt DeadLetterQueue.Arn
 
-  ErrorAlarmArn:
-    Description: ARN of the error CloudWatch alarm
-    Value: !GetAtt ErrorAlarm.Arn
+  # EventBridge Rules
+  AuditEventBridgeRuleArn:
+    Description: ARN of the S3 audit trigger EventBridge rule
+    Value: !GetAtt AuditEventBridgeRule.Arn
 
-  EventBridgeRuleArn:
-    Description: ARN of the EventBridge rule
-    Value: !GetAtt EventBridgeRule.Arn
+  FPolicyEventBridgeRuleArn:
+    Description: ARN of the FPolicy EventBridge rule
+    Value: !GetAtt FPolicyEventBridgeRule.Arn
