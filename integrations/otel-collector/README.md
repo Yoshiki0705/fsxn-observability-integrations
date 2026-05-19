@@ -206,6 +206,21 @@ Basic Auth value must be `base64(instanceId:apiToken)` — NOT `instanceId:apiTo
 
 Ingest API keys start with `hcaik_`. Environment keys (`hcxik_`) will NOT work for data ingestion.
 
+## Enterprise Documentation
+
+For production, security, and governance:
+
+- [Architecture Decision Record](docs/en/architecture-decision.md) — Direct Send vs Collector decision matrix
+- [ONTAP Telemetry Source of Truth](docs/en/ontap-telemetry-source-of-truth.md) — Evidence authority vs operational copies
+- [Security Hardening Guide](docs/en/security-hardening.md) — Trust boundary, IAM, secrets, TLS
+- [Config Governance Guide](docs/en/config-governance.md) — CI validation, staged rollout, approval
+- [Operations Runbook](docs/en/operations-runbook.md) — 7 failure scenarios with recovery steps
+- [Cost Model](docs/en/cost-model.md) — Event sizing, volume tiers, NAT vs VPC endpoint
+- [PoC Checklist](docs/en/poc-checklist.md) — 5-phase validation with Go/No-Go criteria
+- [Compliance Evidence Note](docs/en/compliance-note.md) — Raw logs vs normalized copies
+- [Routing and Filtering Examples](docs/en/routing-filtering-examples.md) — Security routing, PII redaction
+- [Hybrid ONTAP Telemetry](docs/en/hybrid-ontap-telemetry.md) — FSx/CVO/on-prem patterns
+
 ## Documentation
 
 - [Japanese Setup Guide](docs/ja/setup-guide.md)
