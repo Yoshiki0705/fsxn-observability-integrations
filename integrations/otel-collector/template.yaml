@@ -1,3 +1,10 @@
+# Production deployment notes:
+# - For production, use otel-collector-config-production.yaml (includes
+#   memory_limiter, sending_queue, retry_on_failure)
+# - Collector endpoint must be reachable from Lambda (VPC or public)
+# - See docs/en/security-hardening.md for IAM and network hardening
+# - See docs/en/operations-runbook.md for failure recovery procedures
+
 AWSTemplateFormatVersion: '2010-09-09'
 Description: FSxN OTel Collector Integration - OTLP/HTTP audit log shipping via S3 Access Point
 # Tested OTel Collector image: otel/opentelemetry-collector-contrib:0.152.0

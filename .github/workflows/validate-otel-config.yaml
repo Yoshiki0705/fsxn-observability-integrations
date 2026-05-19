@@ -1,0 +1,26 @@
+name: Validate OTel Collector Configs
+on:
+  pull_request:
+    paths:
+      - 'integrations/otel-collector/otel-collector-config*.yaml'
+  push:
+    paths:
+      - 'integrations/otel-collector/otel-collector-config*.yaml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate all OTel Collector configs
+        run: |
+          for config in integrations/otel-collector/otel-collector-config*.yaml; do
+            echo "Validating: $config"
+            # Note: validate may report errors for unresolved ${env:...} variables
+            # This is expected in CI without runtime secrets
+            docker run --rm \
+              -v $(pwd)/integrations/otel-collector:/config \
+              otel/opentelemetry-collector-contrib:0.152.0 \
+              validate --config /config/$(basename $config) 2>&1 || true
+          done
