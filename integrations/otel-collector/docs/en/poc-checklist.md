@@ -231,3 +231,16 @@ aws cloudformation delete-stack \
 | Cost delta acceptable | < 20% increase | ___ | ☐ |
 
 **Decision**: All criteria must be "Go" to proceed with production cutover. Any single "No-Go" requires remediation before retry.
+
+## Executive Go/No-Go Criteria
+
+For enterprise and partner-led deployments, add these governance criteria:
+
+| Criterion | Go | No-Go |
+|-----------|-----|-------|
+| Backend parity | Event count and critical fields match across selected backends | Material field loss or unexplained count mismatch |
+| Operations ownership | Collector owner and change process defined | No clear owner |
+| Rollback | Direct-send or previous exporter path documented and tested | No rollback path |
+| Security | Secrets, network boundary, and access control reviewed | Shared credentials or public Collector endpoint |
+| Compliance | Raw audit evidence retention defined separately from backend copies | Normalized logs treated as sole evidence without approval |
+| Change management | Collector config changes follow approval process | Ad-hoc config changes without review |
