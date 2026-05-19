@@ -376,7 +376,6 @@ Resources:
   # ============================================================
   FPolicyShipperFunction:
     Type: AWS::Lambda::Function
-    DependsOn: FPolicyLogGroup
     Properties:
       FunctionName: fsxn-otel-fpolicy-shipper
       Runtime: python3.12
