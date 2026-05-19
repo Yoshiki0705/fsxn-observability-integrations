@@ -1,5 +1,16 @@
 # OTel Collector Operations Guide
 
+## Collector Health Model (4 Layers)
+
+| Layer | What to Monitor | Key Metrics |
+|-------|----------------|-------------|
+| Producer (Lambda) | Errors, duration, retry count | CloudWatch Lambda metrics |
+| Collector process | OTLP receiver, memory, CPU | health_check + internal metrics |
+| Exporter | Error count, retry count, queue length | otelcol_exporter_* metrics |
+| Backend | Last successful ingest, event count, latency | Backend-specific dashboards |
+
+---
+
 ## Minimum Collector Health Checks
 
 A production Collector deployment must monitor these signals at minimum:
@@ -315,3 +326,66 @@ service:
 - [ ] Review IAM policies for least privilege
 - [ ] Rotate Secrets Manager keys
 - [ ] DR test (backend switchover)
+
+## Operations Runbook
+
+### Collector Unavailable
+
+**Symptoms**: Lambda returns 502, health check fails
+**Actions**:
+1. Check ECS task status: `aws ecs describe-tasks --cluster <cluster> --tasks <task-id>`
+2. Check container logs: `aws logs tail /ecs/otel-collector --since 5m`
+3. If task stopped: force new deployment `aws ecs update-service --force-new-deployment`
+4. If persistent: check security group, NAT Gateway, memory limits
+
+### Backend Exporter Failing
+
+**Symptoms**: Logs arrive at Collector but not at backend
+**Actions**:
+1. Check Collector logs for exporter errors
+2. Verify backend credentials are valid (not expired/rotated)
+3. Check backend status page for outages
+4. If one backend fails, others continue (failure isolation)
+
+### Queue Growing
+
+**Symptoms**: `otelcol_exporter_queue_size` increasing
+**Actions**:
+1. Check backend response latency
+2. Check for backend throttling (429 responses)
+3. If persistent: increase `queue_size` or add Collector replicas
+4. Monitor for queue full → data drop
+
+### Lambda Cannot Reach Collector
+
+**Symptoms**: Lambda timeout, connection refused
+**Actions**:
+1. Verify Collector task is running and healthy
+2. Check security group: Lambda SG → Collector SG port 4318
+3. Check VPC routing (if Lambda is in VPC)
+4. Check NAT Gateway (if Collector needs internet egress)
+
+### Data Missing in One Backend Only
+
+**Symptoms**: Event count mismatch between backends
+**Actions**:
+1. Check exporter-specific error logs
+2. Verify backend credential validity
+3. Check timestamp acceptance window (Datadog: 18h past)
+4. Check backend ingestion delay (may be normal)
+
+### Config Rollback
+
+**Symptoms**: New config causes export failures
+**Actions**:
+1. Identify last known good config: `git log --oneline otel-collector-config*.yaml`
+2. Revert: `git checkout <hash> -- otel-collector-config.yaml`
+3. Redeploy: `aws ecs update-service --force-new-deployment`
+
+### Emergency Direct-Send Bypass
+
+**Symptoms**: Collector completely unavailable, logs must flow
+**Actions**:
+1. Update Lambda OTLP_ENDPOINT to point directly to backend (requires AUTH_MODE change)
+2. Or: re-enable direct-send Lambda via EventBridge rule
+3. Document as incident; restore Collector path when resolved

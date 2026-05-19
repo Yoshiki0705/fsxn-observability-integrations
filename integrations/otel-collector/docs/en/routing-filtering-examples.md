@@ -393,3 +393,57 @@ service:
       processors: []
       exporters: []  # Dropped
 ```
+
+## Security-Oriented Routing for ONTAP Events
+
+### ARP Alerts → Security Backend + PagerDuty-capable Backend
+
+```yaml
+processors:
+  filter/arp_alerts:
+    logs:
+      include:
+        match_type: regexp
+        record_attributes:
+          - key: event_name
+            value: "^arw\\..*"
+
+service:
+  pipelines:
+    logs/arp:
+      receivers: [otlp]
+      processors: [filter/arp_alerts, batch]
+      exporters: [otlp_http/siem, otlp_http/grafana]
+```
+
+### FPolicy Create Burst → Security Investigation
+
+```yaml
+processors:
+  filter/fpolicy_creates:
+    logs:
+      include:
+        match_type: regexp
+        record_attributes:
+          - key: operation_type
+            value: "^create$"
+
+service:
+  pipelines:
+    logs/fpolicy_burst:
+      receivers: [otlp]
+      processors: [filter/fpolicy_creates, batch]
+      exporters: [otlp_http/siem]
+```
+
+### User/Path Redaction for Privacy
+
+```yaml
+processors:
+  transform/redact_user_path:
+    log_statements:
+      - context: log
+        statements:
+          - replace_pattern(attributes["user.name"], "(.{2}).*@.*", "$1***@***")
+          - replace_pattern(attributes["fsxn.path"], "/vol[^/]*/[^/]*/", "/vol/***/")
+```

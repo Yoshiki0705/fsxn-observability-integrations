@@ -65,6 +65,26 @@ Before deploying OTel Collector in production, answer these questions:
 | SLA | Collector availability target: 99.9% (health_check monitored) |
 | Change management | Config changes require CI validation + staged rollout |
 
+## ONTAP Telemetry Source of Truth
+
+| Telemetry Source | Role | Authority |
+|-----------------|------|-----------|
+| Raw ONTAP audit logs (EVTX/XML in S3) | Authoritative evidence record | Compliance / Legal |
+| EMS / ARP events | Operational and security event signals | Security / Operations |
+| FPolicy events | Real-time file activity signals | Security / Investigation |
+| OTel Collector | Distribution and routing layer | Platform team |
+| Backends (Datadog/Grafana/Honeycomb) | Search, visualization, alerting, investigation | End users |
+
+> **Key principle**: Raw audit logs are the authoritative evidence. OTel-delivered normalized events are operational search and alerting copies. EMS and FPolicy are signals, not complete audit replacements. Backends can differ in retention, indexing, and query semantics.
+
+## ONTAP Telemetry Delivery Options
+
+| Source | Direct Send | OTel Collector | Best For |
+|--------|-------------|----------------|----------|
+| Audit logs | Simple single backend | Multi-backend / migration | Compliance and investigation |
+| EMS / ARP | Fast alerting to one backend | Fan-out to SecOps + SRE | Security and operations |
+| FPolicy | Real-time file signal | Multi-backend enrichment | Ransomware triage |
+
 ## Architecture Diagram
 
 ```

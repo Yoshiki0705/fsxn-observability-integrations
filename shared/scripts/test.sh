@@ -25,7 +25,11 @@ run_python_tests() {
 run_ts_tests() {
   echo "📘 Running TypeScript tests..."
   cd "${PROJECT_ROOT}"
-  npx jest --passWithNoTests
+  if [[ -f "node_modules/.bin/jest" ]] && [[ -d "node_modules/ts-jest" ]]; then
+    npx jest --passWithNoTests
+  else
+    echo "   ⏭️  Skipping TypeScript tests (ts-jest not installed). Run 'npm install' first."
+  fi
 }
 
 if [[ "$VENDOR" == "all" ]]; then
