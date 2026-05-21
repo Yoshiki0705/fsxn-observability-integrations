@@ -2,6 +2,8 @@
 
 🌐 [日本語](docs/ja/setup-guide.md) | [English](docs/en/setup-guide.md)
 
+> 📖 **Shared docs**: [Delivery Guarantee Patterns](../../docs/en/delivery-guarantees.md) | [Webhook Security](../../docs/en/webhook-security.md)
+
 ## Architecture
 
 ```
