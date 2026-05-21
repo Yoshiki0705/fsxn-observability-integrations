@@ -187,3 +187,31 @@ If you're already using Workload Factory, consider leveraging the Journal table 
 - [Amazon S3 — Monitoring and Logging Access Points](https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-points-monitoring-logging.html)
 - [NetApp Workload Factory — Journal Table Setup](https://docs.netapp.com/us-en/workload-fsx-ontap/setup-journal-table.html)
 - [FSx for ONTAP — Monitoring with CloudTrail](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/logging-using-cloudtrail-win.html)
+
+
+## Service Feedback Summary
+
+### Observed Customer Need
+
+- Near-real-time audit log shipping from FSx for ONTAP S3 Access Points
+- Lower latency than CloudTrail data event delivery (observed 5–15 min in validation)
+- Lower operational complexity than polling for higher-volume workloads
+- Event-driven trigger without the $0.10/100K events cost of CloudTrail data events
+
+### Current Workaround
+
+- EventBridge Scheduler polling with SSM / DynamoDB checkpoint
+- Polling interval configurable (default: 5 minutes)
+- Application-side responsibility for list, read, checkpoint, retry
+
+### Trade-off Analysis
+
+| Approach | Latency | Cost | Complexity | Reliability |
+|----------|---------|------|-----------|-------------|
+| Scheduler polling (this project) | ≤ schedule interval | Lambda only | Medium (app-side checkpoint) | At-least-once with DLQ |
+| CloudTrail data events → EventBridge | 5–15 min observed | $0.10/100K events + Lambda | Low (event-driven) | At-least-once |
+| Native object notification (hypothetical) | Near-real-time | TBD | Low | TBD |
+
+### Potential Future Improvement
+
+Native object-created style eventing or lower-latency data-plane event delivery for FSx-attached S3 Access Points would simplify operational design for audit log shipping use cases, reducing the need for application-side polling, checkpointing, and overlap prevention logic.
