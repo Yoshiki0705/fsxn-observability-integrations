@@ -10,6 +10,16 @@
 | markdown-links | markdown-link-check | No (continue-on-error) | Documentation link integrity |
 | actionlint | actionlint | No (continue-on-error) | GitHub Actions workflow syntax |
 
+## Current Enforcement Status
+
+| Check | Current Mode | Target Mode |
+|---|---|---|
+| cfn-lint | Blocking | Blocking |
+| cfn-guard | Non-blocking | Blocking on main after rule tuning |
+| markdown-link-check | Non-blocking | Blocking with external-link ignore rules |
+| actionlint | Non-blocking | Blocking |
+| Trivy | Blocking for high/critical findings | Blocking |
+
 ## cfn-guard Adoption Roadmap
 
 ```
