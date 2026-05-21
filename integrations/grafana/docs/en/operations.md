@@ -202,14 +202,14 @@ Choose the right event source for each security use case:
 
 This integration pattern is designed for FSx for ONTAP. For other ONTAP environments:
 
-| Environment | Audit Log Read Path | Recommended Pattern |
-|-------------|--------------------|--------------------|
-| FSx for ONTAP | S3 Access Point (S3 API) | Lambda Scheduler polling (this project) |
-| On-prem ONTAP | NFS/SMB mount or syslog export | OTel Collector / VM-based shipper |
-| Cloud Volumes ONTAP | Depends on cloud provider | Cloud-native log shipping |
-| Hybrid (FSx + on-prem) | Separate source adapters | Normalize to OTLP, aggregate in Collector |
+| Environment | S3 Access Point Read Path | Recommended Pattern |
+|-------------|--------------------------|---------------------|
+| FSx for ONTAP | Yes (FSx-attached S3 Access Point) | Lambda Scheduler polling (this project) |
+| On-prem ONTAP | No FSx S3 Access Point available | OTel Collector / VM-based shipper or log export |
+| Cloud Volumes ONTAP | Validate available access method per cloud provider | Collector / VM-based shipper unless S3-style access path is explicitly available |
+| Hybrid (FSx + on-prem) | Mixed — separate source adapters | Normalize to OTLP, aggregate in Collector |
 
-> The S3 Access Point read path is specific to FSx for ONTAP. On-prem ONTAP does not have S3 Access Points. For hybrid environments, use the OTel Collector (Part 5) as the aggregation layer with separate source adapters per environment.
+> The S3 Access Point read path is specific to FSx for ONTAP. On-prem ONTAP and Cloud Volumes ONTAP do not have FSx S3 Access Points. For hybrid environments, use the OTel Collector (Part 5) as the aggregation layer with separate source adapters per environment.
 
 ## Troubleshooting Boundary Matrix
 
