@@ -29,6 +29,15 @@ NetApp's Workload Factory product uses exactly this pattern for its **Journal ta
 - Events flow through CloudTrail → EventBridge → processing pipeline
 - This confirms the pattern works in production
 
+### Journal Table vs Polling: When to Use Which
+
+| Pattern | Source Data | Use Case |
+|---------|------------|----------|
+| **Journal table / CloudTrail** | S3 Access Point data-plane operations (GetObject, PutObject, etc.) | Track who accessed files through the S3 API |
+| **Polling (this project)** | ONTAP-generated audit log files on the FSx volume | Ship ONTAP audit logs to an observability backend |
+
+Use Journal table / CloudTrail data events when you need S3 Access Point data-plane operation history (which Lambda or user called GetObject on which key). Use the polling pattern when your primary source is ONTAP-generated audit log files (SMB/NFS file access events written by ONTAP's audit subsystem) that you want to ship to an observability backend like Grafana, Datadog, or Splunk.
+
 Reference: [NetApp Workload Factory — Journal Table Setup](https://docs.netapp.com/us-en/workload-fsx-ontap/setup-journal-table.html)
 
 ## Architecture: CloudTrail → EventBridge → Lambda

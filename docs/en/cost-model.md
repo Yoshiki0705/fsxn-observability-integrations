@@ -72,3 +72,30 @@ The Collector path has higher fixed cost but enables multi-backend delivery, enr
 - Use Grafana Cloud log retention tiers appropriate to your compliance needs
 - Avoid CloudTrail data events unless near-real-time trigger is required ($0.10/100K events)
 - Deploy Lambda outside VPC to avoid NAT Gateway cost for S3 AP access
+
+
+## NetApp-Specific Cost Drivers
+
+For FSx for ONTAP environments, these additional factors affect pipeline cost:
+
+| Driver | Impact | How to Control |
+|--------|--------|----------------|
+| Audit log rotation interval | More frequent rotation = more files per poll = higher Lambda duration | Tune rotation interval in ONTAP audit config |
+| Average audit file size | Larger files = longer parse time per invocation | Adjust MAX_KEYS_PER_RUN accordingly |
+| FPolicy event volume | High-volume shares can generate thousands of events/second | Scope FPolicy by volume/path/operation type |
+| EMS event volume | Typically low; spikes during incidents | No action needed for cost |
+| FSx provisioned throughput | S3 AP read throughput is bounded by FSx file system throughput | Monitor read latency; scale FSx if needed |
+| Grafana ingest GB/day | Primary ongoing cost for Grafana Cloud | Control via polling interval + MAX_KEYS_PER_RUN |
+| CloudTrail data events (if enabled) | $0.10 / 100K events; can be significant at scale | Use polling pattern instead (default) |
+| NAT Gateway (if VPC Lambda) | $0.045/GB processed | Deploy Lambda outside VPC for S3 AP access |
+
+### FPolicy Volume Estimation
+
+FPolicy event volume depends on workload:
+
+| Workload Type | Typical Event Rate | Recommendation |
+|---------------|-------------------|----------------|
+| Home directories (low activity) | 10-100 events/min | Full monitoring feasible |
+| Shared file server (medium) | 100-1000 events/min | Scope to security-relevant operations |
+| Build/CI output (high I/O) | 1000+ events/min | Scope narrowly or use audit logs instead |
+| Database files on NAS | Very high open/read/write | Exclude from FPolicy scope |

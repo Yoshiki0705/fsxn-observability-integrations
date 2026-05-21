@@ -179,3 +179,69 @@ For regulated environments, document the evidence boundary clearly:
 | Delivery semantics | At-least-once | Duplicates possible; dedup is app-side |
 
 **Key principle**: Grafana Cloud is an analysis, visualization, and alerting destination — not the system of record. The FSx audit files on the ONTAP volume are the authoritative source. This pipeline delivers copies for operational visibility; it does not replace the original audit trail.
+
+
+## Security Signal Tuning
+
+Choose the right event source for each security use case:
+
+| Signal Type | Source | Use Case | Volume |
+|-------------|--------|----------|--------|
+| Storage system alerts | EMS | Ransomware (ARP), quota, hardware | Low (high-confidence) |
+| User/file access investigation | Audit logs | Who accessed what, when | Medium-high |
+| Near-real-time file operations | FPolicy | File create/delete/rename detection | High (scope carefully) |
+
+**Guidance**:
+- Use EMS for high-confidence storage system alerts (ransomware, quota, disk failure)
+- Use audit logs for user/file access investigation and compliance
+- Use FPolicy for near-real-time file operation detection where latency matters
+- Scope FPolicy by volume/share/path to control event volume
+- Avoid sending all file operations to alerting rules without filtering — use LogQL filters to reduce noise
+
+## Applicability Matrix
+
+This integration pattern is designed for FSx for ONTAP. For other ONTAP environments:
+
+| Environment | Audit Log Read Path | Recommended Pattern |
+|-------------|--------------------|--------------------|
+| FSx for ONTAP | S3 Access Point (S3 API) | Lambda Scheduler polling (this project) |
+| On-prem ONTAP | NFS/SMB mount or syslog export | OTel Collector / VM-based shipper |
+| Cloud Volumes ONTAP | Depends on cloud provider | Cloud-native log shipping |
+| Hybrid (FSx + on-prem) | Separate source adapters | Normalize to OTLP, aggregate in Collector |
+
+> The S3 Access Point read path is specific to FSx for ONTAP. On-prem ONTAP does not have S3 Access Points. For hybrid environments, use the OTel Collector (Part 5) as the aggregation layer with separate source adapters per environment.
+
+## Troubleshooting Boundary Matrix
+
+When investigating issues, identify the responsible layer first:
+
+| Symptom | Check First | Likely Owner |
+|---------|-------------|--------------|
+| No audit files visible via S3 AP | ONTAP audit config, S3 AP permission, file-system user | NetApp / Storage |
+| Lambda `AccessDenied` on GetObject | IAM policy, S3 AP resource policy, file-system user mapping | AWS / Storage |
+| Scheduler DLQ messages > 0 | Scheduler logs, Lambda invocation errors | Platform / SRE |
+| Lambda errors in CloudWatch | Lambda code, Grafana endpoint, credentials | Platform / Observability |
+| Grafana query returns empty | OTLP delivery success, label mapping, tenant config | Observability |
+| EMS events not arriving | ONTAP webhook destination config, API Gateway logs | NetApp / Security / Platform |
+| FPolicy events delayed | SQS backlog, bridge Lambda errors, ECS task health | Platform / NetApp |
+| Checkpoint not advancing | Poison-pill file, auth failure, Grafana 5xx | Platform (see poison-pill handling) |
+
+
+## FPolicy Operational Mode Guidance
+
+FPolicy can operate in mandatory or non-mandatory mode. Choose based on your use case:
+
+| Mode | Behavior When External Engine Unavailable | Use Case |
+|------|-------------------------------------------|----------|
+| **Non-mandatory** | File operations proceed without notification | Observability-only pipelines (this project) |
+| **Mandatory** | File operations blocked until engine responds | Access control / DLP enforcement |
+
+**Recommendations for observability pipelines**:
+- Use **non-mandatory** mode — the pipeline is for visibility, not access control
+- Scope monitored operations to reduce event volume (e.g., create + delete + rename only)
+- Scope by volume or share path where possible
+- Monitor SQS backlog and bridge Lambda errors for delivery health
+- Treat FPolicy events as at-least-once signals (duplicates possible on engine reconnect)
+- If the ECS Fargate task restarts, update the ONTAP External Engine IP
+
+**Volume control**: FPolicy can generate very high event volumes on busy file shares. For observability, focus on security-relevant operations (create, delete, rename) rather than all operations (open, read, write, close). Filter at the ONTAP FPolicy policy level, not in Lambda.
