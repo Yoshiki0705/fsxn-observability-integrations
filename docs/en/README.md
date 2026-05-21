@@ -150,6 +150,8 @@ aws cloudformation delete-stack \
 - [Minimum Test Path](quick-start-minimum.md)
 - [Detection Use Cases](detection-use-cases.md)
 - [Normalized Event Schema](normalized-event-schema.md)
+- [Delivery Guarantee Patterns](delivery-guarantees.md)
+- [Webhook Security Guide](webhook-security.md)
 
 ## Tech Stack
 
