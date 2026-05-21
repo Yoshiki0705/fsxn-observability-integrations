@@ -128,6 +128,20 @@ Tune these based on your EMS event volume.
 | Production (private network) | `SHARED_SECRET` | Resource policy (source IP) |
 | Production (internet-facing) | `SHARED_SECRET` | Resource policy + WAF + throttling |
 
+## Recommended Production Baseline
+
+For most deployments, the following combination provides strong security without excessive complexity:
+
+1. **API Gateway Lambda authorizer** with shared secret (Bearer token)
+2. **Secret stored in AWS Secrets Manager** with rotation schedule
+3. **Source IP restrictions** via API Gateway resource policy (if ONTAP management addresses are stable)
+4. **AWS WAF** for internet-facing endpoints (rate limiting, IP reputation)
+5. **API Gateway access logging** enabled for audit trail
+6. **CloudWatch alarm** on authorization failures (`4XX` count)
+7. **Secret rotation runbook** documented and tested
+
+> Start with items 1–3 for initial production deployment. Add WAF (item 4) when the endpoint is internet-facing or when compliance requires it.
+
 ## Files
 
 | File | Purpose |
