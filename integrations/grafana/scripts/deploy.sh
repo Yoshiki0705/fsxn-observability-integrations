@@ -20,9 +20,39 @@
 #   export S3_BUCKET_NAME="your-fsxn-audit-log-bucket"
 #   bash integrations/grafana/scripts/deploy.sh
 #
+# Options:
+#   --audit-only    Deploy only the audit log poller (template.yaml)
+#   --all           Deploy all stacks (default)
+#
 # All parameters can be overridden via environment variables.
 
 set -euo pipefail
+
+# --- Parse arguments --------------------------------------------------------
+
+DEPLOY_MODE="all"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --audit-only) DEPLOY_MODE="audit-only"; shift ;;
+    --all)        DEPLOY_MODE="all"; shift ;;
+    -h|--help)
+      echo "Usage: bash deploy.sh [OPTIONS]"
+      echo ""
+      echo "Options:"
+      echo "  --audit-only    Deploy only the audit log poller (template.yaml)"
+      echo "  --all           Deploy all stacks: audit + EMS + FPolicy (default)"
+      echo ""
+      echo "Environment variables (required):"
+      echo "  GRAFANA_SECRET_ARN    Secrets Manager ARN for Grafana credentials"
+      echo "  S3_ACCESS_POINT_ARN   FSx for ONTAP S3 Access Point ARN"
+      echo "  LOKI_ENDPOINT         Grafana Cloud OTLP Gateway URL"
+      echo "  S3_BUCKET_NAME        S3 bucket name for audit logs"
+      exit 0
+      ;;
+    *) echo "Unknown option: $1"; exit 1 ;;
+  esac
+done
 
 # --- Configuration (override via environment variables) ---------------------
 
@@ -104,7 +134,9 @@ aws cloudformation deploy \
 
 echo "  ✅ Main stack deployed: ${STACK_PREFIX}-integration"
 
-# --- Step 2: Deploy EMS stack ----------------------------------------------
+# --- Step 2: Deploy EMS stack (skip if --audit-only) ------------------------
+
+if [ "$DEPLOY_MODE" = "all" ]; then
 
 echo "--- Step 2/4: Deploying EMS webhook stack ---"
 
@@ -146,6 +178,8 @@ aws cloudformation deploy \
 
 echo "  ✅ FPolicy stack deployed: ${STACK_PREFIX}-fpolicy"
 
+fi  # end DEPLOY_MODE=all
+
 # --- Step 4: Update Lambda function code -----------------------------------
 
 echo "--- Step 4/4: Updating Lambda function code ---"
@@ -161,6 +195,8 @@ aws lambda update-function-code \
   --region "${AWS_REGION}" > /dev/null
 rm -f /tmp/grafana-handler.zip
 echo "  ✅ Main handler updated"
+
+if [ "$DEPLOY_MODE" = "all" ]; then
 
 # EMS handler
 echo "  Updating EMS handler..."
@@ -181,6 +217,8 @@ aws lambda update-function-code \
   --region "${AWS_REGION}" > /dev/null
 rm -f /tmp/grafana-fpolicy-handler.zip
 echo "  ✅ FPolicy handler updated"
+
+fi  # end DEPLOY_MODE=all
 
 # --- Summary ----------------------------------------------------------------
 
