@@ -21,6 +21,14 @@ EC2-free observability integrations for Amazon FSx for NetApp ONTAP via FSx for 
 | Higher reliability | SQS + DynamoDB ledger + Collector/Alloy | Backpressure, replay, batching, durable state |
 | Partner PoC | Partner Solution Brief + PoC Checklist | Clear scope, deliverables, and responsibility boundaries |
 
+## Recommended First 30 Minutes / 最初の30分
+
+1. Read "Choose Your Path" above to identify your target integration
+2. Run unit tests with sample payloads: `python -m pytest integrations/datadog/tests/ -v`
+3. Review the [PoC Success Criteria](docs/en/poc-success-criteria.md) for your target integration
+4. Deploy audit-only path in a sandbox account (see Quick Start below)
+5. Confirm: one log record arrives, checkpoint advances, DLQ remains empty
+
 ## Architecture Pattern / アーキテクチャパターン
 
 ```

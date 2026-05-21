@@ -1,13 +1,15 @@
 {
   "ignorePatterns": [
     { "pattern": "^https://github.com/your-org" },
+    { "pattern": "^https://dev.to/" },
     { "pattern": "^#" },
     { "pattern": "^mailto:" }
   ],
   "replacementPatterns": [],
   "httpHeaders": [],
-  "timeout": "10s",
+  "timeout": "20s",
   "retryOn429": true,
   "retryCount": 3,
+  "fallbackRetryDelay": "30s",
   "aliveStatusCodes": [200, 206, 301, 302, 307, 308]
 }
