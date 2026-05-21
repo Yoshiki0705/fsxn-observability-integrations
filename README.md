@@ -163,6 +163,9 @@ aws cloudformation deploy \
 - [Detection Use Cases (English)](docs/en/detection-use-cases.md)
 - [正規化イベントスキーマ (日本語)](docs/ja/normalized-event-schema.md)
 - [Normalized Event Schema (English)](docs/en/normalized-event-schema.md)
+- [配信保証パターン (日本語)](docs/ja/delivery-guarantees.md)
+- [Delivery Guarantee Patterns (English)](docs/en/delivery-guarantees.md)
+- [Webhook セキュリティガイド (English)](docs/en/webhook-security.md)
 
 ## Tech Stack / 技術スタック
 

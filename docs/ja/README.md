@@ -98,6 +98,8 @@ aws cloudformation deploy \
 - [最小テストパス](quick-start-minimum.md)
 - [検知ユースケース](detection-use-cases.md)
 - [正規化イベントスキーマ](normalized-event-schema.md)
+- [配信保証パターン](delivery-guarantees.md)
+- [Webhook セキュリティガイド](../en/webhook-security.md)
 
 ## 技術スタック
 
