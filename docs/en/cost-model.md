@@ -91,6 +91,8 @@ For FSx for ONTAP environments, these additional factors affect pipeline cost:
 
 ### FPolicy Volume Estimation
 
+The following event-rate ranges are planning examples based on general workload patterns, not universal sizing guidance. Actual event volume depends on SVM configuration, FPolicy scope, monitored operations, client behavior, and access patterns. Measure event volume in your own environment before using these for production sizing.
+
 FPolicy event volume depends on workload:
 
 | Workload Type | Typical Event Rate | Recommendation |
