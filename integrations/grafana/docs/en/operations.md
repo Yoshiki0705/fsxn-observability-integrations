@@ -165,6 +165,8 @@ Do **not** promote high-cardinality fields to Loki labels. Keep them in the log 
 
 > Loki indexes labels, not log content. High-cardinality labels cause index bloat, slow queries, and increased storage cost. Use `| json | UserName="admin"` instead of `{UserName="admin"}`.
 
+Use labels for stable routing dimensions such as `service_name` and keep investigative fields in the log body or structured metadata.
+
 ## Evidence Boundary (Compliance)
 
 For regulated environments, document the evidence boundary clearly:
@@ -275,6 +277,8 @@ The Lambda converts parsed audit/EMS/FPolicy records to OTLP log records using t
   - `fsxn.operation` — normalized operation type
   - `fsxn.result` — success / failure
 
+When both source-native and normalized fields are present, keep the original field in the log body for forensic fidelity and add normalized `fsxn.*` attributes for cross-backend queries.
+
 This namespace approach ensures forward compatibility if OpenTelemetry Semantic Conventions add storage-domain attributes in the future.
 
 ## Graduating to Alloy
@@ -296,7 +300,11 @@ Benefits of the Alloy layer:
 
 Because the Lambda produces standard OTLP payloads, no Lambda code changes are needed — only the destination URL changes.
 
+Keep Lambda focused on source-specific parsing and OTLP emission. Move cross-cutting pipeline concerns such as enrichment, redaction, routing, and backend fan-out into Alloy or the OpenTelemetry Collector.
+
 ## Telemetry Pipeline SLO Examples
+
+These are pipeline-internal SLOs, not application user-facing SLOs. They measure whether audit, EMS, and FPolicy signals arrive in Grafana within expected operational bounds.
 
 For production, define SLOs for the pipeline itself:
 

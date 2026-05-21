@@ -122,6 +122,8 @@ EventBridge Scheduler → Lambda (reader) → OTel Collector / Grafana Alloy
 
 **Reference**: See [Part 5 — OTel Collector](https://dev.to/aws-builders/escape-vendor-lock-in-multi-backend-log-delivery-with-otel-collector-for-fsx-for-ontap) for the full Collector-based architecture.
 
+> Persistent queue behavior depends on the Collector / Alloy exporter and queue configuration. Validate retry, storage, and backpressure behavior before relying on it for stronger delivery guarantees.
+
 ## Checkpoint Strategies
 
 | Strategy | Storage | Concurrency | Deduplication | Complexity |
