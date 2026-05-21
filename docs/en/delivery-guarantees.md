@@ -158,6 +158,19 @@ Supports concurrent workers, deduplication, retry tracking, and poison-pill dete
 | Credential rotation | 401/403 until cold start | Use auth_cache with reload-on-401/403 |
 | Scheduler throttled | DLQ captures event | Next scheduled run covers the gap |
 
+## Failure Ownership Matrix
+
+Different failure types are owned by different layers. Understanding this separation helps assign operational responsibility:
+
+| Failure | Owner Layer | Quickstart Behavior | Production Option |
+|---------|-------------|--------------------|--------------------|
+| Scheduler cannot invoke Lambda | EventBridge Scheduler | Retry + Scheduler DLQ | DLQ alarm + replay runbook |
+| Lambda crashes during processing | Lambda runtime | Checkpoint not advanced; next run retries | Lambda failure destination → SQS |
+| Vendor API returns 429/5xx | Shipper retry logic | Retry 3x then raise | SQS buffering or Collector path |
+| One file repeatedly fails parse | Application logic | Stops checkpoint advancement | DynamoDB poison-pill ledger |
+| Credential expired / rotated | Auth cache layer | 401/403 until cache refresh | auth_cache.py with reload-on-401/403 |
+| Lambda concurrency exhausted | Lambda service | Throttled; Scheduler DLQ | Expected with ReservedConcurrency=1 |
+
 ## Pipeline Health Monitoring
 
 All tiers should monitor:

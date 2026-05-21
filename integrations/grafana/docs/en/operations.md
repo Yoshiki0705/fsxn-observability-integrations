@@ -112,3 +112,70 @@ Decrease (e.g., `rate(1 minute)`) when:
 | Scheduler DLQ messages > 0 | Invocations failing | Check Lambda errors, Grafana endpoint |
 | Checkpoint not advancing | Poller stuck | Check for poison-pill file or auth failure |
 | Lambda Throttles > 0 | Concurrency exhausted | Expected with ReservedConcurrency=1; check backlog |
+
+
+## FSx Audit Polling Validation Checklist
+
+Before deploying the audit log poller to production, validate:
+
+- [ ] Audit log file naming is monotonically increasing (lexical order matches chronological order)
+- [ ] Audit log rotation interval is known and documented
+- [ ] Late-arriving files are not expected, or a lookback window is configured
+- [ ] Average file size is measured (affects Lambda duration per file)
+- [ ] FSx provisioned throughput is sufficient for polling read load
+- [ ] Lambda p95 duration is below the schedule interval
+- [ ] S3 Access Point file-system user has read permission on the audit log path
+- [ ] S3 Access Point resource policy allows the Lambda execution role
+- [ ] `StartAfter` checkpoint behavior is validated with your key naming pattern
+- [ ] Scheduler DLQ alarm is configured
+
+> **Why this matters**: The `StartAfter` high-watermark checkpoint assumes audit log keys are monotonically increasing and immutable. If files can arrive out of lexical order or be overwritten, use a DynamoDB object ledger instead.
+
+## Ownership Matrix
+
+For enterprise deployments, clarify operational ownership across teams:
+
+| Area | Recommended Owner |
+|------|-------------------|
+| FSx audit logging configuration | Storage team |
+| S3 Access Point policy | Storage / Platform |
+| Lambda deployment and updates | Platform team |
+| Grafana dashboards and queries | Observability team |
+| Grafana alert routing and contact points | SRE / Security Operations |
+| EMS webhook security | Security / Platform |
+| Scheduler DLQ replay | SRE / Platform |
+| Token rotation (Grafana, webhook) | Security / Platform |
+| Poison-pill investigation | Storage / Platform |
+| Cost monitoring (Lambda, Grafana ingest) | FinOps / Platform |
+
+## Loki Label Cardinality Guidance
+
+Do **not** promote high-cardinality fields to Loki labels. Keep them in the log body or structured metadata and extract at query time with `| json`.
+
+**Fields that must NOT be labels:**
+- `UserName` — unbounded user count
+- `ObjectName` / `fsxn.path` — unbounded file paths
+- `client.address` — unbounded IP addresses
+- `event_id` — unique per event
+
+**Fields safe as labels (low cardinality):**
+- `service_name` — fixed set (`fsxn-audit`, `fsxn-ems`, `fsxn-fpolicy`)
+- `severity` — small set (`alert`, `warning`, `info`)
+- `operation` — bounded set (`create`, `read`, `write`, `delete`, `rename`)
+
+> Loki indexes labels, not log content. High-cardinality labels cause index bloat, slow queries, and increased storage cost. Use `| json | UserName="admin"` instead of `{UserName="admin"}`.
+
+## Evidence Boundary (Compliance)
+
+For regulated environments, document the evidence boundary clearly:
+
+| Evidence | Location | Retention |
+|----------|----------|-----------|
+| Audit log source of truth | FSx for ONTAP audit volume | Controlled by ONTAP retention policy |
+| Analysis and alerting | Grafana Cloud Loki | Controlled by Grafana Cloud retention tier |
+| Failed invocation evidence | Scheduler DLQ (SQS) | 14 days (SQS max retention) |
+| Processing progress | SSM Parameter Store checkpoint | Indefinite (until deleted) |
+| Lambda execution evidence | CloudWatch Logs | Configurable (default: 30 days) |
+| Delivery semantics | At-least-once | Duplicates possible; dedup is app-side |
+
+**Key principle**: Grafana Cloud is an analysis, visualization, and alerting destination — not the system of record. The FSx audit files on the ONTAP volume are the authoritative source. This pipeline delivers copies for operational visibility; it does not replace the original audit trail.

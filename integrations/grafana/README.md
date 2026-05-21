@@ -10,6 +10,17 @@
 FSx ONTAP → S3 Access Point → EventBridge → Lambda → Grafana Loki Push API
 ```
 
+## ONTAP-Side Prerequisites
+
+Before deploying this integration, ensure:
+
+- Audit logging enabled on the target SVM (`vserver audit create`)
+- Audit log path exposed through an FSx for ONTAP S3 Access Point
+- EMS webhook destination configured for relevant events (if using EMS path)
+- FPolicy server deployed (if using file-operation stream path)
+
+See [Prerequisites Guide](../../docs/en/prerequisites.md) for detailed setup instructions.
+
 ## Quick Deploy
 
 ```bash
