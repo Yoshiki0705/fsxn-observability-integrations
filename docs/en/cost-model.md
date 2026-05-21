@@ -120,5 +120,13 @@ Duplicate rate increases when:
 - Grafana endpoint has intermittent 5xx errors (Lambda retries, then next run re-processes)
 - Lambda times out after sending but before checkpointing
 - Scheduler DLQ replay is performed without checking current checkpoint state
+- Aggressive retry policy (high MaximumRetryAttempts)
+- SSM Parameter Store transient write failures
+
+Duplicate rate decreases when:
+- Larger `SAFETY_THRESHOLD_MS` (stops processing well before timeout)
+- `auth_cache` reload-on-401/403 prevents repeated auth failures
+- Stable Grafana Cloud OTLP Gateway (no extended outages)
+- DynamoDB object ledger with conditional writes (production upgrade)
 
 For cost estimation, use 1–3% duplicate overhead as a conservative planning factor for the direct path. The Collector/Alloy path with persistent queue reduces this to near-zero.

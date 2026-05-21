@@ -37,6 +37,10 @@ Before deploying, gather these from your Grafana Cloud console:
 - [ ] Store ingestion credentials in AWS Secrets Manager as `{"instance_id":"<id>","api_key":"<token>"}`
 - [ ] Store dashboard provisioning token separately (used by `create-dashboard.sh` and `create-alerts.sh`)
 
+Use separate credentials for each concern:
+- **OTLP ingestion**: `logs:write` scoped token (stored in Secrets Manager, used by Lambda)
+- **Grafana HTTP API provisioning**: dashboard / alert provisioning permissions (used by scripts only)
+
 ## Quick Deploy
 
 ```bash
