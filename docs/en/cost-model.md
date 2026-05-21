@@ -101,3 +101,24 @@ FPolicy event volume depends on workload:
 | Shared file server (medium) | 100-1000 events/min | Scope to security-relevant operations |
 | Build/CI output (high I/O) | 1000+ events/min | Scope narrowly or use audit logs instead |
 | Database files on NAS | Very high open/read/write | Exclude from FPolicy scope |
+
+
+## Duplicate Delivery Cost Factor
+
+Because the direct path provides at-least-once delivery, retries after partial success can increase ingest volume. Estimate duplicate overhead as:
+
+```
+effective_ingest = baseline_ingest × (1 + retry_duplicate_rate)
+```
+
+In practice, duplicate rate is low (< 1%) when:
+- Grafana Cloud OTLP Gateway is stable (no extended outages)
+- Lambda timeout is well above typical processing duration
+- SSM checkpoint updates succeed reliably
+
+Duplicate rate increases when:
+- Grafana endpoint has intermittent 5xx errors (Lambda retries, then next run re-processes)
+- Lambda times out after sending but before checkpointing
+- Scheduler DLQ replay is performed without checking current checkpoint state
+
+For cost estimation, use 1–3% duplicate overhead as a conservative planning factor for the direct path. The Collector/Alloy path with persistent queue reduces this to near-zero.
