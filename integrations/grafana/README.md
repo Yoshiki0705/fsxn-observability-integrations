@@ -15,9 +15,14 @@ FSx ONTAP → S3 Access Point → EventBridge → Lambda → Grafana Loki Push A
 Before deploying this integration, ensure:
 
 - Audit logging enabled on the target SVM (`vserver audit create`)
+- Audit policy covers required SMB/NFS events
+- Audit log format is known (EVTX or XML/JSON-converted output)
+- Audit log rotation interval is documented
 - Audit log path exposed through an FSx for ONTAP S3 Access Point
+- S3 Access Point file-system identity has read permission on the audit log directory
+- Test audit file is visible through the S3 Access Point (`aws s3 ls` on AP ARN)
 - EMS webhook destination configured for relevant events (if using EMS path)
-- FPolicy server deployed (if using file-operation stream path)
+- FPolicy server deployed and reachable from ONTAP (if using file-operation stream path)
 
 See [Prerequisites Guide](../../docs/en/prerequisites.md) for detailed setup instructions.
 

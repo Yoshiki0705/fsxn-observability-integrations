@@ -56,3 +56,45 @@ If this is your first deployment:
 6. Add EMS and FPolicy only after the audit path works
 
 This minimizes variables and gives you a clear success signal before adding complexity.
+
+
+## PoC Workstream Split
+
+For multi-team deployments, assign tasks by domain:
+
+### NetApp / ONTAP Side
+- [ ] Enable audit logging on target SVM
+- [ ] Configure audit log format (EVTX or XML)
+- [ ] Document audit log rotation interval
+- [ ] Configure EMS webhook destination (if using EMS path)
+- [ ] Validate FPolicy server connectivity (if using FPolicy path)
+- [ ] Validate S3 Access Point file-system identity has read permission
+- [ ] Confirm test audit file is visible through S3 Access Point
+
+### AWS Side
+- [ ] Deploy Lambda / Scheduler / DLQ (CloudFormation)
+- [ ] Validate IAM policy and S3 Access Point resource policy
+- [ ] Validate checkpoint advancement (SSM Parameter Store)
+- [ ] Configure Scheduler DLQ alarm
+- [ ] Test DLQ replay procedure
+
+### Grafana Side
+- [ ] Validate OTLP ingestion (logs visible in Explore)
+- [ ] Create dashboard with 4 panels
+- [ ] Create alert rules (ransomware, quota, failed access)
+- [ ] Configure contact points and notification policies
+- [ ] Validate label mapping (`service_name` index label)
+
+## Outcome Metrics
+
+Track these KPIs to demonstrate PoC value:
+
+| Metric | Target | How to Measure |
+|--------|--------|----------------|
+| Time to first audit log in Grafana | < 30 min from deploy | Timestamp of first log entry |
+| Number of verified LogQL queries | ≥ 5 | Verified Query Matrix in article |
+| Alert rule creation success | 3/3 rules | `create-alerts.sh` exit code |
+| Mean poller duration | < 60% of schedule interval | CloudWatch Lambda Duration p95 |
+| Scheduler DLQ count | 0 | SQS metric |
+| Security owner approval | Signed off | Webhook auth mode agreed |
+| Customer sign-off | Documented | At-least-once semantics accepted |
