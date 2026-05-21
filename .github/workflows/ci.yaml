@@ -53,6 +53,33 @@ jobs:
           cfn-lint integrations/*/template.yaml
           cfn-lint shared/templates/*.yaml
 
+  cfn-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cfn-guard
+        run: |
+          curl -L https://github.com/aws-cloudformation/cloudformation-guard/releases/latest/download/cfn-guard-v3-ubuntu-latest.tar.gz -o cfn-guard.tar.gz
+          tar -xzf cfn-guard.tar.gz
+          sudo mv cfn-guard /usr/local/bin/
+          cfn-guard --version
+
+      - name: Run cfn-guard on integration templates
+        run: |
+          echo "Running cfn-guard validation..."
+          FAILED=0
+          for template in integrations/*/template*.yaml shared/templates/*.yaml; do
+            if [ -f "$template" ]; then
+              echo "Validating: $template"
+              cfn-guard validate -d "$template" -r guard/rules/ --show-summary fail || FAILED=1
+            fi
+          done
+          if [ "$FAILED" -eq 1 ]; then
+            echo "⚠️ cfn-guard found policy violations (non-blocking)"
+          fi
+        continue-on-error: true
+
   security-scan:
     runs-on: ubuntu-latest
     steps:
@@ -100,3 +127,26 @@ jobs:
           scan-type: 'fs'
           scan-ref: '.'
           severity: 'CRITICAL,HIGH'
+
+  markdown-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check markdown links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          config-file: '.markdown-link-check.json'
+        continue-on-error: true
+
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run actionlint
+        uses: rhysd/actionlint-action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true

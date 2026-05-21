@@ -1,0 +1,14 @@
+{
+  "source": "fpolicy.fsxn",
+  "detail-type": "FPolicy File Operation",
+  "detail": {
+    "operation": "delete",
+    "file_path": "/vol1/temp/scratch-file.tmp",
+    "user": "DOMAIN\\admin",
+    "client_ip": "10.0.1.101",
+    "protocol": "cifs",
+    "svm": "svm-prod-01",
+    "volume": "vol1",
+    "timestamp": "2026-01-15T10:45:00.000Z"
+  }
+}

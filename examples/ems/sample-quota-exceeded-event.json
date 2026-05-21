@@ -1,0 +1,12 @@
+{
+  "message-name": "wafl.quota.softlimit.exceeded",
+  "message-severity": "warning",
+  "message-timestamp": "2026-01-15T11:00:00.000Z",
+  "parameters": {
+    "vserver-name": "svm-prod-01",
+    "volume-name": "vol_home",
+    "quota-target": "DOMAIN\\user01",
+    "used-bytes": "62914560",
+    "limit-bytes": "52428800"
+  }
+}

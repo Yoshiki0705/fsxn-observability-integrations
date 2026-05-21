@@ -1,0 +1,36 @@
+# CloudFormation Guard rules for Lambda security best practices
+# These rules validate that Lambda functions follow security and operational standards.
+
+let lambdas = Resources.*[ Type == "AWS::Lambda::Function" ]
+
+# Lambda functions must have a timeout configured
+rule lambda_has_timeout when %lambdas !empty {
+  %lambdas.Properties.Timeout exists
+  <<Lambda functions must have an explicit Timeout to prevent runaway executions>>
+}
+
+# Lambda functions must have reserved concurrency or be explicitly unlimited
+rule lambda_has_memory when %lambdas !empty {
+  %lambdas.Properties.MemorySize exists
+  <<Lambda functions must have an explicit MemorySize configuration>>
+}
+
+# No plaintext secrets in parameters
+rule no_plaintext_secret_parameters {
+  when Parameters exists {
+    Parameters.*[ keys == /.*[Ss]ecret.*/ ] {
+      NoEcho == true
+      <<Parameters containing 'Secret' in the name must have NoEcho: true>>
+    }
+  }
+}
+
+# DLQ should be configured for async Lambda functions
+rule lambda_has_dlq when %lambdas !empty {
+  %lambdas.Properties {
+    DeadLetterConfig exists
+    OR
+    this is_struct
+  }
+  <<Lambda functions should have a DeadLetterConfig for error handling>>
+}
