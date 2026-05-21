@@ -1,0 +1,50 @@
+[
+  {
+    "EventID": "4663",
+    "Timestamp": "2026-01-15T10:30:00.000Z",
+    "SVMName": "svm-prod-01",
+    "UserName": "DOMAIN\\user01",
+    "ClientIP": "10.0.1.100",
+    "Operation": "ReadData",
+    "ObjectName": "/vol1/reports/quarterly-report.xlsx",
+    "Result": "Success",
+    "HandleID": "0x00000001",
+    "AccessMask": "0x1"
+  },
+  {
+    "EventID": "4663",
+    "Timestamp": "2026-01-15T10:30:05.000Z",
+    "SVMName": "svm-prod-01",
+    "UserName": "DOMAIN\\admin",
+    "ClientIP": "10.0.1.101",
+    "Operation": "WriteData",
+    "ObjectName": "/vol1/data/export.csv",
+    "Result": "Success",
+    "HandleID": "0x00000002",
+    "AccessMask": "0x2"
+  },
+  {
+    "EventID": "4663",
+    "Timestamp": "2026-01-15T10:30:10.000Z",
+    "SVMName": "svm-prod-01",
+    "UserName": "DOMAIN\\external-user",
+    "ClientIP": "10.0.2.50",
+    "Operation": "ReadData",
+    "ObjectName": "/vol1/confidential/secret.docx",
+    "Result": "Access Denied",
+    "HandleID": "0x00000003",
+    "AccessMask": "0x1"
+  },
+  {
+    "EventID": "4660",
+    "Timestamp": "2026-01-15T10:30:15.000Z",
+    "SVMName": "svm-prod-01",
+    "UserName": "DOMAIN\\backup-svc",
+    "ClientIP": "10.0.1.100",
+    "Operation": "DeleteFile",
+    "ObjectName": "/vol1/temp/old-export.csv",
+    "Result": "Success",
+    "HandleID": "0x00000004",
+    "AccessMask": "0x10000"
+  }
+]
