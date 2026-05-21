@@ -317,3 +317,37 @@ For production, define SLOs for the pipeline itself:
 | Availability | Pipeline processes files on ≥99% of scheduled invocations | Scheduler DLQ depth = 0 |
 
 These are starter targets. Adjust based on your organization's audit compliance requirements and operational capacity.
+
+
+## Scaling Beyond a Single Poller
+
+The single-concurrency poller (ReservedConcurrentExecutions=1) is appropriate for quickstart and low-to-medium volume workloads. For higher volume, redesign rather than simply increasing MAX_KEYS_PER_RUN:
+
+| Approach | When to Use | Trade-off |
+|----------|-------------|-----------|
+| Increase MAX_KEYS_PER_RUN | Moderate volume, single prefix | Simple but bounded by Lambda timeout |
+| Prefix partitioning | Multiple SVMs or audit paths | Requires stable prefix layout |
+| DynamoDB object ledger | Concurrent workers needed | Higher complexity, enables dedup |
+| SQS fan-out | High volume, per-object isolation | Reader lists → SQS → multiple shippers |
+| Alloy / Collector | Multi-backend or enrichment needed | Compute cost, but pipeline flexibility |
+
+**Design principles for scale**:
+- Partition by stable prefixes if audit log layout supports it (e.g., per-SVM prefix)
+- Replace SSM high-watermark with DynamoDB object ledger for concurrent processing
+- Use SQS to fan out object processing to multiple shipper Lambdas
+- Add idempotency by object key + ETag / LastModified (conditional DynamoDB writes)
+- Monitor FSx S3 Access Point read throughput — it is bounded by FSx provisioned throughput
+- Apply backpressure (reduce polling rate or pause) instead of increasing MAX_KEYS_PER_RUN indefinitely
+- Consider Alloy / Collector when pipeline concerns (batching, retry, transform) outgrow Lambda
+
+## Mission-Critical Workload Addendum
+
+This pipeline is **not** a high-availability mechanism. It complements HA / DR designs by providing:
+
+- Audit evidence for file access and administrative activity
+- EMS alert visibility for ONTAP-side events (ransomware, quota, hardware)
+- FPolicy-based near-real-time file operation visibility
+- DLQ and checkpoint evidence for log delivery health
+- Grafana dashboards and alerts for operational response
+
+For SAP, Oracle, SQL Server, JP1, HULFT, VDI, or enterprise file service workloads on EC2 with FSx for ONTAP, combine this observability layer with workload-specific HA / DR patterns. This pipeline does not affect RTO/RPO — it provides the operational evidence and alerting that supports faster incident investigation and audit compliance.
