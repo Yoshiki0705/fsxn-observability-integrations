@@ -7,25 +7,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- Governance and compliance documentation (bilingual ja/en)
-- Security review checklist (bilingual ja/en)
-- PoC success criteria document (bilingual ja/en)
-- Production readiness levels in README
+- Governance and compliance review guides (bilingual ja/en)
+- Security review checklists (bilingual ja/en)
+- PoC success criteria and production readiness levels
+- CI policy documentation with cfn-guard adoption roadmap (bilingual ja/en)
+- cfn-guard policy checks in GitHub Actions (non-blocking)
+- Markdown link check and actionlint CI jobs
+- Sample payloads for audit, EMS, and FPolicy validation in examples/
+- Shared Python observability module (Lambda Powertools logger/metrics/tracer)
+- Shared Python object ledger module (DynamoDB-backed idempotent processing)
 - Choose your path decision guide in README
-- Trigger model note explaining FSx S3 AP polling approach
-- Sample payloads in examples/ directory (audit, EMS, FPolicy)
-- cfn-guard rules for Lambda security and secrets management
-- cfn-guard CI job in GitHub Actions
-- Markdown link check CI job
-- actionlint CI job
-- Shared Python observability module (Lambda Powertools)
-- Shared Python idempotency module (DynamoDB object ledger)
+- Recommended first 30 minutes section in README
 - Try with sample data section in README
+- Community disclaimer in README
 
 ### Changed
-- README restructured as decision guide (not just implementation list)
-- README Grafana Cloud description updated to OTLP Gateway primary
-- Documentation section expanded with governance/security/PoC links
+- README restructured as decision guide with production readiness levels
+- Clarified FSx for ONTAP S3 Access Point trigger model (polling, not event-driven)
+- Updated Grafana Cloud path to OTLP Gateway primary, Loki Push API fallback
+- Reworded ObjectLedger semantics as idempotent object processing and duplicate suppression
+- Added compliance disclaimer to governance docs (not an attestation)
+- Updated .markdown-link-check.json with flaky link mitigation
 
 ## [0.3.0] - 2026-05-15
 

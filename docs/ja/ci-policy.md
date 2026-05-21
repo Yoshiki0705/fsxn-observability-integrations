@@ -10,6 +10,16 @@
 | markdown-links | markdown-link-check | No (continue-on-error) | ドキュメントリンクの整合性確認 |
 | actionlint | actionlint | No (continue-on-error) | GitHub Actions ワークフロー構文チェック |
 
+## 現在の適用状況
+
+| Check | Current Mode | Target Mode |
+|---|---|---|
+| cfn-lint | Blocking | Blocking |
+| cfn-guard | Non-blocking | Blocking on main after rule tuning |
+| markdown-link-check | Non-blocking | Blocking with external-link ignore rules |
+| actionlint | Non-blocking | Blocking |
+| Trivy | Blocking for high/critical findings | Blocking |
+
 ## cfn-guard 導入ロードマップ
 
 ```

@@ -2,6 +2,10 @@
 
 🌐 [日本語](docs/ja/README.md) | [English](docs/en/README.md)
 
+> This is a community reference implementation and not an official AWS service feature or compliance attestation. Validate all configurations, costs, and compliance requirements in your own environment.
+>
+> 本リポジトリはコミュニティベースのリファレンス実装であり、AWS 公式サービス機能や準拠性を保証するものではありません。設定、コスト、コンプライアンス要件は各自の環境で検証してください。
+
 ---
 
 ## Overview / 概要
