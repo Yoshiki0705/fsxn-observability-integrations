@@ -81,6 +81,8 @@ Before deploying in regulated environments, confirm:
 
 ## Applicable Frameworks
 
+> **Disclaimer**: This document is not a compliance attestation. It provides review considerations and control-mapping prompts for regulated environments such as FISC- or ISMAP-governed workloads.
+
 This pipeline pattern can support evidence requirements for:
 - **AWS Well-Architected Framework** — Operational Excellence and Security pillars
 - **SOC 2** — Monitoring and logging controls

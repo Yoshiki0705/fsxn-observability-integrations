@@ -1,8 +1,8 @@
 """Shared idempotency utilities for FSx ONTAP Lambda handlers.
 
-Provides a lightweight idempotency layer using DynamoDB to prevent
-duplicate processing of audit log files. This is the "Level 3" object
-ledger referenced in the Production Readiness Levels.
+Provides a lightweight idempotency layer using DynamoDB for idempotent
+object processing and duplicate suppression of audit log files. This is
+the "Level 3" object ledger referenced in the Production Readiness Levels.
 
 Usage:
     from shared.python.idempotency import ObjectLedger
@@ -37,10 +37,13 @@ from botocore.exceptions import ClientError
 
 
 class ObjectLedger:
-    """DynamoDB-backed object ledger for exactly-once processing.
+    """DynamoDB-backed object ledger for idempotent object processing and duplicate suppression.
 
     Tracks which S3 objects (audit log files) have been successfully
-    processed and delivered to the observability backend.
+    processed and delivered to the observability backend. This does not
+    provide end-to-end exactly-once delivery. It provides idempotent
+    object processing and duplicate suppression within the configured
+    TTL window.
 
     Attributes:
         table_name: DynamoDB table name.

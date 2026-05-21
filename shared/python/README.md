@@ -40,7 +40,7 @@ def lambda_handler(event, context):
 
 ### idempotency.py
 
-DynamoDB-backed object ledger for exactly-once processing (Production Readiness Level 3).
+DynamoDB-backed object ledger for idempotent object processing and duplicate suppression (Production Readiness Level 3).
 
 ```python
 from shared.python.idempotency import ObjectLedger
@@ -63,6 +63,26 @@ ledger.mark_processed(object_key, record_count=42)
 | processed_at | Number | Unix timestamp of processing |
 | record_count | Number | Records extracted |
 | ttl | Number | DynamoDB TTL epoch |
+
+## Lambda Powertools Dependency
+
+The shared observability module expects AWS Lambda Powertools for Python to be packaged through one of:
+- Lambda Layer
+- Deployment package (bundled with function code)
+- Container image
+
+If Powertools is not packaged, handlers will fail fast during cold start rather than silently disabling metrics or tracing.
+
+### ObjectLedger vs Powertools Idempotency
+
+| Aspect | ObjectLedger | Powertools Idempotency |
+|--------|-------------|----------------------|
+| Scope | FSx audit object-level processing state | Request/event-level idempotency |
+| Key | S3 object key + ETag/LastModified | Event payload hash |
+| Use case | "Has this audit file been processed?" | "Has this exact invocation been handled?" |
+| Persistence | DynamoDB with TTL | DynamoDB with TTL |
+
+Use ObjectLedger for file-level deduplication. Use Powertools Idempotency for Lambda invocation-level idempotency (e.g., retried SQS messages).
 
 ## Installation
 
