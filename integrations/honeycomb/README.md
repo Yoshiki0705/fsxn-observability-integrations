@@ -1,5 +1,7 @@
 # FSx for ONTAP Honeycomb Integration
 
+> 📖 **Shared docs**: [Delivery Guarantee Patterns](../../docs/en/delivery-guarantees.md) | [Webhook Security](../../docs/en/webhook-security.md)
+
 ## Architecture
 
 ```

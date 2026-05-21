@@ -1,5 +1,7 @@
 # FSx for ONTAP Dynatrace Integration
 
+> 📖 **Shared docs**: [Delivery Guarantee Patterns](../../docs/en/delivery-guarantees.md) | [Webhook Security](../../docs/en/webhook-security.md)
+
 🚧 **Status: Planned**
 
 ## Architecture

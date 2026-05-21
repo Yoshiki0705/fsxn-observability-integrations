@@ -2,6 +2,8 @@
 
 🌐 [日本語](docs/ja/setup-guide.md) | [English](docs/en/setup-guide.md)
 
+> 📖 **Shared docs**: [Delivery Guarantee Patterns](../../docs/en/delivery-guarantees.md) | [Webhook Security](../../docs/en/webhook-security.md)
+
 ## Overview
 
 Serverless alternative to the [EC2-based Splunk integration](https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on-amazon-fsx-for-netapp-ontap-using-splunk/) that uses syslog-ng + Universal Forwarder on EC2 instances.

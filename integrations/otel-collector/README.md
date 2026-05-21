@@ -1,5 +1,7 @@
 # OTel Collector Integration
 
+> 📖 **Shared docs**: [Delivery Guarantee Patterns](../../docs/en/delivery-guarantees.md) | [Webhook Security](../../docs/en/webhook-security.md)
+
 FSx for ONTAP audit log shipping via OTLP/HTTP to an OpenTelemetry Collector, enabling vendor-neutral multi-backend delivery.
 
 > **✅ All Backends Verified Working** (2026-05-18)
