@@ -39,13 +39,24 @@ Parameters:
   WebhookAuthMode:
     Type: String
     Default: NONE
-    AllowedValues: [NONE, API_KEY, IAM]
+    AllowedValues: [NONE, API_KEY, IAM, SHARED_SECRET]
     Description: >
       Authorization mode for the EMS webhook endpoint.
       NONE: No auth (quickstart/PoC only — NOT for production).
       API_KEY: Requires x-api-key header (create usage plan separately).
       IAM: Requires AWS IAM SigV4 signed requests.
-      For production, use API_KEY or IAM.
+      SHARED_SECRET: Lambda authorizer validates Bearer token against
+        a secret stored in Secrets Manager (recommended for production
+        when ONTAP cannot sign requests with SigV4).
+      For production, use SHARED_SECRET, API_KEY, or IAM.
+
+  WebhookSecretArn:
+    Type: String
+    Default: ''
+    Description: >
+      ARN of the Secrets Manager secret containing the webhook shared secret.
+      Required when WebhookAuthMode is SHARED_SECRET.
+      Secret format: {"webhook_secret": "<your-token>"}
 
   LogRetentionDays:
     Type: Number
@@ -67,6 +78,8 @@ Parameters:
 
 Conditions:
   UseApiKey: !Equals [!Ref WebhookAuthMode, API_KEY]
+  UseSharedSecret: !Equals [!Ref WebhookAuthMode, SHARED_SECRET]
+  HasWebhookSecret: !Not [!Equals [!Ref WebhookSecretArn, '']]
 
 Resources:
   # Dead Letter Queue for async invocation failures
@@ -115,6 +128,85 @@ Resources:
                   - lambda:InvokeFunction
                 Resource:
                   - !Ref LambdaFunctionArn
+                  - !If
+                    - UseSharedSecret
+                    - !GetAtt AuthorizerFunction.Arn
+                    - !Ref 'AWS::NoValue'
+
+  # --- Lambda Authorizer (SHARED_SECRET mode) ---
+
+  AuthorizerLambdaRole:
+    Type: AWS::IAM::Role
+    Condition: UseSharedSecret
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-authorizer-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SecretsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref WebhookSecretArn
+        - PolicyName: CloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-authorizer:*'
+
+  AuthorizerFunction:
+    Type: AWS::Lambda::Function
+    Condition: UseSharedSecret
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-authorizer'
+      Runtime: python3.12
+      Handler: shared_secret_authorizer.lambda_handler
+      Code:
+        ZipFile: |
+          # Inline placeholder — deploy actual code via:
+          #   aws lambda update-function-code --function-name <name> \
+          #     --zip-file fileb://shared_secret_authorizer.zip
+          def lambda_handler(event, context):
+              raise Exception("Unauthorized")
+      Role: !GetAtt AuthorizerLambdaRole.Arn
+      MemorySize: 128
+      Timeout: 10
+      Environment:
+        Variables:
+          WEBHOOK_SECRET_ARN: !Ref WebhookSecretArn
+
+  AuthorizerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: UseSharedSecret
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-authorizer'
+      RetentionInDays: !Ref LogRetentionDays
+
+  WebhookAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Condition: UseSharedSecret
+    Properties:
+      Name: !Sub '${AWS::StackName}-shared-secret'
+      RestApiId: !Ref EmsWebhookApi
+      Type: REQUEST
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations'
+      AuthorizerCredentials: !GetAtt ApiGatewayExecutionRole.Arn
+      IdentitySource: method.request.header.Authorization
+      AuthorizerResultTtlInSeconds: 300
+
+  # --- REST API Gateway ---
 
   # REST API Gateway
   EmsWebhookApi:
@@ -141,7 +233,8 @@ Resources:
       RestApiId: !Ref EmsWebhookApi
       ResourceId: !Ref EmsResource
       HttpMethod: POST
-      AuthorizationType: !Ref WebhookAuthMode
+      AuthorizationType: !If [UseSharedSecret, CUSTOM, !Ref WebhookAuthMode]
+      AuthorizerId: !If [UseSharedSecret, !Ref WebhookAuthorizer, !Ref 'AWS::NoValue']
       ApiKeyRequired: !If [UseApiKey, true, false]
       Integration:
         Type: AWS_PROXY
