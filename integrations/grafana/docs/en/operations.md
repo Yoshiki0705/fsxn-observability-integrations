@@ -245,3 +245,67 @@ FPolicy can operate in mandatory or non-mandatory mode. Choose based on your use
 - If the ECS Fargate task restarts, update the ONTAP External Engine IP
 
 **Volume control**: FPolicy can generate very high event volumes on busy file shares. For observability, focus on security-relevant operations (create, delete, rename) rather than all operations (open, read, write, close). Filter at the ONTAP FPolicy policy level, not in Lambda.
+
+
+## OTLP Mapping
+
+The Lambda converts parsed audit/EMS/FPolicy records to OTLP log records using this mapping:
+
+| Source Field | OTLP Location | Rationale |
+|-------------|---------------|-----------|
+| `"fsxn-audit"` / `"fsxn-ems"` / `"fsxn-fpolicy"` | `resource.attributes["service.name"]` | Loki/Grafana service identity; becomes `service_name` index label |
+| Signal type | `resource.attributes["fsxn.signal_type"]` | Distinguish audit / ems / fpolicy at resource level |
+| SVM name | `resource.attributes["fsxn.svm.name"]` | Source SVM identification |
+| Event timestamp | `log_record.time_unix_nano` | Original event time |
+| ONTAP event name (EMS) | `log_record.attributes["event_name"]` | Query-time filtering |
+| Audit operation | `log_record.attributes["Operation"]` | Query-time filtering |
+| User name | `log_record.attributes["UserName"]` | Query-time filtering (NOT a label) |
+| Object path | `log_record.attributes["ObjectName"]` | Query-time filtering (NOT a label) |
+| Raw event payload | `log_record.body` | Preserve source payload for investigation |
+| Severity | `log_record.severity_text` | EMS severity mapping |
+
+### Attribute Naming Policy
+
+- Use OTel standard attributes where applicable: `service.name`, `deployment.environment.name`, `cloud.region`
+- Preserve ONTAP-native fields in `log_record.body` for full fidelity
+- Add normalized custom attributes under a stable `fsxn.*` namespace:
+  - `fsxn.signal_type` — audit / ems / fpolicy
+  - `fsxn.svm.name` — source SVM
+  - `fsxn.volume.name` — source volume (when available)
+  - `fsxn.operation` — normalized operation type
+  - `fsxn.result` — success / failure
+
+This namespace approach ensures forward compatibility if OpenTelemetry Semantic Conventions add storage-domain attributes in the future.
+
+## Graduating to Alloy
+
+The Lambda already emits OTLP-shaped log payloads. To move from direct send to Grafana Alloy:
+
+1. Deploy Alloy (ECS Fargate or EC2) with an `otelcol.receiver.otlp` component
+2. Change Lambda `LOKI_ENDPOINT` to point to Alloy's OTLP receiver (`http://<alloy>:4318/v1/logs`)
+3. Add Alloy processors: `otelcol.processor.batch`, `otelcol.processor.attributes`, `otelcol.processor.transform`
+4. Export from Alloy to Grafana Cloud OTLP endpoint via `otelcol.exporter.otlphttp`
+5. Optionally add a second exporter for another backend (Datadog, S3 archive, etc.)
+
+Benefits of the Alloy layer:
+- **Batching**: Aggregate multiple Lambda invocations into efficient batches
+- **Retry with persistent queue**: Survive Grafana Cloud outages without losing data
+- **Transform/redaction**: Remove PII or enrich with metadata before shipping
+- **Multi-backend routing**: Fan out to multiple destinations from a single pipeline
+- **Resource detection**: Auto-add cloud metadata (region, account, etc.)
+
+Because the Lambda produces standard OTLP payloads, no Lambda code changes are needed — only the destination URL changes.
+
+## Telemetry Pipeline SLO Examples
+
+For production, define SLOs for the pipeline itself:
+
+| SLO | Target | Measurement |
+|-----|--------|-------------|
+| Freshness | 99% of audit files visible in Grafana within 2× schedule interval | Checkpoint age custom metric |
+| Completeness | 99.9% of processed files have successful delivery | Grafana send failure rate |
+| Replayability | 100% of Scheduler DLQ events reviewed within 1 business day | DLQ age alarm |
+| Safety | 0 production audit files deleted by cleanup scripts | Cleanup script guards |
+| Availability | Pipeline processes files on ≥99% of scheduled invocations | Scheduler DLQ depth = 0 |
+
+These are starter targets. Adjust based on your organization's audit compliance requirements and operational capacity.

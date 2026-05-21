@@ -26,6 +26,17 @@ Before deploying this integration, ensure:
 
 See [Prerequisites Guide](../../docs/en/prerequisites.md) for detailed setup instructions.
 
+## Grafana Cloud Setup Checklist
+
+Before deploying, gather these from your Grafana Cloud console:
+
+- [ ] Create a Grafana Cloud stack (or use existing)
+- [ ] Locate OTLP endpoint: `https://otlp-gateway-prod-<region>.grafana.net/otlp`
+- [ ] Create a `logs:write` scoped API token for OTLP ingestion
+- [ ] Create a Grafana Service Account token for dashboard/alert provisioning (separate from ingestion token)
+- [ ] Store ingestion credentials in AWS Secrets Manager as `{"instance_id":"<id>","api_key":"<token>"}`
+- [ ] Store dashboard provisioning token separately (used by `create-dashboard.sh` and `create-alerts.sh`)
+
 ## Quick Deploy
 
 ```bash
