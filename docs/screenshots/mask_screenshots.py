@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""
-スクリーンショットから個人情報・環境固有情報をマスクするスクリプト。
+"""スクリーンショットから個人情報・環境固有情報をマスクするスクリプト。
 
 対象:
   - Datadog スクリーンショット: メールアドレス、組織名、ユーザー名
   - AWS スクリーンショット: アカウントID、ARN
+  - 全 PNG: メタデータ（EXIF, テキストチャンク）の除去
+  - 全 PNG: リソース ID パターン（subnet-xxx, sg-xxx, vpc-xxx 等）の検出
 
 マスク対象の個人情報:
   - メールアドレス
@@ -12,18 +13,284 @@
   - ユーザー名
   - トライアル情報
 
+マスク対象のリソース ID パターン:
+  - subnet-[a-f0-9]+
+  - sg-[a-f0-9]+
+  - vpc-[a-f0-9]+
+  - API Gateway ID (10文字英数字)
+  - AWS アカウント ID (12桁数字)
+  - Secret ARN (arn:aws:secretsmanager:...)
+  - IP アドレス (プライベート/パブリック)
+
 使用方法:
-  python3 docs/screenshots/mask_screenshots.py
+  python3 docs/screenshots/mask_screenshots.py [--dir <directory>]
 
 依存:
   pip install Pillow
 """
 
+from __future__ import annotations
+
+import re
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw
+from PIL.PngImagePlugin import PngInfo
 
 SCRIPT_DIR = Path(__file__).parent
+
+# --- Sensitive pattern definitions ---
+# Patterns that indicate real AWS resource IDs in PNG metadata
+SENSITIVE_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
+    ("Subnet ID", re.compile(r"subnet-[0-9a-f]{8,17}"), "subnet-0123456789abcdef0"),
+    ("Security Group ID", re.compile(r"sg-[0-9a-f]{8,17}"), "sg-0123456789abcdef0"),
+    ("VPC ID", re.compile(r"vpc-[0-9a-f]{8,17}"), "vpc-0123456789abcdef0"),
+    ("ENI ID", re.compile(r"eni-[0-9a-f]{8,17}"), "eni-0123456789abcdef0"),
+    ("Instance ID", re.compile(r"i-[0-9a-f]{8,17}"), "i-0123456789abcdef0"),
+    (
+        "FSx File System ID",
+        re.compile(r"fs-[0-9a-f]{8,17}"),
+        "fs-0123456789abcdef0",
+    ),
+    ("SVM ID", re.compile(r"svm-[0-9a-f]{8,17}"), "svm-0123456789abcdef0"),
+    (
+        "API Gateway ID",
+        re.compile(
+            r"(?<![a-zA-Z0-9])[a-z0-9]{10}"
+            r"\.execute-api\.[a-z0-9-]+\.amazonaws\.com"
+        ),
+        "a1b2c3d4e5.execute-api.ap-northeast-1.amazonaws.com",
+    ),
+    (
+        "AWS Account ID",
+        re.compile(r"(?<![0-9])\d{12}(?![0-9])"),
+        "123456789012",
+    ),
+    (
+        "Secret ARN",
+        re.compile(
+            r"arn:aws:secretsmanager:[a-z0-9-]+:\d{12}"
+            r":secret:[A-Za-z0-9/_+=.@-]+"
+        ),
+        "arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:example-XXXXXX",
+    ),
+    (
+        "General ARN",
+        re.compile(r"arn:aws:[a-z0-9-]+:[a-z0-9-]*:\d{12}:[^\s\"'<>]+"),
+        "arn:aws:service:region:123456789012:resource/placeholder",
+    ),
+    (
+        "Public IP",
+        re.compile(
+            r"(?<![0-9])"
+            r"(?!10\.)"
+            r"(?!172\.(?:1[6-9]|2[0-9]|3[01])\.)"
+            r"(?!192\.168\.)"
+            r"(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])"
+            r"(?:\.(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])){3}"
+            r"(?![0-9])"
+        ),
+        "<public-ip>",
+    ),
+    (
+        "Private IP",
+        re.compile(
+            r"(?<![0-9])"
+            r"(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+            r"|172\.(?:1[6-9]|2[0-9]|3[01])\.\d{1,3}\.\d{1,3}"
+            r"|192\.168\.\d{1,3}\.\d{1,3})"
+            r"(?![0-9])"
+        ),
+        "10.0.x.x",
+    ),
+]
+
+
+# --- Metadata stripping ---
+
+
+class MetadataStripResult:
+    """Result of PNG metadata stripping operation."""
+
+    def __init__(self, filepath: Path) -> None:
+        """Initialize result for a file.
+
+        Args:
+            filepath: Path to the PNG file processed.
+        """
+        self.filepath = filepath
+        self.metadata_removed: list[str] = []
+        self.sensitive_found: list[tuple[str, str]] = []
+        self.was_modified: bool = False
+
+    def summary(self) -> str:
+        """Return a human-readable summary of the operation.
+
+        Returns:
+            Summary string describing what was done.
+        """
+        parts: list[str] = []
+        if self.metadata_removed:
+            parts.append(
+                f"metadata removed: {', '.join(self.metadata_removed)}"
+            )
+        if self.sensitive_found:
+            for pattern_name, matched in self.sensitive_found:
+                display = matched if len(matched) <= 30 else matched[:27] + "..."
+                parts.append(f"detected: {pattern_name} ({display})")
+        if not parts:
+            return "no changes"
+        return "; ".join(parts)
+
+
+def _scan_text_for_sensitive(
+    text: str, result: MetadataStripResult
+) -> None:
+    """Scan text content for sensitive patterns.
+
+    Args:
+        text: Text content to scan.
+        result: MetadataStripResult to append findings to.
+    """
+    for pattern_name, pattern, _placeholder in SENSITIVE_PATTERNS:
+        matches = pattern.findall(text)
+        for match in matches:
+            result.sensitive_found.append((pattern_name, match))
+
+
+def strip_png_metadata(filepath: Path) -> MetadataStripResult:
+    """PNG file metadata (EXIF, text chunks) removal.
+
+    Uses Pillow to re-save the image, stripping unwanted metadata.
+    Pixel data is not modified. This operation is idempotent.
+
+    Args:
+        filepath: Path to the PNG file to process.
+
+    Returns:
+        MetadataStripResult with details of what was removed.
+    """
+    result = MetadataStripResult(filepath)
+
+    img = Image.open(filepath)
+
+    # Check for existing metadata
+    has_exif = hasattr(img, "info") and "exif" in img.info
+    has_text = hasattr(img, "text") and img.text
+    has_icc = hasattr(img, "info") and "icc_profile" in img.info
+
+    if has_exif:
+        result.metadata_removed.append("EXIF")
+    if has_text:
+        text_dict = img.text
+        # Check if only our safe marker exists (idempotent check)
+        is_only_our_marker = (
+            len(text_dict) == 1
+            and "Software" in text_dict
+            and text_dict["Software"] == "mask_screenshots.py"
+        )
+        if not is_only_our_marker:
+            result.metadata_removed.append(
+                f"text chunks({len(text_dict)})"
+            )
+            # Scan text chunks for sensitive patterns
+            for key, value in text_dict.items():
+                text_content = f"{key}={value}"
+                _scan_text_for_sensitive(text_content, result)
+    if has_icc:
+        result.metadata_removed.append("ICC profile")
+
+    # Also scan any raw info dict string values for sensitive data
+    if hasattr(img, "info"):
+        for key, value in img.info.items():
+            if key in ("exif", "icc_profile"):
+                continue  # Binary data, skip
+            if isinstance(value, str):
+                _scan_text_for_sensitive(value, result)
+            elif isinstance(value, bytes):
+                try:
+                    text_val = value.decode("utf-8", errors="ignore")
+                    _scan_text_for_sensitive(text_val, result)
+                except (UnicodeDecodeError, AttributeError):
+                    pass
+
+    if result.metadata_removed or result.sensitive_found:
+        result.was_modified = True
+        # Re-save without metadata - preserve image mode and pixel data only
+        # Create a fresh image from pixel data to avoid carrying over metadata
+        pixel_data = img.tobytes()
+        clean_img = Image.frombytes(img.mode, img.size, pixel_data)
+        pnginfo = PngInfo()
+        # Add only a safe comment indicating the file was cleaned
+        pnginfo.add_text("Software", "mask_screenshots.py")
+        clean_img.save(filepath, pnginfo=pnginfo)
+        clean_img.close()
+
+    img.close()
+    return result
+
+
+def process_all_png_metadata(directory: Path) -> list[MetadataStripResult]:
+    """Process all PNG files in a directory, stripping metadata.
+
+    Recursively finds all PNG files and strips metadata from each.
+    This operation is idempotent - running it multiple times produces
+    the same result.
+
+    Args:
+        directory: Directory to scan for PNG files.
+
+    Returns:
+        List of MetadataStripResult for each processed file.
+    """
+    results: list[MetadataStripResult] = []
+    png_files = sorted(directory.rglob("*.png"))
+
+    for png_file in png_files:
+        try:
+            result = strip_png_metadata(png_file)
+            results.append(result)
+        except Exception as e:
+            print(f"  Warning: {png_file.name}: error - {e}")
+
+    return results
+
+
+def print_metadata_summary(results: list[MetadataStripResult]) -> None:
+    """Print a summary of metadata stripping operations.
+
+    Args:
+        results: List of MetadataStripResult from processing.
+    """
+    modified_count = sum(1 for r in results if r.was_modified)
+    sensitive_count = sum(len(r.sensitive_found) for r in results)
+
+    print(f"\n{'=' * 60}")
+    print("Summary: PNG Metadata Processing")
+    print(f"{'=' * 60}")
+    print(f"  Files processed: {len(results)}")
+    print(f"  Metadata removed: {modified_count} files")
+    print(f"  Sensitive patterns detected: {sensitive_count}")
+
+    if sensitive_count > 0:
+        print("\n  WARNING - Sensitive patterns found:")
+        for result in results:
+            if result.sensitive_found:
+                try:
+                    rel_path = result.filepath.relative_to(SCRIPT_DIR)
+                except ValueError:
+                    rel_path = result.filepath.name
+                for pattern_name, matched in result.sensitive_found:
+                    display = (
+                        matched if len(matched) <= 40 else matched[:37] + "..."
+                    )
+                    print(f"    - {rel_path}: {pattern_name} -> {display}")
+
+    print(f"{'=' * 60}\n")
+
+
+# --- Visual region masking (existing functionality) ---
 
 
 def mask_region(img: Image.Image, box: tuple, color: tuple = (41, 46, 57)) -> None:
@@ -486,38 +753,70 @@ def mask_honeycomb_screenshot():
     print(f"  ✅ {filepath.name}: マスク完了")
 
 
-if __name__ == "__main__":
+def main(target_dir: Path | None = None) -> None:
+    """Run all masking operations.
+
+    Args:
+        target_dir: Directory to process. Defaults to SCRIPT_DIR.
+    """
+    directory = target_dir or SCRIPT_DIR
+
     print("🔒 スクリーンショットマスク処理開始...")
+    print(f"   対象ディレクトリ: {directory}")
     print()
 
-    print("--- 新規撮影分 ---")
+    # Phase 1: Visual region masking (vendor-specific)
+    print("=" * 60)
+    print("Phase 1: Visual Region Masking")
+    print("=" * 60)
+
+    print("\n--- 新規撮影分 ---")
     mask_datadog_arp_detection()
     mask_datadog_arp_log_detail()
     mask_datadog_fpolicy_suspect_activity()
     mask_aws_ems_lambda_logs()
 
-    print()
-    print("--- FPolicy フルパス検証分 ---")
+    print("\n--- FPolicy フルパス検証分 ---")
     mask_datadog_fpolicy_full_path()
     mask_datadog_fpolicy_detail()
     mask_aws_ecs_fpolicy_logs()
     mask_aws_lambda_fpolicy_logs()
 
-    print()
-    print("--- 既存スクリーンショット ---")
+    print("\n--- 既存スクリーンショット ---")
     mask_datadog_dashboard()
     mask_datadog_pipeline_config()
     mask_datadog_unauthorized_access()
     mask_datadog_logs_arrival()
 
-    print()
-    print("--- OTel Collector 検証分 ---")
+    print("\n--- OTel Collector 検証分 ---")
     mask_otel_screenshots()
 
-    print()
-    print("--- マルチバックエンド検証分 ---")
+    print("\n--- マルチバックエンド検証分 ---")
     mask_grafana_cloud_screenshot()
     mask_honeycomb_screenshot()
 
+    # Phase 2: PNG metadata stripping (all files)
     print()
+    print("=" * 60)
+    print("Phase 2: PNG Metadata Stripping & Sensitive Pattern Scan")
+    print("=" * 60)
+    print()
+
+    results = process_all_png_metadata(directory)
+    print_metadata_summary(results)
+
     print("✅ 全マスク処理完了")
+
+
+if __name__ == "__main__":
+    # Parse optional --dir argument
+    target_directory: Path | None = None
+    if "--dir" in sys.argv:
+        idx = sys.argv.index("--dir")
+        if idx + 1 < len(sys.argv):
+            target_directory = Path(sys.argv[idx + 1])
+            if not target_directory.is_dir():
+                print(f"Error: {target_directory} is not a directory")
+                sys.exit(1)
+
+    main(target_directory)

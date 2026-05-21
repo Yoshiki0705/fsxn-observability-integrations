@@ -36,6 +36,17 @@ Parameters:
     MaxValue: 5000
     Description: API Gateway throttling burst limit
 
+  WebhookAuthMode:
+    Type: String
+    Default: NONE
+    AllowedValues: [NONE, API_KEY, IAM]
+    Description: >
+      Authorization mode for the EMS webhook endpoint.
+      NONE: No auth (quickstart/PoC only — NOT for production).
+      API_KEY: Requires x-api-key header (create usage plan separately).
+      IAM: Requires AWS IAM SigV4 signed requests.
+      For production, use API_KEY or IAM.
+
   LogRetentionDays:
     Type: Number
     Default: 30
@@ -53,6 +64,9 @@ Parameters:
       - 180
       - 365
     Description: CloudWatch Logs retention period in days
+
+Conditions:
+  UseApiKey: !Equals [!Ref WebhookAuthMode, API_KEY]
 
 Resources:
   # Dead Letter Queue for async invocation failures
@@ -127,7 +141,8 @@ Resources:
       RestApiId: !Ref EmsWebhookApi
       ResourceId: !Ref EmsResource
       HttpMethod: POST
-      AuthorizationType: NONE
+      AuthorizationType: !Ref WebhookAuthMode
+      ApiKeyRequired: !If [UseApiKey, true, false]
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST

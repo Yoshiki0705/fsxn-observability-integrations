@@ -8,6 +8,8 @@ This directory contains screenshots captured during E2E verification of the Graf
 |----------|-------------|
 | `explore-log-arrival.png` | Grafana Explore showing FSxN audit log arrival with timestamp and content fields |
 | `dashboard-overview.png` | Grafana dashboard with all 4 panels (log volume, operations breakdown, user activity, failure events) rendered with data |
+| `grafana-ems-events.png` | Grafana Explore showing EMS events (`{service_name="fsxn-ems"}`) with event_name and severity fields |
+| `grafana-fpolicy-events.png` | Grafana Explore showing FPolicy events (`{service_name="fsxn-fpolicy"}`) with operation and file_path fields |
 
 ## Capture Requirements
 
@@ -80,3 +82,55 @@ This directory contains screenshots captured during E2E verification of the Graf
 - Screenshots are captured manually during E2E verification against real Grafana Cloud infrastructure
 - Placeholder PNG files are committed initially and replaced with actual captures during verification
 - Both the Japanese and English setup guides reference these screenshots via relative path `../screenshots/<filename>`
+- EMS and FPolicy screenshots require Grafana Cloud login and data ingestion via OTLP Gateway
+
+---
+
+## EMS/FPolicy Screenshot Capture Instructions
+
+### `grafana-ems-events.png`
+
+**Purpose**: Verify that EMS events arrive in Grafana Cloud Loki and are queryable.
+
+**Navigation Path**:
+
+1. Log in to Grafana Cloud (`https://<instance>.grafana.net`)
+2. Click the **Explore** icon (compass) in the left sidebar
+3. Select **Loki** as the data source
+4. Enter the following LogQL query:
+   ```
+   {service_name="fsxn-ems"}
+   ```
+5. Click **Run query**
+6. Verify that EMS events are displayed with:
+   - `event_name` field (e.g., `arw.volume.state`, `wafl.quota.softlimit.exceeded`)
+   - `severity` field (e.g., `alert`, `warning`)
+   - `svm` field
+7. Capture the screenshot at ≥1024×768 resolution
+
+---
+
+### `grafana-fpolicy-events.png`
+
+**Purpose**: Verify that FPolicy file operation events arrive in Grafana Cloud Loki.
+
+**Navigation Path**:
+
+1. Log in to Grafana Cloud (`https://<instance>.grafana.net`)
+2. Click the **Explore** icon (compass) in the left sidebar
+3. Select **Loki** as the data source
+4. Enter the following LogQL query:
+   ```
+   {service_name="fsxn-fpolicy"}
+   ```
+5. Click **Run query**
+6. Verify that FPolicy events are displayed with:
+   - `operation` field (e.g., `create`, `write`, `rename`, `delete`)
+   - `file_path` field
+   - `user` field
+   - `client_ip` field
+7. Capture the screenshot at ≥1024×768 resolution
+
+---
+
+> **Note**: These placeholder PNG files (1x1 pixel) need to be replaced with actual Grafana UI captures after logging in and confirming data arrival. Run `python3 docs/screenshots/mask_screenshots.py` before committing actual screenshots.

@@ -385,14 +385,55 @@ Full guide: `docs/ja/prerequisites.md` / `docs/en/prerequisites.md`
 
 ## Adding a New Vendor Integration
 
-1. Create directory: `mkdir -p integrations/<vendor>/{lambda,docs/{ja,en},tests}`
-2. Copy reference: use `integrations/datadog/` as the template
+1. Create directory: `mkdir -p integrations/<vendor>/{lambda,scripts,docs/{ja,en},tests}`
+2. Copy reference: use `integrations/grafana/` as the template (most complete)
 3. Implement `lambda/handler.py` with vendor-specific API formatting
 4. Create `template.yaml` following the CloudFormation structure in steering
-5. Write bilingual docs: `docs/ja/setup-guide.md` and `docs/en/setup-guide.md`
-6. Add pytest tests with mocked API responses
-7. Update root `README.md` vendor table (change 🚧 to ✅)
-8. Update `docs/{ja,en}/vendor-comparison.md`
+5. Create `template-ems.yaml` for EMS webhook Lambda
+6. Create `template-fpolicy.yaml` for FPolicy EventBridge Lambda
+7. Write bilingual docs: `docs/ja/setup-guide.md` and `docs/en/setup-guide.md`
+8. Add pytest tests with mocked API responses
+9. Create `scripts/deploy.sh` (env-var driven, no hardcoded values)
+10. Create `scripts/cleanup.sh` as a thin wrapper calling `shared/scripts/cleanup-vendor.sh`
+11. Update root `README.md` vendor table (change 🚧 to ✅)
+12. Update `docs/{ja,en}/vendor-comparison.md`
+
+### Cleanup Script Template
+
+Each vendor's `scripts/cleanup.sh` should be a thin wrapper:
+
+```bash
+#!/bin/bash
+# Clean up <Vendor> integration resources.
+set -euo pipefail
+
+export STACK_PREFIX="${STACK_PREFIX:-fsxn-<vendor>}"
+export SECRET_NAME="${SECRET_NAME:-<vendor>/fsxn-credentials}"
+export VENDOR_NAME="<Vendor Name>"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec bash "${SCRIPT_DIR}/../../../shared/scripts/cleanup-vendor.sh" "$@"
+```
+
+The shared script (`shared/scripts/cleanup-vendor.sh`) handles:
+- Dependency-safe deletion order (API Gateway before Lambda)
+- DELETE_FAILED state detection and guidance
+- Optional Lambda Layer, Secret, and S3 data cleanup
+- `--all` flag for complete teardown
+- `-y` flag for CI/CD non-interactive mode
+
+### Deletion Order (Critical)
+
+CloudFormation stacks MUST be deleted in this order:
+
+```
+1. ${STACK_PREFIX}-fpolicy       (no external dependencies)
+2. ${STACK_PREFIX}-ems-webhook   (API Gateway references EMS Lambda ARN)
+3. ${STACK_PREFIX}-ems           (safe after API Gateway is gone)
+4. ${STACK_PREFIX}-integration   (independent)
+```
+
+If you delete the EMS Lambda (step 3) before the API Gateway (step 2), CloudFormation will fail with a resource-in-use error.
 
 ## Commit Convention
 
