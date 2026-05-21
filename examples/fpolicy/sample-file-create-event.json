@@ -1,0 +1,14 @@
+{
+  "source": "fpolicy.fsxn",
+  "detail-type": "FPolicy File Operation",
+  "detail": {
+    "operation": "create",
+    "file_path": "/vol1/shared/new-document.docx",
+    "user": "DOMAIN\\user01",
+    "client_ip": "10.0.1.100",
+    "protocol": "cifs",
+    "svm": "svm-prod-01",
+    "volume": "vol1",
+    "timestamp": "2026-01-15T10:40:00.000Z"
+  }
+}
