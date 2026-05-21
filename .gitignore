@@ -26,6 +26,9 @@ venv/
 # Blog drafts (not for public repo)
 docs/blog/
 
+# Verification results (contain real instance IDs and environment details)
+docs/**/verification-results*.md
+
 # Private credentials and environment files
 .private/
 

@@ -384,7 +384,7 @@ Resources:
       RequiresCompatibilities:
         - FARGATE
       RuntimePlatform:
-        CpuArchitecture: ARM64
+        CpuArchitecture: X86_64
         OperatingSystemFamily: LINUX
       Cpu: !Ref Cpu
       Memory: !Ref Memory
@@ -421,8 +421,6 @@ Resources:
   EcsService:
     Condition: IsFargate
     Type: AWS::ECS::Service
-    DependsOn:
-      - NlbListener
     Properties:
       ServiceName: !Sub '${AWS::StackName}-fpolicy-server'
       Cluster: !Ref EcsCluster
@@ -435,10 +433,6 @@ Resources:
           SecurityGroups:
             - !Ref FPolicyServerSecurityGroup
           Subnets: !Ref SubnetIds
-      LoadBalancers:
-        - ContainerName: fpolicy-server
-          ContainerPort: !Ref FPolicyPort
-          TargetGroupArn: !Ref NlbTargetGroup
       Tags:
         - Key: Project
           Value: fsxn-observability
@@ -472,8 +466,8 @@ Resources:
       HealthCheckEnabled: true
       HealthCheckProtocol: TCP
       HealthCheckIntervalSeconds: 30
-      HealthyThresholdCount: 3
-      UnhealthyThresholdCount: 3
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 10
       Tags:
         - Key: Project
           Value: fsxn-observability

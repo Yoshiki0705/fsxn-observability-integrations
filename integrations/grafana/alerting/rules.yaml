@@ -1,0 +1,175 @@
+# Grafana Alerting Rules for FSx for ONTAP
+#
+# These rules use Grafana's unified alerting format and target Loki datasource.
+# Deploy via the create-alerts.sh script or import via Grafana HTTP API.
+#
+# Prerequisites:
+#   - Logs flowing to Grafana Cloud via OTLP Gateway (service_name labels)
+#   - Loki datasource configured (uid: grafanacloud-logs)
+#
+# Alert Rules:
+#   1. Ransomware Detection (ONTAP ARP state change)
+#   2. Quota Warning (WAFL soft limit exceeded)
+#   3. Failed Access Spike (>10 failures in 5 minutes)
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: FSxN Security Alerts
+    folder: FSxN Alerts
+    interval: 1m
+    rules:
+      # --- Ransomware Detection Alert ---
+      # Fires when ONTAP Anti-Ransomware Protection (ARP) detects a volume
+      # state change, indicating potential ransomware activity.
+      - uid: fsxn-ransomware-detection
+        title: "FSxN: Ransomware Activity Detected (ARP)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafanacloud-logs
+            model:
+              expr: 'count_over_time({service_name="fsxn-ems"} | json | event_name="arw.volume.state" [5m])'
+              queryType: range
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0
+              refId: C
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "ONTAP Anti-Ransomware Protection detected a volume state change"
+          description: "The arw.volume.state EMS event indicates potential ransomware activity on an FSx for ONTAP volume. Investigate immediately."
+          runbook_url: "https://docs.netapp.com/us-en/ontap/anti-ransomware/respond-abnormal-task.html"
+        labels:
+          severity: critical
+          team: storage
+          source: fsxn-ems
+
+      # --- Quota Warning Alert ---
+      # Fires when a WAFL quota soft limit is exceeded, indicating a user
+      # or qtree is approaching their storage allocation.
+      - uid: fsxn-quota-warning
+        title: "FSxN: Storage Quota Soft Limit Exceeded"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafanacloud-logs
+            model:
+              expr: 'count_over_time({service_name="fsxn-ems"} | json | event_name="wafl.quota.softlimit.exceeded" [5m])'
+              queryType: range
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0
+              refId: C
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "WAFL quota soft limit exceeded on FSx for ONTAP"
+          description: "A user or qtree has exceeded their storage quota soft limit. Review quota usage and consider increasing limits or notifying the user."
+        labels:
+          severity: warning
+          team: storage
+          source: fsxn-ems
+
+      # --- Failed Access Spike Alert ---
+      # Fires when more than 10 failed access attempts occur within 5 minutes,
+      # indicating potential unauthorized access or misconfiguration.
+      - uid: fsxn-failed-access-spike
+        title: "FSxN: Failed Access Spike (>10 in 5min)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafanacloud-logs
+            model:
+              expr: 'count_over_time({service_name="fsxn-audit"} | json | Result="Failure" [5m])'
+              queryType: range
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 10
+              refId: C
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "High rate of failed access attempts on FSx for ONTAP"
+          description: "More than 10 failed access attempts detected in the last 5 minutes. This may indicate brute-force attempts, permission misconfiguration, or unauthorized access."
+        labels:
+          severity: warning
+          team: security
+          source: fsxn-audit
