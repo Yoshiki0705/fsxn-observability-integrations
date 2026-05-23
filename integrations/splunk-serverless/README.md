@@ -147,5 +147,7 @@ index=fsxn_audit sourcetype=fsxn:ontap:audit user="admin@corp.local"
 
 ## Related Documents
 
+- [Migration from EC2 (English)](docs/en/migration-from-ec2.md) — Step-by-step guide to replace EC2 UF
+- [EC2 からの移行ガイド (日本語)](docs/ja/migration-from-ec2.md)
 - [Vendor Comparison](../../docs/en/vendor-comparison.md)
 - [PoC Success Criteria](../../docs/en/poc-success-criteria.md)
