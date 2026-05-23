@@ -1,7 +1,15 @@
 """Pytest fixtures for New Relic integration tests."""
 
 import json
+import os
+
 import pytest
+
+# Set environment variables BEFORE handler import (module-level os.environ[] access)
+os.environ.setdefault("NEW_RELIC_REGION", "US")
+os.environ.setdefault("API_KEY_SECRET_ARN", "arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:nr-key")
+os.environ.setdefault("S3_ACCESS_POINT_ARN", "arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit")
+os.environ.setdefault("LOG_LEVEL", "DEBUG")
 
 
 @pytest.fixture(autouse=True)
