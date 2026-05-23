@@ -15,6 +15,22 @@ FSx ONTAP → S3 Access Point → EventBridge → Lambda → Grafana Cloud OTLP 
 
 **PoC time estimate**: ~30 minutes from deploy to first queryable log in Grafana Cloud.
 
+## Direct OTLP vs OTel Collector — Decision Guide
+
+| Criteria | Direct (this integration) | Via OTel Collector |
+|----------|--------------------------|-------------------|
+| **Simplicity** | ✅ Fewer moving parts | ❌ Collector infra required |
+| **Single backend (Grafana only)** | ✅ Recommended | Overkill |
+| **Multi-backend (Grafana + others)** | ❌ Separate Lambda per vendor | ✅ Single Lambda, fan-out in Collector |
+| **Redaction / PII filtering** | ❌ Must implement in Lambda | ✅ Collector processors handle it |
+| **Routing rules** | ❌ Not supported | ✅ Route by severity, SVM, etc. |
+| **Cost (Grafana only)** | ✅ Lower (no Collector) | Higher (+$9-36/month for Fargate) |
+
+**Recommendation**:
+- Grafana Cloud as your **only** backend → Use this integration (Direct OTLP)
+- Grafana Cloud + other backends → Use [OTel Collector integration](../otel-collector/)
+- Need redaction or routing → Use [OTel Collector integration](../otel-collector/)
+
 ## ONTAP-Side Prerequisites
 
 Before deploying this integration, ensure:
@@ -86,3 +102,33 @@ Each log stream is labeled with:
 {job="fsxn-audit", svm="svm-prod-01"} | json | Result="Failure"
 {job="fsxn-audit"} | json | line_format "{{.UserName}} {{.Operation}} {{.ObjectName}}"
 ```
+
+## Monitoring
+
+- **CloudWatch Alarm**: Lambda errors > 5 in 10 minutes
+- **Dead Letter Queue**: Failed events preserved for 14 days (KMS encrypted)
+- **Grafana Cloud**: Monitor ingestion rate via Cloud Portal usage dashboard
+
+## Limits & Known Issues
+
+- Use `otlp_http` exporter (NOT `loki` exporter) for OTLP Gateway
+- Basic Auth value must be `base64(instanceId:apiToken)` — NOT plain text
+- Grafana Cloud Free Tier: 50 GB/month logs, 14-day retention
+- No Firehose support — Lambda direct delivery only
+
+## Cost Estimate
+
+| Monthly Log Volume | Grafana Cloud Cost | Notes |
+|-------------------|-------------------|-------|
+| 1 GB | $0 | Free tier (50 GB/month) |
+| 10 GB | $0 | Free tier |
+| 50 GB | $0 | At free tier limit |
+| 100 GB | ~$25 | $0.50/GB beyond 50 GB free |
+
+> Grafana Cloud Free Tier includes 50 GB/month of log ingestion with 14-day retention. Pro tier extends retention to 30 days.
+
+## Related Documents
+
+- [OTel Collector Integration](../otel-collector/) — Multi-backend via Collector (verified with Grafana)
+- [Vendor Comparison](../../docs/en/vendor-comparison.md)
+- [PoC Success Criteria](../../docs/en/poc-success-criteria.md)
