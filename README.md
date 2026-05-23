@@ -255,6 +255,11 @@ aws cloudformation delete-stack \
 - [Security Review Checklist (English)](docs/en/security-review-checklist.md)
 - [PoC 成功基準 (日本語)](docs/ja/poc-success-criteria.md)
 - [PoC Success Criteria (English)](docs/en/poc-success-criteria.md)
+- [Partner Solution Brief (English)](docs/en/partner-solution-brief.md)
+- [PoC Proposal Template (English)](docs/en/poc-proposal-template.md)
+- [Workshop Agenda (English)](docs/en/workshop-agenda.md)
+- [Data Residency Matrix (English)](docs/en/data-residency.md)
+- [Security Best Practices (English)](docs/en/security-best-practices.md)
 
 ## Tech Stack / 技術スタック
 
