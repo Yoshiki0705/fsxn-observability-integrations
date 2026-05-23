@@ -115,6 +115,7 @@ Each log stream is labeled with:
 - Basic Auth value must be `base64(instanceId:apiToken)` — NOT plain text
 - Grafana Cloud Free Tier: 50 GB/month logs, 14-day retention
 - No Firehose support — Lambda direct delivery only
+- **Data residency**: Grafana Cloud stacks are region-specific (US, EU, AP). Select the stack region matching your data residency requirements. Evaluate cross-border data transfer with your compliance team.
 
 ## Cost Estimate
 

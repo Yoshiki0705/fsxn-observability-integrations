@@ -138,6 +138,7 @@ index=fsxn_audit sourcetype=fsxn:ontap:audit user="admin@corp.local"
 - `VerifySSL=false` disables TLS verification (⚠️ do NOT use in production)
 - Splunk Cloud HEC endpoints require allowlisting of Lambda's outbound IP (NAT Gateway EIP)
 - For sustained >1000 events/sec, use the Firehose path (`template-firehose.yaml`)
+- **Data residency**: For Splunk Cloud, data is stored in the region of your Splunk Cloud deployment. For self-managed Splunk, data stays in your infrastructure. Evaluate cross-border data transfer requirements with your compliance team.
 
 ## Cost Estimate
 
