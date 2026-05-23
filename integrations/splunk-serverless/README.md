@@ -10,6 +10,8 @@ Serverless alternative to the [EC2-based Splunk integration](https://aws.amazon.
 
 This integration ships FSx ONTAP audit logs directly to Splunk via HTTP Event Collector (HEC), eliminating the need for EC2 instances.
 
+**PoC time estimate**: ~30 minutes from deploy to first queryable event in Splunk (assumes HEC is already configured).
+
 ## Architecture Comparison
 
 ```
@@ -98,3 +100,52 @@ aws secretsmanager create-secret \
 - Lambda must be able to reach the Splunk HEC endpoint
 - If Splunk is in a private VPC, deploy Lambda in the same VPC with NAT Gateway
 - For Splunk Cloud, ensure the HEC endpoint is publicly accessible or use AWS PrivateLink
+
+## Query Examples (SPL)
+
+```spl
+# Find all failed access attempts
+index=fsxn_audit sourcetype=fsxn:ontap:audit result=Failure
+| stats count by user, path
+
+# Top operations by volume
+index=fsxn_audit sourcetype=fsxn:ontap:audit
+| stats count by operation
+| sort -count
+
+# Access timeline
+index=fsxn_audit sourcetype=fsxn:ontap:audit
+| timechart span=5m count by operation
+
+# Specific user investigation
+index=fsxn_audit sourcetype=fsxn:ontap:audit user="admin@corp.local"
+| table _time, operation, path, result, client_ip
+```
+
+## Monitoring
+
+- **CloudWatch Alarm**: Lambda errors > 5 in 10 minutes
+- **Dead Letter Queue**: Failed events preserved for 14 days (KMS encrypted)
+- **Splunk**: Monitor HEC token health via `_internal` index
+
+## Limits & Known Issues
+
+- No hard batch size limit for HEC, but recommended < 1MB per event
+- `VerifySSL=false` disables TLS verification (⚠️ do NOT use in production)
+- Splunk Cloud HEC endpoints require allowlisting of Lambda's outbound IP (NAT Gateway EIP)
+- For sustained >1000 events/sec, use the Firehose path (`template-firehose.yaml`)
+
+## Cost Estimate
+
+| Monthly Log Volume | AWS Lambda Cost | Splunk License Impact |
+|-------------------|----------------|----------------------|
+| 1 GB | ~$0.50 | Minimal (within most license allocations) |
+| 10 GB | ~$5 | Check daily indexing volume limit |
+| 100 GB | ~$50 | Significant — consider Firehose path |
+
+> Splunk pricing is license-based (daily indexing volume). This integration does not change your Splunk license cost — it only changes the delivery mechanism from EC2 to Lambda.
+
+## Related Documents
+
+- [Vendor Comparison](../../docs/en/vendor-comparison.md)
+- [PoC Success Criteria](../../docs/en/poc-success-criteria.md)

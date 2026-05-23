@@ -7,8 +7,13 @@
 ## Architecture
 
 ```
-FSx ONTAP → S3 Access Point → EventBridge → Lambda → Grafana Loki Push API
+FSx ONTAP → S3 Access Point → EventBridge → Lambda → Grafana Cloud OTLP Gateway
+                                                      (fallback: Loki Push API)
 ```
+
+> **Note**: The recommended path is via the OTLP Gateway (`https://otlp-gateway-prod-<region>.grafana.net/otlp`), NOT the Loki Push API directly. The `otlp_http` exporter is verified working; the `loki` exporter is a legacy fallback only.
+
+**PoC time estimate**: ~30 minutes from deploy to first queryable log in Grafana Cloud.
 
 ## ONTAP-Side Prerequisites
 

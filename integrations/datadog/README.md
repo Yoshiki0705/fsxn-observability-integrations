@@ -8,6 +8,8 @@
 
 EC2-free integration that ships Amazon FSx for NetApp ONTAP audit logs to Datadog. Lambda reads audit log files from the FSx volume via an FSx for ONTAP S3 Access Point and ships them to the Datadog Logs API v2.
 
+**PoC time estimate**: ~30 minutes from deploy to first queryable log in Datadog.
+
 ## Architecture
 
 ```
