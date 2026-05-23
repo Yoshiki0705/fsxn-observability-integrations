@@ -6,17 +6,15 @@
 #
 # Usage:
 #   bash integrations/new-relic/scripts/cleanup.sh
-#   bash integrations/new-relic/scripts/cleanup.sh --delete-secret --delete-layer
 #   bash integrations/new-relic/scripts/cleanup.sh --all
+#   bash integrations/new-relic/scripts/cleanup.sh --all -y
 
 set -euo pipefail
 
-# New Relic-specific configuration
-export STACK_PREFIX="${STACK_PREFIX:-fsxn-newrelic}"
-export SECRET_NAME="${SECRET_NAME:-newrelic/fsxn-license-key}"
+export STACK_PREFIX="${STACK_PREFIX:-fsxn-new-relic}"
+export SECRET_NAME="${SECRET_NAME:-new-relic/fsxn-license-key}"
 export VENDOR_NAME="New Relic"
 
-# Resolve shared script path
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SHARED_SCRIPT="${SCRIPT_DIR}/../../../shared/scripts/cleanup-vendor.sh"
 
