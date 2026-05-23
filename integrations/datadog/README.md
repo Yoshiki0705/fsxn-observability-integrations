@@ -10,6 +10,8 @@ EC2-free integration that ships Amazon FSx for NetApp ONTAP audit logs to Datado
 
 **PoC time estimate**: ~30 minutes from deploy to first queryable log in Datadog.
 
+> ⚠️ Datadog has no free tier for log ingestion. PoC will incur costs (~$0.10/GB ingested). Consider using the [OTel Collector integration](../otel-collector/) with a free-tier backend (Grafana/Honeycomb) for initial validation if budget is a concern.
+
 ## Architecture
 
 ```

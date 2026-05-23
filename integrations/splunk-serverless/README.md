@@ -12,6 +12,10 @@ This integration ships FSx ONTAP audit logs directly to Splunk via HTTP Event Co
 
 **PoC time estimate**: ~30 minutes from deploy to first queryable event in Splunk (assumes HEC is already configured).
 
+## Prerequisites
+
+See [Prerequisites Guide](../../docs/en/prerequisites.md) for ONTAP audit logging setup and S3 Access Point configuration.
+
 ## Architecture Comparison
 
 ```

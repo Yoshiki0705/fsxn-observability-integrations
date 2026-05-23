@@ -16,6 +16,18 @@ Ships Amazon FSx for NetApp ONTAP audit logs to Dynatrace via the Log Ingest API
 FSx ONTAP → S3 Access Point → EventBridge → Lambda → Dynatrace Log Ingest API v2
 ```
 
+## Prerequisites
+
+See [Prerequisites Guide](../../docs/en/prerequisites.md) for ONTAP audit logging setup and S3 Access Point configuration.
+
+## Event Source Templates
+
+| Event Source | Template | Description |
+|-------------|----------|-------------|
+| Audit Logs (S3 AP polling) | `template.yaml` | Primary audit log shipper |
+| EMS Webhooks | `template-ems.yaml` | ONTAP EMS events via API Gateway |
+| FPolicy (file operations) | `template-fpolicy.yaml` | Real-time file operation events |
+
 ## Quick Deploy
 
 ```bash

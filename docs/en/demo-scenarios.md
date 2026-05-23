@@ -92,18 +92,21 @@ Ship same audit logs to Grafana Cloud and Honeycomb simultaneously via OTel Coll
 
 1. **Setup**: OTel Collector integration deployed + Collector configured
    ```yaml
-   # otel-collector-config.yaml
+   # otel-collector-config.yaml (verified working)
    exporters:
-     loki:
-       endpoint: https://logs-prod.grafana.net/loki/api/v1/push
+     otlp_http/grafana:
+       endpoint: https://otlp-gateway-prod-ap-southeast-0.grafana.net/otlp
+       headers:
+         Authorization: Basic ${GRAFANA_BASIC_AUTH}
      otlp_http/honeycomb:
        endpoint: https://api.honeycomb.io
        headers:
          x-honeycomb-team: ${HONEYCOMB_KEY}
+         x-honeycomb-dataset: fsxn-audit
    service:
      pipelines:
        logs:
-         exporters: [loki, otlp_http/honeycomb]
+         exporters: [otlp_http/grafana, otlp_http/honeycomb]
    ```
 2. **Action**: Perform file operations on FSx ONTAP
 3. **Verify**:
