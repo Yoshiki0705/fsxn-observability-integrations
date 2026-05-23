@@ -4,6 +4,8 @@
 
 FSx for ONTAP audit log shipping via OTLP/HTTP to an OpenTelemetry Collector, enabling vendor-neutral multi-backend delivery.
 
+**PoC time estimate**: ~5 minutes for local validation (Docker); ~45 minutes for full AWS deployment with backend verification.
+
 > **✅ All Backends Verified Working** (2026-05-18)
 >
 > | Backend | Status | Config File |
@@ -136,6 +138,48 @@ bash scripts/generate-otlp-payload.sh --output /tmp/payload.json
 ```
 
 ## Deployment
+
+### Production Deployment Options
+
+| Option | Pros | Cons | Recommended For |
+|--------|------|------|----------------|
+| **ECS Fargate** | Serverless, auto-scaling, no patching | Higher per-hour cost than EC2 | Most production workloads |
+| **ECS on EC2** | Lower cost at scale, GPU support | Instance management required | High-volume (>100 GB/month) |
+| **EKS Sidecar** | Kubernetes-native, shared infra | K8s complexity | Teams already on EKS |
+| **EC2 (standalone)** | Full control, lowest cost | Patching, scaling manual | Budget-constrained, stable load |
+
+### ECS Fargate (Recommended)
+
+```bash
+# Deploy OTel Collector on ECS Fargate
+aws cloudformation deploy \
+  --template-file template.yaml \
+  --stack-name fsxn-otel-integration \
+  --parameter-overrides \
+    S3AccessPointArn=<ARN> \
+    OtlpEndpoint=http://<collector-task-ip>:4318 \
+    ApiKeySecretArn=<ARN> \
+  --capabilities CAPABILITY_IAM \
+  --region ap-northeast-1
+```
+
+Collector resource sizing:
+
+| Log Volume | vCPU | Memory | Estimated Cost |
+|-----------|------|--------|---------------|
+| 1-10 GB/month | 0.25 | 512 MB | ~$9/month |
+| 10-50 GB/month | 0.5 | 1 GB | ~$18/month |
+| 50-200 GB/month | 1.0 | 2 GB | ~$36/month |
+
+### Lambda → Collector Network Path
+
+```
+Lambda (VPC or non-VPC) → NLB/ALB → ECS Fargate Task (port 4318)
+```
+
+- Use an internal NLB for VPC-internal traffic
+- Collector health check: `GET /` on port 13133
+- Enable persistent queue in Collector config for reliability
 
 ```bash
 aws cloudformation deploy \
