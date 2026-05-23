@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import time
-from typing import Any
+from typing import Any, Optional
 
 import boto3
 import urllib3
@@ -39,7 +39,7 @@ secrets_client = boto3.client("secretsmanager")
 s3_client = boto3.client("s3")
 http = urllib3.PoolManager(num_pools=4, maxsize=10)
 
-_api_key_cache: str | None = None
+_api_key_cache: Optional[str] = None
 
 
 def get_api_key() -> str:
