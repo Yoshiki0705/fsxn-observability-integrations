@@ -6,6 +6,10 @@ FSx for ONTAP audit log shipping via OTLP/HTTP to an OpenTelemetry Collector, en
 
 **PoC time estimate**: ~5 minutes for local validation (Docker); ~45 minutes for full AWS deployment with backend verification.
 
+## Prerequisites
+
+See [Prerequisites Guide](../../docs/en/prerequisites.md) for ONTAP audit logging setup and S3 Access Point configuration.
+
 > **✅ All Backends Verified Working** (2026-05-18)
 >
 > | Backend | Status | Config File |
