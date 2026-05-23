@@ -1,5 +1,7 @@
 # Sample Payloads
 
+> ⚠️ **Synthetic Test Data Only**: All payloads in this directory are synthetic (fabricated) test data. They do not contain real user identities, file paths, IP addresses, or any production data. Do NOT replace these with real audit logs — use them only for pipeline validation and testing.
+
 Pre-built sample events for testing FSx for ONTAP observability integrations without real infrastructure.
 
 ## Usage
