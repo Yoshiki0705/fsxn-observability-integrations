@@ -124,6 +124,7 @@ LIMIT 100
 - HTTP 202 response indicates acceptance (not guaranteed delivery)
 - License Key vs User Key: only License Key works for log ingestion
 - Firehose delivery is supported via New Relic's Kinesis integration
+- **Data residency**: Logs are sent to New Relic's US or EU data center based on your region selection. Evaluate cross-border data transfer requirements with your compliance team before production deployment.
 
 ## Cost Estimate
 

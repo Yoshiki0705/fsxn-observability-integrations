@@ -125,6 +125,7 @@ WHERE user = "admin@corp.local" | VISUALIZE COUNT | GROUP BY operation
 - Max 5MB per request
 - Ingest keys only (`hcaik_*`); environment keys (`hcxik_*`) are rejected
 - Honeycomb rejects events with timestamps older than ~4 hours
+- **Data residency**: Honeycomb processes data in US regions. Evaluate cross-border data transfer requirements with your compliance team before production deployment.
 
 ## Cost Estimate
 

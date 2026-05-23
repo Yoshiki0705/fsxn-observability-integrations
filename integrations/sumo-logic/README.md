@@ -124,6 +124,7 @@ Lambda sends the following metadata headers with each request:
 - HTTP Source URL contains embedded auth token — rotate by creating a new source
 - No built-in Firehose support — Lambda direct delivery only
 - Sumo Logic Free Tier: 500 MB/day ingestion limit
+- **Data residency**: Sumo Logic deployments are region-specific (US, EU, AU, JP, etc.). Select the deployment matching your data residency requirements. Evaluate cross-border data transfer with your compliance team.
 
 ## Cost Estimate
 

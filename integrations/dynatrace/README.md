@@ -133,6 +133,7 @@ fetch logs
 - Dynatrace returns HTTP 204 on success (not 200)
 - Log entries older than 24 hours may be rejected depending on environment settings
 - Firehose delivery is supported but requires Dynatrace ActiveGate
+- **Data residency**: Dynatrace SaaS environments are region-specific. For Managed or ActiveGate deployments, data stays in your infrastructure. Evaluate cross-border data transfer requirements with your compliance team.
 
 ## Cost Estimate
 

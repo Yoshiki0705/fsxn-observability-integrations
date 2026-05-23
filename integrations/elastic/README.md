@@ -160,6 +160,7 @@ fsxn.svm: "svm-prod-01" AND event.type: "4663"
 - No built-in Firehose support — Lambda direct delivery only
 - Self-signed certificates: set `VerifySSL=false` (⚠️ not recommended for production)
 - Elastic Cloud free trial: 14 days, then paid
+- **Data residency**: For Elastic Cloud, select a deployment region that meets your data residency requirements. For self-hosted, data remains in your VPC. Evaluate cross-border data transfer requirements with your compliance team.
 
 ## Cost Estimate
 
