@@ -24,18 +24,17 @@ FPolicy: ONTAP → TCP:9898 → ECS Fargate → SQS → Lambda → Vendor API
 | Vendor | Status | Description |
 |--------|--------|-------------|
 | [Datadog](../../integrations/datadog/) | ✅ E2E verified | Logs API v2 via Lambda |
-| [New Relic](../../integrations/new-relic/) | 🧪 Implementation ready | Log API v1 via Lambda |
-| [Splunk (Serverless)](../../integrations/splunk-serverless/) | 🧪 Implementation ready | HEC via Lambda (replaces EC2 pattern) |
-| [OTel Collector](../../integrations/otel-collector/) | 🧪 Implementation ready | Vendor-neutral OTLP/HTTP |
-| [Grafana Cloud](../../integrations/grafana/) | 🧪 Implementation ready | Loki Push API via Lambda |
-| [Elastic](../../integrations/elastic/) | 🧪 Implementation ready | Elasticsearch Bulk API |
-| [Dynatrace](../../integrations/dynatrace/) | 🧪 Implementation ready | Log Ingest API v2 |
-| [Sumo Logic](../../integrations/sumo-logic/) | 🧪 Implementation ready | HTTP Source |
-| [Honeycomb](../../integrations/honeycomb/) | 🧪 Implementation ready | Events Batch API |
+| [New Relic](../../integrations/new-relic/) | ✅ E2E verified | Log API v1 via Lambda |
+| [Splunk (Serverless)](../../integrations/splunk-serverless/) | ✅ E2E verified | HEC via Lambda (replaces EC2 pattern) |
+| [OTel Collector](../../integrations/otel-collector/) | ✅ E2E verified | Vendor-neutral OTLP/HTTP (Datadog + Grafana + Honeycomb) |
+| [Grafana Cloud](../../integrations/grafana/) | ✅ E2E verified | OTLP Gateway via Lambda (Loki Push API fallback) |
+| [Elastic](../../integrations/elastic/) | ✅ E2E verified | Elasticsearch Bulk API |
+| [Dynatrace](../../integrations/dynatrace/) | ✅ E2E verified | Log Ingest API v2 |
+| [Sumo Logic](../../integrations/sumo-logic/) | ✅ E2E verified | HTTP Source |
+| [Honeycomb](../../integrations/honeycomb/) | ✅ E2E verified | Events Batch API |
 
 Status:
 - ✅ **E2E verified** — Deployed and validated with real FSx for ONTAP audit logs
-- 🧪 **Implementation ready** — Code and CloudFormation available; E2E validation pending
 
 ## Background
 
@@ -139,19 +138,51 @@ aws cloudformation delete-stack \
 
 ## Documentation
 
+### Getting Started
 - [Prerequisites & Deployment Guide](prerequisites.md)
-- [S3 AP Specification & Troubleshooting](s3ap-fsxn-specification.md)
+- [Minimum Test Path](quick-start-minimum.md)
+- [ONTAP Audit Setup Guide](ontap-audit-setup.md)
+
+### Architecture & Design
 - [Architecture](architecture.md)
 - [Event Sources Guide](event-sources.md)
-- [Vendor Comparison](vendor-comparison.md)
-- [Demo Scenarios](demo-scenarios.md)
-- [Operational Guide](operational-guide.md)
-- [ONTAP Audit Setup Guide](ontap-audit-setup.md)
-- [Minimum Test Path](quick-start-minimum.md)
-- [Detection Use Cases](detection-use-cases.md)
+- [S3 AP Specification & Troubleshooting](s3ap-fsxn-specification.md)
 - [Normalized Event Schema](normalized-event-schema.md)
 - [Delivery Guarantee Patterns](delivery-guarantees.md)
+
+### Operations & Production
+- [Pipeline SLO Definitions](pipeline-slo.md)
+- [Operational Guide](operational-guide.md)
+- [DLQ Replay Runbook](runbooks/dlq-replay.md)
+- [Lambda Errors Runbook](runbooks/lambda-errors.md)
+- [Checkpoint Staleness Runbook](runbooks/checkpoint-stale.md)
+- [S3 AP Throughput Benchmark](s3ap-throughput-benchmark.md)
+- [Cost Validation Template](cost-validation.md)
+
+### Security & Compliance
+- [Data Classification Guide](data-classification.md)
+- [Retention Policy Matrix](retention-policy-matrix.md)
+- [Compliance Evidence Pack](compliance-evidence-pack.md)
+- [Security Review Checklist](security-review-checklist.md)
 - [Webhook Security Guide](webhook-security.md)
+- [Data Residency Matrix](data-residency.md)
+- [Governance & Compliance](governance-and-compliance.md)
+
+### Enterprise & Scale
+- [Multi-Account Deployment (StackSets)](multi-account-deployment.md)
+- [Cross-Region Replication (DR)](cross-region-replication.md)
+- [OTel Collector PII Redaction Cookbook](../../integrations/otel-collector/docs/en/pii-redaction-cookbook.md)
+
+### Partner & Workshop
+- [Vendor Comparison](vendor-comparison.md)
+- [Partner FAQ](partner-faq.md)
+- [Partner Solution Brief](partner-solution-brief.md)
+- [PoC Proposal Template](poc-proposal-template.md)
+- [PoC Success Criteria](poc-success-criteria.md)
+- [Workshop Hands-On Guide (Half Day)](workshop-hands-on-half-day.md)
+- [Workshop Agenda](workshop-agenda.md)
+- [Demo Scenarios](demo-scenarios.md)
+- [Detection Use Cases](detection-use-cases.md)
 
 ## Tech Stack
 

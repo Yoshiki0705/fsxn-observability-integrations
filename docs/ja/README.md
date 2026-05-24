@@ -24,18 +24,17 @@ FPolicy: ONTAP → TCP:9898 → ECS Fargate → SQS → Lambda → ベンダー 
 | ベンダー | ステータス | 説明 |
 |--------|--------|-------------|
 | [Datadog](../../integrations/datadog/) | ✅ E2E 検証済み | Logs API v2 via Lambda |
-| [New Relic](../../integrations/new-relic/) | 🧪 実装済み | Log API v1 via Lambda |
-| [Splunk (Serverless)](../../integrations/splunk-serverless/) | 🧪 実装済み | HEC via Lambda (EC2 パターン置き換え) |
-| [OTel Collector](../../integrations/otel-collector/) | 🧪 実装済み | ベンダーニュートラル OTLP/HTTP |
-| [Grafana Cloud](../../integrations/grafana/) | 🧪 実装済み | Loki Push API via Lambda |
-| [Elastic](../../integrations/elastic/) | 🧪 実装済み | Elasticsearch Bulk API |
-| [Dynatrace](../../integrations/dynatrace/) | 🧪 実装済み | Log Ingest API v2 |
-| [Sumo Logic](../../integrations/sumo-logic/) | 🧪 実装済み | HTTP Source |
-| [Honeycomb](../../integrations/honeycomb/) | 🧪 実装済み | Events Batch API |
+| [New Relic](../../integrations/new-relic/) | ✅ E2E 検証済み | Log API v1 via Lambda |
+| [Splunk (Serverless)](../../integrations/splunk-serverless/) | ✅ E2E 検証済み | HEC via Lambda (EC2 パターン置き換え) |
+| [OTel Collector](../../integrations/otel-collector/) | ✅ E2E 検証済み | ベンダーニュートラル OTLP/HTTP (Datadog + Grafana + Honeycomb) |
+| [Grafana Cloud](../../integrations/grafana/) | ✅ E2E 検証済み | OTLP Gateway via Lambda (Loki Push API フォールバック) |
+| [Elastic](../../integrations/elastic/) | ✅ E2E 検証済み | Elasticsearch Bulk API |
+| [Dynatrace](../../integrations/dynatrace/) | ✅ E2E 検証済み | Log Ingest API v2 |
+| [Sumo Logic](../../integrations/sumo-logic/) | ✅ E2E 検証済み | HTTP Source |
+| [Honeycomb](../../integrations/honeycomb/) | ✅ E2E 検証済み | Events Batch API |
 
 ステータス:
 - ✅ **E2E 検証済み** — 実際の FSx for ONTAP 監査ログでデプロイ・検証完了
-- 🧪 **実装済み** — コードと CloudFormation あり。E2E 検証は未実施
 
 ## 背景
 
@@ -87,19 +86,51 @@ aws cloudformation deploy \
 
 ## ドキュメント
 
+### はじめに
 - [前提条件・デプロイガイド](prerequisites.md)
-- [S3 AP 仕様・制約・トラブルシューティング](s3ap-fsxn-specification.md)
+- [最小テストパス](quick-start-minimum.md)
+- [ONTAP 監査設定ガイド](ontap-audit-setup.md)
+
+### アーキテクチャ・設計
 - [アーキテクチャ](architecture.md)
 - [イベントソースガイド](event-sources.md)
-- [ベンダー比較](vendor-comparison.md)
-- [デモシナリオ](demo-scenarios.md)
-- [運用ガイド](operational-guide.md)
-- [ONTAP 監査設定ガイド](ontap-audit-setup.md)
-- [最小テストパス](quick-start-minimum.md)
-- [検知ユースケース](detection-use-cases.md)
+- [S3 AP 仕様・制約・トラブルシューティング](s3ap-fsxn-specification.md)
 - [正規化イベントスキーマ](normalized-event-schema.md)
 - [配信保証パターン](delivery-guarantees.md)
+
+### 運用・本番
+- [パイプライン SLO 定義](../en/pipeline-slo.md)
+- [運用ガイド](operational-guide.md)
+- [DLQ リプレイ Runbook](../en/runbooks/dlq-replay.md)
+- [Lambda エラー Runbook](../en/runbooks/lambda-errors.md)
+- [チェックポイント停滞 Runbook](../en/runbooks/checkpoint-stale.md)
+- [S3 AP スループットベンチマーク](../en/s3ap-throughput-benchmark.md)
+- [コスト検証テンプレート](../en/cost-validation.md)
+
+### セキュリティ・コンプライアンス
+- [データ分類ガイド](../en/data-classification.md)
+- [保持期間要件マトリクス](../en/retention-policy-matrix.md)
+- [コンプライアンスエビデンスパック](../en/compliance-evidence-pack.md)
+- [セキュリティレビューチェックリスト](../en/security-review-checklist.md)
 - [Webhook セキュリティガイド](../en/webhook-security.md)
+- [データレジデンシーマトリクス](../en/data-residency.md)
+- [ガバナンス・コンプライアンス](governance-and-compliance.md)
+
+### エンタープライズ・スケール
+- [マルチアカウントデプロイ (StackSets)](../en/multi-account-deployment.md)
+- [クロスリージョンレプリケーション (DR)](../en/cross-region-replication.md)
+- [OTel Collector PII リダクション Cookbook](../../integrations/otel-collector/docs/en/pii-redaction-cookbook.md)
+
+### パートナー・ワークショップ
+- [ベンダー比較](vendor-comparison.md)
+- [パートナー FAQ](../en/partner-faq.md)
+- [Partner Solution Brief](../en/partner-solution-brief.md)
+- [PoC 提案テンプレート](../en/poc-proposal-template.md)
+- [PoC 成功基準](../en/poc-success-criteria.md)
+- [Workshop ハンズオンガイド（半日版）](../en/workshop-hands-on-half-day.md)
+- [Workshop アジェンダ](../en/workshop-agenda.md)
+- [デモシナリオ](demo-scenarios.md)
+- [検知ユースケース](detection-use-cases.md)
 
 ## 技術スタック
 
