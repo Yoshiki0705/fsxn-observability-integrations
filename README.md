@@ -268,6 +268,9 @@ aws cloudformation delete-stack \
 - [PoC Proposal Template (English)](docs/en/poc-proposal-template.md)
 - [Workshop Agenda (English)](docs/en/workshop-agenda.md)
 - [Data Residency Matrix (English)](docs/en/data-residency.md)
+- [Multi-Account Deployment (English)](docs/en/multi-account-deployment.md)
+- [Cross-Region Replication (English)](docs/en/cross-region-replication.md)
+- [Compliance Evidence Pack (English)](docs/en/compliance-evidence-pack.md)
 - [Security Best Practices (English)](docs/en/security-best-practices.md)
 
 ## Tech Stack / 技術スタック
