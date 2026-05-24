@@ -59,14 +59,14 @@ FSx for ONTAP S3 Access Points は **S3 Event Notifications および EventBridg
 | Vendor | Status | Description |
 |--------|--------|-------------|
 | [Datadog](integrations/datadog/) | ✅ E2E verified | Logs API v2 via Lambda |
-| [New Relic](integrations/new-relic/) | 🧪 Implementation ready | Log API v1 via Lambda |
+| [New Relic](integrations/new-relic/) | ✅ E2E verified | Log API v1 via Lambda |
 | [Splunk (Serverless)](integrations/splunk-serverless/) | 🧪 Implementation ready | HEC via Lambda (replaces EC2 pattern) |
 | [OTel Collector](integrations/otel-collector/) | ✅ E2E verified | Vendor-neutral OTLP/HTTP (Datadog + Grafana + Honeycomb) |
 | [Grafana Cloud](integrations/grafana/) | 🧪 Implementation ready | OTLP Gateway via Lambda (Loki Push API fallback) |
 | [Elastic](integrations/elastic/) | 🧪 Implementation ready | Elasticsearch Bulk API |
 | [Dynatrace](integrations/dynatrace/) | 🧪 Implementation ready | Log Ingest API v2 |
 | [Sumo Logic](integrations/sumo-logic/) | 🧪 Implementation ready | HTTP Source |
-| [Honeycomb](integrations/honeycomb/) | 🧪 Implementation ready | Events Batch API |
+| [Honeycomb](integrations/honeycomb/) | ✅ E2E verified | Events Batch API |
 
 Status:
 - ✅ **E2E verified** — Deployed and validated with real FSx for ONTAP audit logs
