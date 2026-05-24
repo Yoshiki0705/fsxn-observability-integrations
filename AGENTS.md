@@ -2,7 +2,9 @@
 
 ## Project Overview
 
-Serverless observability integrations shipping Amazon FSx for NetApp ONTAP audit logs to multiple vendors via S3 Access Points. CloudFormation (YAML) + Python 3.12 Lambda + TypeScript tooling. Multi-vendor pattern library with bilingual (ja/en) documentation.
+Serverless observability integrations shipping Amazon FSx for NetApp ONTAP audit logs to 9 vendors (all E2E verified) via S3 Access Points. CloudFormation (YAML) + Python 3.12 Lambda + TypeScript tooling. Multi-vendor pattern library with fully synchronized bilingual (ja/en) documentation.
+
+**Current state**: Phase 1 (Foundation) and Phase 3 (Enterprise Features) complete. 9 vendors E2E verified. See `ROADMAP.md` for Phase 4 plans.
 
 ## Key Commands
 
@@ -19,16 +21,36 @@ npm run lint
 # Run all TypeScript tests
 npm test
 
+# Run ALL Python tests (9 vendors + shared layers)
+python -m pytest \
+  integrations/datadog/tests/ \
+  integrations/grafana/tests/ \
+  integrations/splunk-serverless/tests/ \
+  integrations/otel-collector/tests/ \
+  integrations/new-relic/tests/ \
+  integrations/elastic/tests/ \
+  integrations/dynatrace/tests/ \
+  integrations/sumo-logic/tests/ \
+  integrations/honeycomb/tests/ \
+  shared/lambda-layers/ems-parser/tests/ \
+  -v --tb=short
+
 # Run Python tests for a specific vendor
-cd integrations/datadog && python -m pytest tests/ -v
+python -m pytest integrations/datadog/tests/ -v
 
 # Validate CloudFormation templates
 pip install cfn-lint
 cfn-lint integrations/*/template.yaml
 cfn-lint shared/templates/*.yaml
 
+# Run cfn-guard critical security rules
+cfn-guard validate -d integrations/*/template*.yaml -r guard/rules/critical-security.guard --show-summary fail
+
+# Check bilingual documentation sync
+bash shared/scripts/check-bilingual-sync.sh
+
 # Deploy a vendor integration
-bash shared/scripts/deploy.sh <vendor> <stack-name> --region ap-northeast-1
+bash integrations/<vendor>/scripts/deploy.sh
 
 # Run full test suite
 bash shared/scripts/test.sh
@@ -52,18 +74,60 @@ bash shared/scripts/fpolicy-update-engine-ip.sh --auto
 ## Project Structure
 
 ```
-integrations/<vendor>/       # Vendor-specific implementations
+integrations/<vendor>/       # Vendor-specific implementations (9 vendors, all E2E verified)
   ├── template.yaml          # CloudFormation (single self-contained stack)
+  ├── template-ems.yaml      # EMS webhook handler stack
+  ├── template-fpolicy.yaml  # FPolicy EventBridge handler stack
   ├── lambda/handler.py      # Python 3.12 Lambda function
+  ├── scripts/               # deploy.sh, cleanup.sh
   ├── docs/{ja,en}/          # Bilingual setup guides
   └── tests/                 # pytest unit tests
 
 shared/
-  ├── lambda-layers/         # Reusable Lambda Layers (log-parser, s3ap-reader)
-  ├── templates/             # Base CloudFormation templates (IAM, VPC, S3 AP)
-  └── scripts/               # deploy.sh, test.sh
+  ├── python/                # Shared Python modules (importable by all vendors)
+  │   ├── auth_cache.py      # Secrets Manager TTL cache + reload-on-401/403
+  │   ├── object_ledger.py   # DynamoDB per-object state tracker (Level 3)
+  │   └── sqs_buffer.py      # SQS producer + consumer with partial batch failures
+  ├── lambda-layers/         # Reusable Lambda Layers (log-parser, ems-parser, s3ap-reader)
+  ├── templates/             # Shared CloudFormation templates
+  │   ├── prerequisites.yaml       # S3 AP + EventBridge Scheduler + checkpoint
+  │   ├── ems-webhook-apigw.yaml   # API Gateway + Lambda Authorizer
+  │   ├── fpolicy-server-fargate.yaml  # ECS Fargate + SQS
+  │   ├── object-ledger.yaml       # DynamoDB table + poison-pill alarm (Level 3)
+  │   ├── sqs-buffering.yaml       # SQS buffer queue + DLQ + alarms (Level 3)
+  │   ├── secrets-rotation-sample.yaml  # Auto-rotation Lambda (all vendors)
+  │   └── multi-account-stackset.yaml  # StackSets deployment (Enterprise)
+  ├── fpolicy-server/        # FPolicy TCP server (Go, linux/amd64)
+  └── scripts/               # Operational scripts
+      ├── deploy.sh, test.sh, cleanup-vendor.sh
+      ├── check-bilingual-sync.sh   # ja/en doc sync verification
+      ├── fpolicy-fargate-control.sh
+      ├── fpolicy-update-engine-ip.sh
+      └── pre-push-security-check.sh
 
-.kiro/steering/              # Kiro IDE steering files (do NOT modify without asking)
+guard/rules/                 # cfn-guard policy rules
+  ├── critical-security.guard    # BLOCKING in CI (wildcard IAM, secrets in env, DLQ encryption)
+  ├── lambda-security.guard      # Advisory (timeout, memory, DLQ)
+  └── secrets-management.guard   # Advisory (descriptions, no hardcoded values)
+
+docs/
+  ├── en/                    # English documentation (50 files)
+  │   ├── runbooks/          # DLQ replay, Lambda errors, checkpoint staleness
+  │   ├── pipeline-slo.md    # SLO definitions + Go/No-Go criteria
+  │   ├── data-classification.md  # PII field mapping + handling patterns
+  │   ├── compliance-evidence-pack.md  # ISMAP/FISC/SOC2 evidence template
+  │   ├── multi-account-deployment.md  # StackSets guide
+  │   ├── cross-region-replication.md  # DR patterns (Active-Passive/Active-Active/S3 CRR)
+  │   └── ...
+  ├── ja/                    # Japanese documentation (56 files, fully synced)
+  └── images/                # Shared images
+
+.github/
+  ├── workflows/ci.yaml      # Full CI: all vendors pytest + coverage + cfn-lint + cfn-guard + bilingual sync
+  └── ISSUE_TEMPLATE/        # Bug report + feature request templates
+
+ROADMAP.md                   # Phase 1-4 milestones
+CONTRIBUTING.md              # Contribution guidelines
 ```
 
 ## Code Style
@@ -194,6 +258,10 @@ API keys are fetched from Secrets Manager once per Lambda execution context (col
 
 Japanese (`docs/ja/`) is the primary language. English (`docs/en/`) must mirror the same heading structure and content. When modifying docs, always update both languages. Code examples are identical across languages.
 
+Run `bash shared/scripts/check-bilingual-sync.sh` to verify sync status. This is also checked in CI (non-blocking).
+
+Current state: 50 English files, 56 Japanese files (fully synced + 6 verification-results files in ja/ only).
+
 ## Vendor API Reference (Quick Lookup)
 
 | Vendor | Endpoint | Auth Header | Max Batch | Firehose | Notes |
@@ -231,7 +299,61 @@ For high-volume logs (>1000 events/second sustained), prefer the Firehose path o
 - Use `conftest.py` for shared fixtures (env vars, sample events)
 - Sample event data lives in `tests/test_data/`
 - Tests must be deterministic — no real API calls, no network dependencies
-- Run `python -m pytest tests/ -v` before marking any task complete
+- CI runs ALL 9 vendors + shared layers (not just Datadog)
+- Coverage report generated as CI artifact (`coverage-html/`)
+- Run `python -m pytest integrations/<vendor>/tests/ -v` before marking any task complete
+
+## Production Readiness Levels
+
+The project defines 4 levels. When implementing features, know which level you're targeting:
+
+| Level | Components | Key Files |
+|-------|-----------|-----------|
+| **Level 1**: Quickstart | Audit poller + SSM checkpoint + DLQ | `template.yaml` |
+| **Level 2**: Operational PoC | + Dashboard + alerts + SLO monitoring | `docs/en/pipeline-slo.md` |
+| **Level 3**: Production | + DynamoDB ledger + SQS buffer + poison-pill | `shared/python/object_ledger.py`, `shared/templates/sqs-buffering.yaml` |
+| **Level 4**: Enterprise | + OTel Collector + PII redaction + multi-account + DR | `shared/templates/multi-account-stackset.yaml`, `docs/en/cross-region-replication.md` |
+
+Go/No-Go criteria between levels: `docs/en/pipeline-slo.md`
+
+## Shared Python Modules
+
+These modules in `shared/python/` are designed to be imported by any vendor Lambda:
+
+### `auth_cache.py` — Credential caching with reload-on-401
+```python
+from auth_cache import SecretBackedAuth, send_with_auth_retry
+auth = SecretBackedAuth(secret_arn=os.environ["API_KEY_SECRET_ARN"])
+creds = auth.get()  # Cached; force_refresh=True after 401/403
+```
+
+### `object_ledger.py` — DynamoDB per-object state (Level 3)
+```python
+from object_ledger import ObjectLedger
+ledger = ObjectLedger(table_name=os.environ["LEDGER_TABLE_NAME"])
+if ledger.should_process(key, etag):
+    process(key)
+    ledger.mark_success(key, etag)
+# Auto-promotes to poison_pill after 3 failures
+```
+
+### `sqs_buffer.py` — SQS buffering with partial batch failures (Level 3)
+```python
+from sqs_buffer import SQSProducer, process_sqs_batch
+# Producer (poller Lambda): send file keys to queue
+producer = SQSProducer(queue_url=os.environ["BUFFER_QUEUE_URL"])
+producer.send(key=key, etag=etag)
+# Consumer (shipper Lambda): process with ReportBatchItemFailures
+def lambda_handler(event, context):
+    return process_sqs_batch(event, ship_single_file)
+```
+
+## Operational Runbooks
+
+When alarms fire, reference these runbooks:
+- `docs/en/runbooks/dlq-replay.md` — DLQ has messages (delivery failure)
+- `docs/en/runbooks/lambda-errors.md` — Lambda error rate spike
+- `docs/en/runbooks/checkpoint-stale.md` — Checkpoint not advancing
 
 ## Boundaries
 
@@ -278,20 +400,27 @@ This is a **public repository**. All committed content is visible to anyone.
 ### Pre-Push Checklist
 
 ```bash
-# 1. Check for real account IDs in tracked files
+# 1. Run ALL vendor tests
+python -m pytest integrations/*/tests/ shared/lambda-layers/ems-parser/tests/ -v --tb=short
+
+# 2. Validate CloudFormation (cfn-lint + cfn-guard critical)
+cfn-lint integrations/*/template.yaml shared/templates/*.yaml
+cfn-guard validate -d integrations/*/template*.yaml -r guard/rules/critical-security.guard --show-summary fail
+
+# 3. Check for real account IDs in tracked files
 git ls-files | xargs grep -l "<your-account-id>" 2>/dev/null && echo "FAIL" || echo "PASS"
 
-# 2. Check .kiro/ is not tracked
+# 4. Check .kiro/ is not tracked
 git ls-files .kiro/ | wc -l  # Should be 0
 
-# 3. Check docs/blog/ is not tracked
+# 5. Check docs/blog/ is not tracked
 git ls-files docs/blog/ | wc -l  # Should be 0
 
-# 4. Mask screenshots before committing
-python3 docs/screenshots/mask_screenshots.py
+# 6. Check bilingual sync
+bash shared/scripts/check-bilingual-sync.sh
 
-# 5. Run tests
-python -m pytest integrations/datadog/tests/ -q
+# 7. Mask screenshots before committing
+python3 docs/screenshots/mask_screenshots.py
 ```
 
 ### .gitignore Protected Paths
@@ -313,19 +442,48 @@ All scripts use environment variables with sensible defaults:
 
 ## Key Files
 
+### Vendor Reference Implementations
+- `integrations/grafana/lambda/handler.py` — Most complete reference (audit + OTLP + Loki fallback)
 - `integrations/datadog/lambda/handler.py` — Reference implementation (audit log path)
 - `integrations/datadog/lambda/fpolicy_handler.py` — FPolicy handler (SQS + EventBridge dual-format)
 - `integrations/datadog/template.yaml` — Reference CloudFormation template (audit log)
 - `integrations/datadog/template-ems-fpolicy.yaml` — EMS + FPolicy Lambda (with SQS event source mapping)
+
+### Shared Modules
+- `shared/python/auth_cache.py` — Credential caching (TTL + reload-on-401/403)
+- `shared/python/object_ledger.py` — DynamoDB per-object processing state (Level 3)
+- `shared/python/sqs_buffer.py` — SQS producer + consumer with partial batch failures (Level 3)
 - `shared/lambda-layers/log-parser/python/fsxn_log_parser/parser.py` — EVTX/XML parser
 - `shared/lambda-layers/s3ap-reader/python/s3ap_reader/reader.py` — S3 AP utility
+- `shared/lambda-layers/ems-parser/` — EMS event parser + tests
+
+### CloudFormation Templates
+- `shared/templates/prerequisites.yaml` — S3 AP + EventBridge Scheduler + checkpoint
 - `shared/templates/iam-base-roles.yaml` — IAM role pattern
 - `shared/templates/fpolicy-server-fargate.yaml` — FPolicy Fargate stack (ECS + SQS)
-- `shared/fpolicy-server/build-and-push.sh` — ECR image build (linux/amd64 required)
+- `shared/templates/object-ledger.yaml` — DynamoDB table + poison-pill alarm (Level 3)
+- `shared/templates/sqs-buffering.yaml` — SQS buffer + DLQ + alarms (Level 3)
+- `shared/templates/secrets-rotation-sample.yaml` — Auto-rotation Lambda (all vendors)
+- `shared/templates/multi-account-stackset.yaml` — StackSets deployment (Enterprise)
+
+### Security & CI
+- `guard/rules/critical-security.guard` — Blocking cfn-guard rules (wildcard IAM, secrets in env, DLQ encryption)
 - `shared/scripts/pre-push-security-check.sh` — Security scan before push
+- `shared/scripts/check-bilingual-sync.sh` — ja/en documentation sync check
+
+### Operations
 - `shared/scripts/fpolicy-fargate-control.sh` — FPolicy Fargate start/stop/status
 - `shared/scripts/fpolicy-update-engine-ip.sh` — ONTAP Engine IP auto-update
+- `shared/fpolicy-server/build-and-push.sh` — ECR image build (linux/amd64 required)
 - `docs/screenshots/mask_screenshots.py` — Screenshot masking (PII removal)
+
+### Documentation (key docs for understanding the project)
+- `docs/en/pipeline-slo.md` — SLO definitions + Go/No-Go criteria
+- `docs/en/data-classification.md` — PII field mapping + handling patterns
+- `docs/en/compliance-evidence-pack.md` — ISMAP/FISC/SOC2 evidence template
+- `docs/en/multi-account-deployment.md` — StackSets guide
+- `docs/en/cross-region-replication.md` — DR patterns
+- `integrations/otel-collector/docs/en/pii-redaction-cookbook.md` — 7 OTel Collector redaction recipes
 
 ## Deploying Prerequisites
 
