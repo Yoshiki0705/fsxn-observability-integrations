@@ -37,11 +37,11 @@ Target: Q4 2026
 
 - [ ] Multi-account deployment pattern (AWS Organizations + StackSets)
 - [ ] Cross-region replication for audit log DR
-- [ ] DynamoDB object ledger (per-object processing state)
-- [ ] SQS buffering pattern (backpressure handling)
-- [ ] Poison-pill auto-skip with alerting
-- [ ] OTel Collector PII redaction cookbook (per-regulation)
-- [ ] Compliance evidence pack template (ISMAP, FISC, SOC2)
+- [x] DynamoDB object ledger (per-object processing state)
+- [x] SQS buffering pattern (backpressure handling)
+- [x] Poison-pill auto-skip with alerting
+- [x] OTel Collector PII redaction cookbook (per-regulation)
+- [x] Compliance evidence pack template (ISMAP, FISC, SOC2)
 - [ ] Cost model validation (estimated vs actual billing comparison)
 
 ## Phase 4: Community & Ecosystem (Planned)
