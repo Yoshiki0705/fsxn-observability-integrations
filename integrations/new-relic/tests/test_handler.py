@@ -19,7 +19,7 @@ class TestFormatForNewRelic:
         assert len(result) == 1
         assert result[0]["attributes"]["source"] == "fsxn-ontap"
         assert result[0]["attributes"]["event_type"] == "4663"
-        assert result[0]["timestamp"] == "2026-01-15T12:00:00Z"
+        assert result[0]["timestamp"] == 1768478400000  # 2026-01-15T12:00:00Z in ms
 
     def test_empty_logs(self):
         assert handler._format_for_new_relic([], "test.json") == []

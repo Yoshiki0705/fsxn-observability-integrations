@@ -162,7 +162,17 @@ def _format_for_new_relic(
         }
         ts = log.get("timestamp", log.get("Timestamp"))
         if ts:
-            entry["timestamp"] = ts
+            # New Relic expects Unix epoch in milliseconds
+            if isinstance(ts, str):
+                try:
+                    from datetime import datetime, timezone
+                    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    entry["timestamp"] = int(dt.timestamp() * 1000)
+                except (ValueError, TypeError):
+                    pass  # Skip invalid timestamps
+            elif isinstance(ts, (int, float)):
+                # If already numeric, assume seconds and convert to ms
+                entry["timestamp"] = int(ts * 1000) if ts < 1e12 else int(ts)
         formatted.append(entry)
     return formatted
 
