@@ -33,7 +33,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install pytest boto3 urllib3 moto
+          pip install pytest pytest-cov boto3 urllib3 moto hypothesis
 
       - name: TypeScript lint
         run: npm run lint
@@ -42,10 +42,36 @@ jobs:
       - name: TypeScript tests
         run: npm test
 
-      - name: Python tests - Datadog
+      - name: Python tests - All vendors
         run: |
-          cd integrations/datadog
-          python -m pytest tests/ -v --tb=short
+          python -m pytest \
+            integrations/datadog/tests/ \
+            integrations/grafana/tests/ \
+            integrations/splunk-serverless/tests/ \
+            integrations/otel-collector/tests/ \
+            integrations/new-relic/tests/ \
+            integrations/elastic/tests/ \
+            integrations/dynatrace/tests/ \
+            integrations/sumo-logic/tests/ \
+            integrations/honeycomb/tests/ \
+            -v --tb=short \
+            --cov=integrations \
+            --cov-report=term-missing \
+            --cov-report=html:coverage-html
+
+      - name: Python tests - Shared Lambda Layers
+        run: |
+          python -m pytest \
+            shared/lambda-layers/ems-parser/tests/ \
+            -v --tb=short
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-html/
+          retention-days: 14
 
       - name: Validate CloudFormation templates
         run: |
@@ -65,18 +91,29 @@ jobs:
           sudo mv cfn-guard /usr/local/bin/
           cfn-guard --version
 
-      - name: Run cfn-guard on integration templates
+      - name: Run cfn-guard critical rules (blocking)
         run: |
-          echo "Running cfn-guard validation..."
+          echo "Running critical cfn-guard rules..."
+          for template in integrations/*/template*.yaml shared/templates/*.yaml; do
+            if [ -f "$template" ]; then
+              echo "Validating: $template"
+              cfn-guard validate -d "$template" -r guard/rules/critical-security.guard --show-summary fail
+            fi
+          done
+
+      - name: Run cfn-guard advisory rules (non-blocking)
+        run: |
+          echo "Running advisory cfn-guard rules..."
           FAILED=0
           for template in integrations/*/template*.yaml shared/templates/*.yaml; do
             if [ -f "$template" ]; then
               echo "Validating: $template"
-              cfn-guard validate -d "$template" -r guard/rules/ --show-summary fail || FAILED=1
+              cfn-guard validate -d "$template" -r guard/rules/lambda-security.guard --show-summary fail || FAILED=1
+              cfn-guard validate -d "$template" -r guard/rules/secrets-management.guard --show-summary fail || FAILED=1
             fi
           done
           if [ "$FAILED" -eq 1 ]; then
-            echo "⚠️ cfn-guard found policy violations (non-blocking)"
+            echo "::warning::cfn-guard advisory rules found violations (non-blocking)"
           fi
         continue-on-error: true
 

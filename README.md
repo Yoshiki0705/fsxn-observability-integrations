@@ -119,7 +119,7 @@ See [`examples/`](examples/) for pre-built sample audit, EMS, and FPolicy event 
 
 ```bash
 # 1. リポジトリクローン
-git clone https://github.com/your-org/fsxn-observability-integrations.git
+git clone https://github.com/Yoshiki0705/fsxn-observability-integrations.git
 cd fsxn-observability-integrations
 
 # 2. 依存関係インストール
@@ -255,7 +255,16 @@ aws cloudformation delete-stack \
 - [Security Review Checklist (English)](docs/en/security-review-checklist.md)
 - [PoC 成功基準 (日本語)](docs/ja/poc-success-criteria.md)
 - [PoC Success Criteria (English)](docs/en/poc-success-criteria.md)
+- [Pipeline SLO Definitions (English)](docs/en/pipeline-slo.md)
+- [Data Classification Guide (English)](docs/en/data-classification.md)
+- [DLQ Replay Runbook (English)](docs/en/runbooks/dlq-replay.md)
 - [Partner Solution Brief (English)](docs/en/partner-solution-brief.md)
+- [Retention Policy Matrix (English)](docs/en/retention-policy-matrix.md)
+- [Partner FAQ (English)](docs/en/partner-faq.md)
+- [Workshop Hands-On Guide — Half Day (English)](docs/en/workshop-hands-on-half-day.md)
+- [DLQ Replay Runbook (English)](docs/en/runbooks/dlq-replay.md)
+- [Lambda Errors Runbook (English)](docs/en/runbooks/lambda-errors.md)
+- [Checkpoint Staleness Runbook (English)](docs/en/runbooks/checkpoint-stale.md)
 - [PoC Proposal Template (English)](docs/en/poc-proposal-template.md)
 - [Workshop Agenda (English)](docs/en/workshop-agenda.md)
 - [Data Residency Matrix (English)](docs/en/data-residency.md)
@@ -272,3 +281,7 @@ aws cloudformation delete-stack \
 ## License
 
 MIT
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for planned features, Phase 2-4 milestones, and blog series plan.
