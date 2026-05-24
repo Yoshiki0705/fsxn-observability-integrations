@@ -53,7 +53,7 @@ Target: 2027 H1
 - [ ] AWS Marketplace listing (partner-delivered)
 - [ ] Terraform module equivalents
 - [ ] CDK construct library
-- [ ] Community contribution guidelines (CONTRIBUTING.md)
+- [x] Community contribution guidelines (CONTRIBUTING.md)
 - [ ] GitHub Discussions for Q&A
 - [ ] Integration test suite with LocalStack
 
@@ -66,7 +66,7 @@ Target: 2027 H1
 | 10 | High-Cardinality Analysis with Honeycomb | Draft |
 | 11 | AI-Powered Root Cause with Dynatrace | Draft |
 | 12 | JP Region with Sumo Logic | Draft |
-| 13 | 9 Vendors, One Architecture: Lessons Learned (series finale) | Planned |
+| 13 | 9 Vendors, One Architecture: Lessons Learned (series finale) | Draft |
 | 14 | Production Hardening: SLOs, Runbooks, and Data Classification | Planned |
 | 15 | Multi-Account Deployment with AWS Organizations | Planned (Phase 3) |
 
