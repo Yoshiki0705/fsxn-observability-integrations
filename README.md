@@ -65,7 +65,7 @@ FSx for ONTAP S3 Access Points は **S3 Event Notifications および EventBridg
 | [Grafana Cloud](integrations/grafana/) | ✅ E2E verified | OTLP Gateway via Lambda (Loki Push API fallback) |
 | [Elastic](integrations/elastic/) | ✅ E2E verified | Elasticsearch Bulk API |
 | [Dynatrace](integrations/dynatrace/) | ✅ E2E verified | Log Ingest API v2 |
-| [Sumo Logic](integrations/sumo-logic/) | 🧪 Implementation ready | HTTP Source |
+| [Sumo Logic](integrations/sumo-logic/) | ✅ E2E verified | HTTP Source |
 | [Honeycomb](integrations/honeycomb/) | ✅ E2E verified | Events Batch API |
 
 Status:
