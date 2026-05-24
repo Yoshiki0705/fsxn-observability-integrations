@@ -187,3 +187,12 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
+
+  bilingual-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check bilingual documentation sync
+        run: bash shared/scripts/check-bilingual-sync.sh
+        continue-on-error: true
