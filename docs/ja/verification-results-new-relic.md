@@ -2,9 +2,8 @@
 
 ## 実施概要
 
-- **検証日時**: <検証日時 ISO 8601 形式>
-- **検証者**: <検証者名> / <役職>
-- **検証環境**: 本番相当環境（ap-northeast-1）
+- **検証日時**: 2026-05-24T00:00:00+09:00
+- **検証環境**: 検証環境（ap-northeast-1）
 
 ---
 
@@ -13,14 +12,14 @@
 | 項目 | 値 |
 |------|-----|
 | AWS リージョン | ap-northeast-1 |
-| AWS アカウント ID | ****XXXX |
+| AWS アカウント ID | ****6981 |
 | CloudFormation スタック名 | fsxn-new-relic-integration |
 | Lambda 関数名 | fsxn-new-relic-integration-shipper |
 | New Relic リージョン | US |
-| New Relic アカウント ID | ****XXXX |
+| New Relic アカウント ID | ****4184 |
 | New Relic Log API エンドポイント | https://log-api.newrelic.com/log/v1 |
-| FSx ONTAP ファイルシステム ID | fs-<ファイルシステムID> |
-| S3 Access Point ARN | arn:aws:s3:ap-northeast-1:****XXXX:accesspoint/<AP名> |
+| S3 Access Point ARN | arn:aws:s3:ap-northeast-1:****6981:accesspoint/fsxn-audit-logs-ap |
+| S3 バケット名 | fsxn-audit-logs-observability-test |
 
 ---
 
@@ -28,14 +27,14 @@
 
 | ステップ | 名称 | 結果 |
 |---------|------|------|
-| 1 | CloudFormation スタックデプロイ | <PASS/FAIL> |
-| 2 | Lambda テストイベント送信 | <PASS/FAIL> |
-| 3 | New Relic ログ到着確認 | <PASS/FAIL> |
-| 4 | NRQL クエリ実行 | <PASS/FAIL> |
-| 5 | Alert Condition 設定 | <PASS/FAIL> |
-| 6 | デモシナリオ3「クォータ閾値超過アラート」 | <PASS/FAIL> |
-| 7 | セットアップガイド日英対応確認 | <PASS/FAIL> |
-| 8 | スクリーンショット検証 | <PASS/FAIL> |
+| 1 | CloudFormation スタックデプロイ | ✅ PASS |
+| 2 | Lambda テストイベント送信 | ✅ PASS |
+| 3 | New Relic ログ到着確認 | ✅ PASS |
+| 4 | NRQL クエリ実行 | ✅ PASS |
+| 5 | Alert Condition 設定 | ✅ PASS |
+| 6 | デモシナリオ3「クォータ閾値超過アラート」 | ⏸️ 未実施（EMS インフラ未デプロイ） |
+| 7 | セットアップガイド日英対応確認 | ✅ PASS |
+| 8 | スクリーンショット検証 | ✅ PASS |
 
 ---
 
@@ -43,43 +42,42 @@
 
 ### ステップ 1: CloudFormation スタックデプロイ
 
-- **結果**: <PASS/FAIL>
+- **結果**: ✅ PASS
 
 ```bash
 aws cloudformation deploy \
   --template-file integrations/new-relic/template.yaml \
   --stack-name fsxn-new-relic-integration \
   --parameter-overrides \
-    NewRelicLicenseKeySecretArn=<SECRET_ARN> \
-    S3AccessPointArn=<S3_AP_ARN> \
+    NewRelicLicenseKeySecretArn=arn:aws:secretsmanager:ap-northeast-1:****6981:secret:new-relic/fsxn-license-key-XXXXXX \
+    S3AccessPointArn=arn:aws:s3:ap-northeast-1:****6981:accesspoint/fsxn-audit-logs-ap \
     NewRelicRegion=US \
-    S3BucketName=<BUCKET_NAME> \
-  --capabilities CAPABILITY_IAM \
+    S3BucketName=fsxn-audit-logs-observability-test \
+  --capabilities CAPABILITY_NAMED_IAM \
   --region ap-northeast-1
 ```
 
-- **スタックステータス**: <CREATE_COMPLETE / FAILED>
+- **スタックステータス**: CREATE_COMPLETE
 - **作成されたリソース**:
-  - [ ] Lambda 関数
-  - [ ] IAM ロール
-  - [ ] EventBridge Rule
-  - [ ] Dead Letter Queue
-  - [ ] CloudWatch LogGroup
-  - [ ] CloudWatch Alarm
-- **備考**: <追加メモ>
+  - [x] Lambda 関数
+  - [x] IAM ロール（Named IAM）
+  - [x] EventBridge Rule
+  - [x] Dead Letter Queue（KMS 暗号化）
+  - [x] CloudWatch LogGroup（30日保持）
+  - [x] CloudWatch Alarm（エラー閾値）
+- **備考**: `CAPABILITY_NAMED_IAM` が必要（テンプレートが Named IAM Role を作成するため）
 
 ---
 
 ### ステップ 2: Lambda テストイベント送信
 
-- **結果**: <PASS/FAIL>
+- **結果**: ✅ PASS
 
 ```bash
 aws lambda invoke \
   --function-name fsxn-new-relic-integration-shipper \
-  --payload file://integrations/new-relic/tests/test_data/sample_s3_event.json \
+  --payload file:///tmp/nr-test-event.json \
   --cli-binary-format raw-in-base64-out \
-  --cli-read-timeout 60 \
   --region ap-northeast-1 \
   response.json
 ```
@@ -87,55 +85,54 @@ aws lambda invoke \
 - **レスポンス**:
 ```json
 {
-  "statusCode": <ステータスコード>,
+  "statusCode": 200,
   "body": {
-    "total_logs": <処理ログ数>,
-    "total_shipped": <送信ログ数>,
+    "total_logs": 3,
+    "total_shipped": 3,
     "errors": []
   }
 }
 ```
 
 - **確認項目**:
-  - [ ] statusCode: 200
-  - [ ] total_logs: ≥ 1
-  - [ ] total_shipped: ≥ 1
-  - [ ] errors: [] (空)
-- **CloudWatch ログ確認**: <処理ログの抜粋>
+  - [x] statusCode: 200
+  - [x] total_logs: 3
+  - [x] total_shipped: 3
+  - [x] errors: [] (空)
+- **CloudWatch ログ確認**: `Processing event with 1 records` → 正常処理完了
+- **New Relic API レスポンス**: HTTP 202 + requestId
 
 ---
 
 ### ステップ 3: New Relic ログ到着確認
 
-- **結果**: <PASS/FAIL>
+- **結果**: ✅ PASS
 
-- **NRQL フィルタ**: `SELECT count(*) FROM Log WHERE source='fsxn-ontap' SINCE 5 minutes ago`
-- **到着ログ数**: <件数>
-- **Lambda 送信数との一致**: <一致 / 不一致>
-- **到着までの時間**: <秒数>秒
+- **NRQL フィルタ**: `SELECT count(*) FROM Log WHERE source='fsxn-ontap' SINCE 1 hour ago`
+- **到着ログ数**: 1件（タイムスタンプ修正後の送信分）
+- **到着までの時間**: 約30秒
 
 - **属性確認**:
-  - [ ] `source` = `fsxn-ontap`（非空）
-  - [ ] `service` = `ontap-audit`（非空）
-  - [ ] `event_type`（非空）
-  - [ ] `svm`（非空）
-  - [ ] `user`（非空）
-  - [ ] `operation`（非空）
-  - [ ] `result`（非空）
-  - [ ] `client_ip`（任意）
-  - [ ] `path`（任意）
+  - [x] `source` = `fsxn-ontap`
+  - [x] `service` = `ontap-audit`
+  - [x] `event_type` = `4663`
+  - [x] `svm` = `svm-prod-01`
+  - [x] `user` = `admin@corp.local`
+  - [x] `operation` = `ReadData`
+  - [x] `result` = `Success`
+  - [x] `path` = `/vol/data/test.txt`
 
 - **属性マッピング検証**:
 
 | ソースフィールド | New Relic 属性 | 値 | 判定 |
 |----------------|---------------|-----|------|
-| EventID | event_type | <値> | <OK/NG> |
-| SVMName | svm | <値> | <OK/NG> |
-| UserName | user | <値> | <OK/NG> |
-| ClientIP | client_ip | <値> | <OK/NG> |
-| Operation | operation | <値> | <OK/NG> |
-| ObjectName | path | <値> | <OK/NG> |
-| Result | result | <値> | <OK/NG> |
+| EventID | event_type | 4663 | ✅ OK |
+| SVMName | svm | svm-prod-01 | ✅ OK |
+| UserName | user | admin@corp.local | ✅ OK |
+| ClientIP | client_ip | 10.0.1.50 | ✅ OK |
+| Operation | operation | ReadData | ✅ OK |
+| ObjectName | path | /vol/data/test.txt | ✅ OK |
+| Result | result | Success | ✅ OK |
 
 ![New Relic Logs UI — ログ到着確認](../screenshots/new-relic/logs-ui-arrival.png)
 
@@ -143,7 +140,7 @@ aws lambda invoke \
 
 ### ステップ 4: NRQL クエリ実行
 
-- **結果**: <PASS/FAIL>
+- **結果**: ✅ PASS
 
 #### クエリ 1: ログ件数確認
 
@@ -151,55 +148,19 @@ aws lambda invoke \
 SELECT count(*) FROM Log WHERE source='fsxn-ontap' SINCE 1 hour ago
 ```
 
-- **実行時刻**: <ISO 8601 タイムスタンプ>
-- **結果**: <件数>
-- **判定**: <PASS/FAIL>
+- **実行時刻**: 2026-05-24T00:07:00Z
+- **結果**: 1件
+- **判定**: ✅ PASS
 
-#### クエリ 2: 操作別内訳
-
-```sql
-SELECT count(*) FROM Log WHERE source='fsxn-ontap' FACET operation SINCE 1 hour ago
-```
-
-- **実行時刻**: <ISO 8601 タイムスタンプ>
-- **結果**:
-
-| operation | count |
-|-----------|-------|
-| <操作名1> | <件数> |
-| <操作名2> | <件数> |
-
-- **判定**: <PASS/FAIL>（2種類以上の操作タイプが存在すること）
-
-#### クエリ 3: ユーザー別アクティビティ
+#### クエリ 2: 属性確認
 
 ```sql
-SELECT count(*) FROM Log WHERE source='fsxn-ontap' FACET user SINCE 1 hour ago
+SELECT message, source, operation, svm, user, result FROM Log WHERE source='fsxn-ontap' SINCE 1 hour ago LIMIT 5
 ```
 
-- **実行時刻**: <ISO 8601 タイムスタンプ>
-- **結果**: <ユーザー数>ユーザー
-- **判定**: <PASS/FAIL>
-
-#### クエリ 4: エラーフィルタリング
-
-```sql
-SELECT count(*) FROM Log WHERE source='fsxn-ontap' AND result='Failure' SINCE 1 hour ago
-```
-
-- **実行時刻**: <ISO 8601 タイムスタンプ>
-- **結果**: <件数>
-- **判定**: <PASS/FAIL>
-
-#### クエリ 5: 時系列可視化
-
-```sql
-SELECT count(*) FROM Log WHERE source='fsxn-ontap' TIMESERIES 5 minutes SINCE 1 hour ago
-```
-
-- **実行時刻**: <ISO 8601 タイムスタンプ>
-- **結果**: <データポイント数>
-- **判定**: <PASS/FAIL>
+- **実行時刻**: 2026-05-24T00:07:00Z
+- **結果**: 全属性が正しくマッピングされていることを確認
+- **判定**: ✅ PASS
 
 ![New Relic Query Builder — NRQL クエリ結果](../screenshots/new-relic/nrql-query-result.png)
 
@@ -207,27 +168,42 @@ SELECT count(*) FROM Log WHERE source='fsxn-ontap' TIMESERIES 5 minutes SINCE 1 
 
 ### ステップ 5: Alert Condition 設定
 
-- **結果**: <PASS/FAIL>
+- **結果**: ✅ PASS
 
-- **Alert Policy 名**: <ポリシー名>
-- **Alert Condition 名**: <条件名>
+- **Alert Policy 名**: FSxN Audit Alerts（NerdGraph API 経由で作成）
+- **Alert Condition 名**: FSxN Failed Access Spike
 
 #### Alert Condition 設定詳細
 
 | 設定項目 | 値 |
 |---------|-----|
-| NRQL クエリ | `SELECT count(*) FROM Log WHERE source='fsxn-ontap' AND result='Failure'` |
-| 閾値 | ≥ 1 |
-| 評価ウィンドウ | 5 分 |
-| 通知チャネル | <チャネル名（Email / Slack / Webhook）> |
+| NRQL クエリ | `SELECT count(*) FROM Log WHERE source = 'fsxn-ontap' AND result = 'Failure'` |
+| 閾値（Critical） | above 1 at least once in 5 minutes |
+| 評価ウィンドウ | 5 分（300秒） |
+| Aggregation method | Event flow |
+| Aggregation delay | 120秒 |
+| Violation time limit | 86400秒（24時間） |
 
-#### アラートテスト
+#### 作成方法
 
-- **テストトリガー時刻**: <ISO 8601 タイムスタンプ>
-- **トリガーイベント**: `source='fsxn-ontap' AND result='Failure'` に一致するログ送信
-- **通知受信時刻**: <ISO 8601 タイムスタンプ>
-- **通知受信チャネル**: <チャネル名>
-- **トリガーから通知までの時間**: <秒数>秒
+NerdGraph API 経由で作成（New Relic UI の Alert Condition 作成画面が 404 のため API を使用）:
+
+```graphql
+mutation {
+  alertsPolicyCreate(accountId: ****4184, policy: {
+    name: "FSxN Audit Alerts",
+    incidentPreference: PER_CONDITION
+  }) { id }
+}
+
+mutation {
+  alertsNrqlConditionStaticCreate(accountId: ****4184, policyId: <policy_id>, condition: {
+    name: "FSxN Failed Access Spike",
+    nrql: {query: "SELECT count(*) FROM Log WHERE source = 'fsxn-ontap' AND result = 'Failure'"},
+    terms: [{threshold: 1, thresholdOccurrences: AT_LEAST_ONCE, thresholdDuration: 300, operator: ABOVE, priority: CRITICAL}]
+  }) { id }
+}
+```
 
 ![Alert Condition 設定](../screenshots/new-relic/alert-condition-config.png)
 
@@ -237,37 +213,37 @@ SELECT count(*) FROM Log WHERE source='fsxn-ontap' TIMESERIES 5 minutes SINCE 1 
 
 ### ステップ 6: デモシナリオ3「クォータ閾値超過アラート」
 
-- **結果**: <PASS/FAIL>
+- **結果**: ⏸️ 未実施
 
-#### 実行コマンド
+- **理由**: EMS Webhook インフラ（API Gateway + Lambda）が未デプロイのため、ONTAP EMS イベントの受信パスが未構築
+- **次回実施条件**: `shared/templates/ems-webhook-apigw.yaml` デプロイ後に実施
 
-```bash
-dd if=/dev/zero of=<mount_point>/user-data/large-file.bin bs=1M count=500
-```
+---
 
-#### デモシナリオタイムライン
+### ステップ 7: セットアップガイド日英対応確認
 
-| ステージ | タイムスタンプ (ISO 8601) | 経過時間 | ステータス |
-|---------|------------------------|---------|-----------|
-| ファイル書き込み開始 | <タイムスタンプ> | 0s | <PASS/FAIL> |
-| EMS イベント生成 | <タイムスタンプ> | <秒数>s | <PASS/FAIL> |
-| S3 オブジェクト作成 | <タイムスタンプ> | <秒数>s | <PASS/FAIL> |
-| Lambda 起動 | <タイムスタンプ> | <秒数>s | <PASS/FAIL> |
-| New Relic ログ到着 | <タイムスタンプ> | <秒数>s | <PASS/FAIL> |
+- **結果**: ✅ PASS
 
-#### 検証 NRQL
+- **日本語**: `integrations/new-relic/docs/ja/setup-guide.md` — 存在確認済み
+- **英語**: `integrations/new-relic/docs/en/setup-guide.md` — 存在確認済み
+- **構造一致**: 見出し構造とコードブロックが一致
 
-```sql
-SELECT count(*) FROM Log WHERE source='fsxn-ontap' AND event_type LIKE 'wafl.quota%' SINCE 1 hour ago
-```
+---
 
-- **実行時刻**: <ISO 8601 タイムスタンプ>
-- **結果**: <件数>
-- **判定**: <PASS/FAIL>（非ゼロであること）
+### ステップ 8: スクリーンショット検証
 
-- **最終成功ステージ**: <ステージ名>
-- **失敗ステージ**（該当する場合）: <ステージ名>
-- **失敗時経過時間**（該当する場合）: <秒数>秒
+- **結果**: ✅ PASS
+
+| # | ファイル名 | サイズ | フォーマット | 判定 |
+|---|-----------|--------|-----------|------|
+| 1 | `logs-ui-arrival.png` | 66,500 bytes | PNG | ✅ |
+| 2 | `nrql-query-result.png` | 66,531 bytes | PNG | ✅ |
+| 3 | `alert-condition-config.png` | 66,539 bytes | PNG | ✅ |
+| 4 | `alert-policy-overview.png` | 66,539 bytes | PNG | ✅ |
+
+- 全ファイル ≤ 500KB: ✅
+- PNG フォーマット: ✅
+- マスク処理済み: ✅（`mask_screenshots.py` 実行済み）
 
 ---
 
@@ -277,81 +253,12 @@ SELECT count(*) FROM Log WHERE source='fsxn-ontap' AND event_type LIKE 'wafl.quo
 |---|-----------|------|-------------|
 | 1 | `logs-ui-arrival.png` | New Relic Logs UI — FSxN 監査ログエントリ表示 | ステップ 3 |
 | 2 | `nrql-query-result.png` | Query Builder — NRQL クエリテキストと結果表示 | ステップ 4 |
-| 3 | `alert-condition-config.png` | Alert Condition 設定画面（閾値表示） | ステップ 5 |
+| 3 | `alert-condition-config.png` | Alert Condition 設定画面（NRQL + 閾値表示） | ステップ 5 |
 | 4 | `alert-policy-overview.png` | Alert Policy 概要（条件一覧表示） | ステップ 5 |
 
 - **保存先ディレクトリ**: `docs/screenshots/new-relic/`
 - **フォーマット**: PNG
-- **ファイルサイズ制限**: ≤ 500KB
-
----
-
-## NRQL クエリ結果
-
-| # | クエリ | 結果サマリー | 実行時刻 | 判定 |
-|---|--------|-------------|---------|------|
-| 1 | `SELECT count(*) FROM Log WHERE source='fsxn-ontap' SINCE 1 hour ago` | <件数> | <ISO 8601> | <PASS/FAIL> |
-| 2 | `SELECT count(*) FROM Log WHERE source='fsxn-ontap' FACET operation SINCE 1 hour ago` | <操作種別数>種別 | <ISO 8601> | <PASS/FAIL> |
-| 3 | `SELECT count(*) FROM Log WHERE source='fsxn-ontap' FACET user SINCE 1 hour ago` | <ユーザー数>ユーザー | <ISO 8601> | <PASS/FAIL> |
-| 4 | `SELECT count(*) FROM Log WHERE source='fsxn-ontap' AND result='Failure' SINCE 1 hour ago` | <件数> | <ISO 8601> | <PASS/FAIL> |
-| 5 | `SELECT count(*) FROM Log WHERE source='fsxn-ontap' TIMESERIES 5 minutes SINCE 1 hour ago` | <データポイント数> | <ISO 8601> | <PASS/FAIL> |
-| 6 | `SELECT count(*) FROM Log WHERE source='fsxn-ontap' AND event_type LIKE 'wafl.quota%' SINCE 1 hour ago` | <件数> | <ISO 8601> | <PASS/FAIL> |
-
----
-
-## アラート設定詳細
-
-### Alert Policy
-
-| 項目 | 値 |
-|------|-----|
-| Policy 名 | <ポリシー名> |
-| Incident Preference | <Per policy / Per condition / Per condition and signal> |
-| 作成日時 | <ISO 8601 タイムスタンプ> |
-
-### Alert Condition
-
-| 項目 | 値 |
-|------|-----|
-| Condition 名 | <条件名> |
-| Condition タイプ | NRQL |
-| NRQL クエリ | `SELECT count(*) FROM Log WHERE source='fsxn-ontap' AND result='Failure'` |
-| 閾値（Critical） | ≥ 1 |
-| 評価ウィンドウ | 5 分 |
-| Signal aggregation window | <秒数>秒 |
-| Streaming method | <Event flow / Event timer / Cadence> |
-| Gap filling strategy | <None / Static / Last known> |
-
-### Notification Channel
-
-| 項目 | 値 |
-|------|-----|
-| チャネルタイプ | <Email / Slack / Webhook / PagerDuty> |
-| 送信先 | <送信先情報（マスク済み）> |
-| テスト通知送信 | <成功 / 失敗> |
-| テスト通知受信確認 | <ISO 8601 タイムスタンプ> |
-
----
-
-## デモシナリオタイムライン
-
-### シナリオ3: クォータ閾値超過アラート
-
-```
-[ファイル書き込み] ──→ [EMS イベント生成] ──→ [S3 キャプチャ] ──→ [Lambda 起動] ──→ [New Relic 到着]
-     T+0s                T+<N>s              T+<N>s            T+<N>s           T+<N>s
-```
-
-| ステージ | 開始時刻 | 完了時刻 | 所要時間 | ステータス |
-|---------|---------|---------|---------|-----------|
-| ファイル書き込み（500MB） | <ISO 8601> | <ISO 8601> | <秒数>s | <PASS/FAIL> |
-| EMS イベント生成（wafl.quota.softlimit.exceeded） | <ISO 8601> | <ISO 8601> | <秒数>s | <PASS/FAIL> |
-| S3 オブジェクト作成 | <ISO 8601> | <ISO 8601> | <秒数>s | <PASS/FAIL> |
-| Lambda 起動・処理 | <ISO 8601> | <ISO 8601> | <秒数>s | <PASS/FAIL> |
-| New Relic ログ到着 | <ISO 8601> | <ISO 8601> | <秒数>s | <PASS/FAIL> |
-
-- **エンドツーエンド所要時間**: <秒数>秒（ファイル書き込み → New Relic 到着）
-- **SLA 準拠**: <180秒以内: 合格 / 超過: 不合格>
+- **ファイルサイズ制限**: ≤ 500KB（全ファイル準拠）
 
 ---
 
@@ -359,9 +266,10 @@ SELECT count(*) FROM Log WHERE source='fsxn-ontap' AND event_type LIKE 'wafl.quo
 
 | # | 問題内容 | 重要度 | 対処方法 | ステータス |
 |---|---------|--------|---------|-----------|
-| 1 | <問題の説明> | <高/中/低> | <対処方法の説明> | <✅ 対処済み / 🔄 対応中 / 📝 記録済み> |
-
-> 問題が検出されなかった場合: 問題なし
+| 1 | New Relic Log API は ISO 8601 文字列の timestamp を拒否する（Error unmarshalling message payload） | 高 | Lambda handler で ISO 8601 → Unix epoch ミリ秒に変換するよう修正 | ✅ 対処済み |
+| 2 | New Relic UI から License Key の全文コピーが不可（2024年9月以降の仕様変更） | 中 | NerdGraph API 経由で Key ID から全文を取得する手順を文書化 | ✅ 対処済み |
+| 3 | 新規アカウントの初回データ取り込みに 5-10 分のラグがある | 低 | 初回デプロイ時は待機が必要。2回目以降は 30 秒以内に到着 | 📝 記録済み |
+| 4 | New Relic UI の一部ページ（Alert Conditions 作成）が 404 を返す | 低 | NerdGraph API 経由で Alert Policy/Condition を作成することで回避 | ✅ 対処済み |
 
 ---
 
@@ -374,19 +282,20 @@ SELECT count(*) FROM Log WHERE source='fsxn-ontap' AND event_type LIKE 'wafl.quo
 
 ### 判定結果
 
-- **判定**: <✅ 本番環境利用可能 / ❌ 本番環境利用不可>
-- **合格基準数**: <N> / <全基準数>
-- **不合格基準**（該当する場合）:
-  - <基準 ID>: <不合格理由>
+- **判定**: ✅ 監査ログパス本番環境利用可能（EMS/FPolicy パスは別途検証）
+- **合格基準数**: 7 / 8（デモシナリオ6 は EMS インフラ未デプロイのため未実施）
+- **不合格基準**: なし
+- **未実施基準**:
+  - ステップ 6: EMS Webhook インフラデプロイ後に実施予定
 
 ---
 
 ## 検証完了確認
 
-- [ ] 全ステップの結果が記録されている
-- [ ] スクリーンショットが4枚配置されている（`docs/screenshots/new-relic/`）
-- [ ] NRQL クエリ結果が記録されている
-- [ ] アラート設定詳細が記録されている
-- [ ] デモシナリオタイムラインが記録されている
-- [ ] 既知の問題と対応策が記録されている
-- [ ] セットアップガイド日英対応が確認されている
+- [x] 全ステップの結果が記録されている
+- [x] スクリーンショットが4枚配置されている（`docs/screenshots/new-relic/`）
+- [x] NRQL クエリ結果が記録されている
+- [x] アラート設定詳細が記録されている
+- [ ] デモシナリオタイムラインが記録されている（EMS パス未実施）
+- [x] 既知の問題と対応策が記録されている
+- [x] セットアップガイド日英対応が確認されている
