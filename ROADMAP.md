@@ -35,8 +35,8 @@ Target: Q3 2026
 
 Target: Q4 2026
 
-- [ ] Multi-account deployment pattern (AWS Organizations + StackSets)
-- [ ] Cross-region replication for audit log DR
+- [x] Multi-account deployment pattern (AWS Organizations + StackSets)
+- [x] Cross-region replication for audit log DR
 - [x] DynamoDB object ledger (per-object processing state)
 - [x] SQS buffering pattern (backpressure handling)
 - [x] Poison-pill auto-skip with alerting
