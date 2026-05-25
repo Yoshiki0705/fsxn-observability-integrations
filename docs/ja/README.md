@@ -140,6 +140,15 @@ aws cloudformation deploy \
 - **CI/CD**: GitHub Actions
 - **Docs**: Markdown (日英バイリンガル)
 
+## 関連プロジェクト
+
+| リポジトリ | 説明 |
+|-----------|------|
+| [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) | FPolicy イベント駆動パイプライン、キャパシティガードレール等 17 業界ユースケース |
+| [fsxn-lakehouse-integrations](https://github.com/Yoshiki0705/fsxn-lakehouse-integrations) | S3 Access Points 経由の Data Lake / Lakehouse プラットフォーム統合 |
+| [FSx-for-ONTAP-Agentic-Access-Aware-RAG](https://github.com/Yoshiki0705/FSx-for-ONTAP-Agentic-Access-Aware-RAG) | Amazon Bedrock を使ったアクセス制御対応 Agentic RAG（CDK） |
+| [fsx-ontap-lifecycle-management](https://github.com/Yoshiki0705/fsx-ontap-lifecycle-management) | S3 Glacier Deep Archive 連携の 3 階層ライフサイクル管理 |
+
 ## License
 
 MIT
