@@ -20,8 +20,8 @@ FSx for ONTAP 監査ログには以下のデータカテゴリが含まれる可
 | ベンダー | 利用可能リージョン | セルフホスト | データ主権に関する備考 |
 |--------|------------------|-------------------|----------------------|
 | **Datadog** | US1 (Virginia), US3, US5, EU1 (Frankfurt), AP1 (Tokyo), AP2, US1-FED (GovCloud) | ❌ | AP1 (Tokyo) で日本国内データ保持が可能 |
-| **New Relic** | US (Oregon), EU (Frankfurt) | ❌ | AP リージョンなし。US または EU のみ |
-| **Grafana Cloud** | US（複数）, EU（複数）, AP (Sydney, Singapore) | ✅（Grafana OSS + Loki） | セルフホストならデータは VPC 内に保持 |
+| **New Relic** | US (Oregon), EU (Frankfurt), JP (Tokyo — 2026年7月予定) | ❌ | JP リージョンは2026年7月開設予定。それまでは US または EU のみ |
+| **Grafana Cloud** | US（複数）, EU（複数）, AP (Sydney, Singapore); Tokyo は Dedicated tier のみ | ✅（Grafana OSS + Loki） | セルフホストならデータは VPC 内に保持。Free/Pro tier は US/EU のみ |
 | **Splunk** | Splunk Cloud: US, EU, AU, カスタム | ✅（Splunk Enterprise） | セルフマネージドなら自社インフラ内に保持 |
 | **Elastic** | Elastic Cloud: US, EU, AP (Tokyo, Sydney, Singapore) | ✅（セルフホスト） | セルフホスト = 完全なデータ主権 |
 | **Dynatrace** | SaaS: US, EU, AP (Sydney, Singapore) | ✅（Managed / ActiveGate） | Managed デプロイ = 自社インフラ |
