@@ -1,0 +1,582 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  FSxN Management Console - Observability Stack (Stack 3 of 5)
+  Creates AMP workspace, AMG workspace, ECS Cluster, Harvest + ADOT sidecar
+  ECS service, IAM roles, and CloudWatch Log Groups.
+  Depends on: fsxn-mgmt-network (Stack 1), fsxn-mgmt-auth (Stack 2).
+  Phase 2A: Multi-poller support for monitoring multiple FSx ONTAP file systems.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Network Configuration (from Stack 1)
+        Parameters:
+          - PrivateSubnetIds
+          - HarvestTaskSgId
+      - Label:
+          default: FSx ONTAP Configuration
+        Parameters:
+          - OntapManagementEndpoints
+          - OntapCredentialsSecretArns
+      - Label:
+          default: Authentication (from Stack 2)
+        Parameters:
+          - CognitoUserPoolArn
+      - Label:
+          default: Container Configuration
+        Parameters:
+          - HarvestImageTag
+    ParameterLabels:
+      PrivateSubnetIds:
+        default: Private Subnet IDs (2+ AZs)
+      HarvestTaskSgId:
+        default: Harvest Task Security Group ID
+      OntapManagementEndpoints:
+        default: FSx ONTAP Management Endpoints (comma-separated)
+      OntapCredentialsSecretArns:
+        default: ONTAP Credentials Secret ARNs (comma-separated)
+      CognitoUserPoolArn:
+        default: Cognito User Pool ARN
+      HarvestImageTag:
+        default: Harvest Container Image Tag
+
+Parameters:
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: >
+      Private subnets for ECS Fargate tasks.
+      Must span at least 2 Availability Zones.
+
+  HarvestTaskSgId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: >
+      Security Group ID for Harvest ECS tasks (from network stack).
+
+  OntapManagementEndpoints:
+    Type: String
+    Description: >
+      Comma-separated list of FSx ONTAP management endpoint IP addresses or DNS names (1-10).
+      Single endpoint is treated as a list of one for backward compatibility.
+    AllowedPattern: '^[a-zA-Z0-9._,-]+$'
+
+  OntapCredentialsSecretArns:
+    Type: String
+    Description: >
+      Comma-separated list of Secrets Manager secret ARNs containing ONTAP admin credentials.
+      Each ARN corresponds positionally to the endpoint in OntapManagementEndpoints.
+      For shared credentials across all endpoints, provide the same ARN repeated.
+    AllowedPattern: '^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+(,arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+)*$'
+
+  CognitoUserPoolArn:
+    Type: String
+    Description: >
+      ARN of the Cognito User Pool for AMG SAML authentication.
+    AllowedPattern: '^arn:aws:cognito-idp:[a-z0-9-]+:[0-9]{12}:userpool/.+$'
+
+  HarvestImageTag:
+    Type: String
+    Default: latest
+    Description: >
+      Container image tag for NetApp Harvest collector.
+      Recommend pinning to a specific version (e.g., '24.05.2') for production.
+
+Resources:
+  # ============================================================
+  # Amazon Managed Service for Prometheus (AMP) Workspace
+  # ============================================================
+  AmpWorkspace:
+    Type: AWS::APS::Workspace
+    Properties:
+      Alias: fsxn-mgmt-harvest-metrics
+      Tags:
+        - Key: Project
+          Value: fsxn-management-console
+        - Key: Component
+          Value: observability
+
+  # ============================================================
+  # Amazon Managed Grafana (AMG) Workspace
+  # ============================================================
+  AmgWorkspaceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: grafana.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: AmgAmpReadPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - aps:ListWorkspaces
+                  - aps:DescribeWorkspace
+                  - aps:QueryMetrics
+                  - aps:GetLabels
+                  - aps:GetSeries
+                  - aps:GetMetricMetadata
+                Resource: !Sub 'arn:aws:aps:${AWS::Region}:${AWS::AccountId}:workspace/${AmpWorkspace}'
+      Tags:
+        - Key: Project
+          Value: fsxn-management-console
+
+  AmgWorkspace:
+    Type: AWS::Grafana::Workspace
+    Properties:
+      Name: fsxn-mgmt-grafana
+      Description: FSxN Management Console - Grafana dashboards for ONTAP metrics
+      AccountAccessType: CURRENT_ACCOUNT
+      AuthenticationProviders:
+        - SAML
+      PermissionType: SERVICE_MANAGED
+      RoleArn: !GetAtt AmgWorkspaceRole.Arn
+      DataSources:
+        - PROMETHEUS
+      SamlConfiguration:
+        IdpMetadata:
+          Url: !Sub
+            - 'https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}'
+            - UserPoolId: !Select [1, !Split ['/', !Select [5, !Split [':', !Ref CognitoUserPoolArn]]]]
+        RoleValues:
+          Admin:
+            - admin
+          Editor:
+            - editor
+        AssertionAttributes:
+          Email: email
+          Name: name
+
+  # ============================================================
+  # ECS Cluster (shared across observability and console layers)
+  # ============================================================
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: fsxn-mgmt-cluster
+      CapacityProviders:
+        - FARGATE
+        - FARGATE_SPOT
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 1
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Project
+          Value: fsxn-management-console
+
+  # ============================================================
+  # CloudWatch Log Groups
+  # ============================================================
+  HarvestLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/fsxn-mgmt/harvest
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: fsxn-management-console
+        - Key: Component
+          Value: harvest
+
+  AdotLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/fsxn-mgmt/adot-collector
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: fsxn-management-console
+        - Key: Component
+          Value: adot
+
+  # ============================================================
+  # IAM Task Execution Role (ECR pull + CloudWatch Logs + Secrets)
+  # ============================================================
+  HarvestTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: HarvestTaskExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: EcrAuth
+                Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: '*'
+              - Sid: EcrPull
+                Effect: Allow
+                Action:
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                Resource: !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/*'
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub '${HarvestLogGroup.Arn}:*'
+                  - !Sub '${AdotLogGroup.Arn}:*'
+              - Sid: SecretsManagerReadForInjection
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Split [',', !Ref OntapCredentialsSecretArns]
+      Tags:
+        - Key: Project
+          Value: fsxn-management-console
+
+  # ============================================================
+  # IAM Task Role (Secrets Manager read + AMP remote-write)
+  # ============================================================
+  HarvestTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: HarvestTaskPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: SecretsManagerRead
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Split [',', !Ref OntapCredentialsSecretArns]
+              - Sid: AmpRemoteWrite
+                Effect: Allow
+                Action:
+                  - aps:RemoteWrite
+                Resource: !Sub 'arn:aws:aps:${AWS::Region}:${AWS::AccountId}:workspace/${AmpWorkspace}'
+      Tags:
+        - Key: Project
+          Value: fsxn-management-console
+
+  # ============================================================
+  # ECS Task Definition: Harvest + ADOT Sidecar
+  # ============================================================
+  # Uses /busybox/sh (available in the Harvest image) to generate
+  # harvest.yml at startup, then exec's bin/poller.
+  # Phase 2A: Generates one poller entry per comma-separated endpoint.
+  # Each poller gets datacenter=fsxn-{i+1} and sequential port from 12990.
+  # Single shared credential (ONTAP_USERNAME + ONTAP_PASSWORD) applied to all endpoints.
+  HarvestTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: fsxn-mgmt-harvest
+      Cpu: '1024'
+      Memory: '2048'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !GetAtt HarvestTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt HarvestTaskRole.Arn
+      ContainerDefinitions:
+        # ---------------------------------------------------------
+        # Harvest container: NetApp Harvest metrics collector
+        # ---------------------------------------------------------
+        # The Harvest image (ghcr.io/netapp/harvest) includes /busybox/sh.
+        # We use it to write harvest.yml from env vars, then exec bin/poller.
+        # Phase 2A: Generates N poller entries from comma-separated endpoints.
+        - Name: harvest
+          Image: !Sub 'ghcr.io/netapp/harvest:${HarvestImageTag}'
+          Cpu: 512
+          Memory: 1024
+          Essential: true
+          EntryPoint:
+            - /busybox/sh
+            - -c
+          Command:
+            - |
+              # Phase 2A: Multi-poller harvest.yml generation
+              # Parse comma-separated endpoints into individual entries
+              IFS=',' read -ra ENDPOINTS <<< "$ONTAP_MGMT_ENDPOINTS"
+              NUM_ENDPOINTS=${#ENDPOINTS[@]}
+
+              # Generate harvest.yml header
+              cat > /opt/harvest/harvest.yml << 'HEADER'
+              Pollers:
+              HEADER
+
+              # Generate one poller entry per endpoint
+              POLLER_NAMES=""
+              i=0
+              for EP in "${ENDPOINTS[@]}"; do
+                EP=$(echo "$EP" | xargs)  # trim whitespace
+                IDX=$((i + 1))
+                PORT=$((12990 + i))
+                POLLER_NAME="fsxn-cluster-${IDX}"
+                if [ -n "$POLLER_NAMES" ]; then
+                  POLLER_NAMES="${POLLER_NAMES},${POLLER_NAME}"
+                else
+                  POLLER_NAMES="${POLLER_NAME}"
+                fi
+                cat >> /opt/harvest/harvest.yml << EOF
+                ${POLLER_NAME}:
+                  datacenter: fsxn-${IDX}
+                  addr: ${EP}
+                  auth_style: basic_auth
+                  username: ${ONTAP_USERNAME}
+                  password: ${ONTAP_PASSWORD}
+                  collectors:
+                    - Rest
+                    - RestPerf
+                  exporters:
+                    - prometheus
+                  schedule:
+                    - data: 60s
+              EOF
+                i=$((i + 1))
+              done
+
+              # Generate exporters and defaults sections
+              cat >> /opt/harvest/harvest.yml << 'FOOTER'
+              Exporters:
+                prometheus:
+                  exporter: Prometheus
+                  port_range: 12990-12999
+              Defaults:
+                use_insecure_tls: true
+              FOOTER
+
+              # Start all pollers
+              exec bin/poller --config harvest.yml --pollers "$POLLER_NAMES"
+          PortMappings:
+            - ContainerPort: 12990
+              Protocol: tcp
+            - ContainerPort: 12991
+              Protocol: tcp
+            - ContainerPort: 12992
+              Protocol: tcp
+            - ContainerPort: 12993
+              Protocol: tcp
+            - ContainerPort: 12994
+              Protocol: tcp
+            - ContainerPort: 12995
+              Protocol: tcp
+            - ContainerPort: 12996
+              Protocol: tcp
+            - ContainerPort: 12997
+              Protocol: tcp
+            - ContainerPort: 12998
+              Protocol: tcp
+            - ContainerPort: 12999
+              Protocol: tcp
+          Environment:
+            - Name: ONTAP_MGMT_ENDPOINTS
+              Value: !Ref OntapManagementEndpoints
+          Secrets:
+            - Name: ONTAP_USERNAME
+              ValueFrom: !Sub
+                - '${FirstSecretArn}:username::'
+                - FirstSecretArn: !Select [0, !Split [',', !Ref OntapCredentialsSecretArns]]
+            - Name: ONTAP_PASSWORD
+              ValueFrom: !Sub
+                - '${FirstSecretArn}:password::'
+                - FirstSecretArn: !Select [0, !Split [',', !Ref OntapCredentialsSecretArns]]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref HarvestLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: harvest
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - 'wget --no-verbose --tries=1 --spider http://localhost:12990/ || exit 1'
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+
+        # ---------------------------------------------------------
+        # ADOT Collector sidecar: scrapes Harvest -> remote-writes to AMP
+        # ---------------------------------------------------------
+        # Uses AOT_CONFIG_CONTENT env var for inline config (no config file needed).
+        # ADOT natively supports this env var to pass collector configuration.
+        # Phase 2A: Scrapes all ports in range 12990-12999 to cover up to 10 pollers.
+        - Name: adot-collector
+          Image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+          Cpu: 256
+          Memory: 512
+          Essential: false
+          Environment:
+            - Name: AOT_CONFIG_CONTENT
+              Value: !Sub |
+                receivers:
+                  prometheus:
+                    config:
+                      scrape_configs:
+                        - job_name: "harvest"
+                          scrape_interval: 15s
+                          static_configs:
+                            - targets:
+                                - "localhost:12990"
+                                - "localhost:12991"
+                                - "localhost:12992"
+                                - "localhost:12993"
+                                - "localhost:12994"
+                                - "localhost:12995"
+                                - "localhost:12996"
+                                - "localhost:12997"
+                                - "localhost:12998"
+                                - "localhost:12999"
+                          metrics_path: /metrics
+                processors:
+                  batch:
+                    send_batch_size: 1000
+                    timeout: 10s
+                exporters:
+                  prometheusremotewrite:
+                    endpoint: "https://aps-workspaces.${AWS::Region}.amazonaws.com/workspaces/${AmpWorkspace}/api/v1/remote_write"
+                    auth:
+                      authenticator: sigv4auth
+                    resource_to_telemetry_conversion:
+                      enabled: true
+                extensions:
+                  sigv4auth:
+                    service: "aps"
+                    region: "${AWS::Region}"
+                service:
+                  extensions:
+                    - sigv4auth
+                  pipelines:
+                    metrics:
+                      receivers:
+                        - prometheus
+                      processors:
+                        - batch
+                      exporters:
+                        - prometheusremotewrite
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AdotLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: adot
+
+  # ============================================================
+  # ECS Service: Harvest (desired count: 1)
+  # ============================================================
+  HarvestService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: fsxn-mgmt-harvest
+      Cluster: !Ref EcsCluster
+      TaskDefinition: !Ref HarvestTaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets: !Ref PrivateSubnetIds
+          SecurityGroups:
+            - !Ref HarvestTaskSgId
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      EnableExecuteCommand: true
+      Tags:
+        - Key: Project
+          Value: fsxn-management-console
+        - Key: Component
+          Value: harvest
+
+# ============================================================
+# Outputs
+# ============================================================
+Outputs:
+  AmpWorkspaceId:
+    Description: Amazon Managed Prometheus workspace ID
+    Value: !Ref AmpWorkspace
+    Export:
+      Name: !Sub '${AWS::StackName}-AmpWorkspaceId'
+
+  AmpWorkspaceEndpoint:
+    Description: AMP workspace remote-write endpoint
+    Value: !Sub 'https://aps-workspaces.${AWS::Region}.amazonaws.com/workspaces/${AmpWorkspace}/api/v1/remote_write'
+    Export:
+      Name: !Sub '${AWS::StackName}-AmpWorkspaceEndpoint'
+
+  AmgWorkspaceUrl:
+    Description: Amazon Managed Grafana workspace URL
+    Value: !GetAtt AmgWorkspace.Endpoint
+    Export:
+      Name: !Sub '${AWS::StackName}-AmgWorkspaceUrl'
+
+  AmgWorkspaceId:
+    Description: Amazon Managed Grafana workspace ID
+    Value: !Ref AmgWorkspace
+    Export:
+      Name: !Sub '${AWS::StackName}-AmgWorkspaceId'
+
+  EcsClusterArn:
+    Description: ECS Cluster ARN (shared across observability and console layers)
+    Value: !GetAtt EcsCluster.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-EcsClusterArn'
+
+  EcsClusterName:
+    Description: ECS Cluster name
+    Value: !Ref EcsCluster
+    Export:
+      Name: !Sub '${AWS::StackName}-EcsClusterName'
+
+  HarvestServiceArn:
+    Description: Harvest ECS Service ARN
+    Value: !Ref HarvestService
+    Export:
+      Name: !Sub '${AWS::StackName}-HarvestServiceArn'
+
+  HarvestServiceName:
+    Description: Harvest ECS Service name
+    Value: !GetAtt HarvestService.Name
+    Export:
+      Name: !Sub '${AWS::StackName}-HarvestServiceName'
+
+  HarvestTaskRoleArn:
+    Description: Harvest task IAM role ARN
+    Value: !GetAtt HarvestTaskRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-HarvestTaskRoleArn'
+
+  HarvestLogGroupName:
+    Description: CloudWatch Log Group for Harvest container
+    Value: !Ref HarvestLogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-HarvestLogGroupName'
+
+  AdotLogGroupName:
+    Description: CloudWatch Log Group for ADOT collector sidecar
+    Value: !Ref AdotLogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-AdotLogGroupName'

@@ -1,0 +1,503 @@
+{
+  "schemaVersion": "2.0",
+  "name": "Snapshot Restore Workflow",
+  "description": "Full snapshot restore workflow with confirmation dialog, job polling, and NAS client disruption warnings for FSx ONTAP volumes",
+  "dataSources": [
+    {
+      "id": "ds_ontap_rest",
+      "name": "FSxN ONTAP REST",
+      "kind": "restapi",
+      "options": {
+        "url": "{{globals.ontap_base_url}}",
+        "auth_type": "basic",
+        "headers": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "credentials": {
+          "username": "{{globals.ontap_username}}",
+          "password": "{{globals.ontap_password}}"
+        },
+        "ssl_certificate": "none"
+      }
+    }
+  ],
+  "queries": [
+    {
+      "id": "q_list_volumes",
+      "name": "listVolumes",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes",
+        "url_params": [
+          { "key": "fields", "value": "name,svm.name,nas.path,nas.security_style" },
+          { "key": "max_records", "value": "200" },
+          { "key": "order_by", "value": "name asc" }
+        ]
+      },
+      "runOnPageLoad": true,
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "volumes", "value": "{{queries.listVolumes.data.records}}" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to load volumes: {{queries.listVolumes.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_list_snapshots",
+      "name": "listSnapshots",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes/{{variables.selectedVolumeUuid}}/snapshots",
+        "url_params": [
+          { "key": "fields", "value": "name,create_time,size" },
+          { "key": "max_records", "value": "100" },
+          { "key": "order_by", "value": "create_time desc" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "snapshots", "value": "{{queries.listSnapshots.data.records}}" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to load snapshots: {{queries.listSnapshots.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_restore_snapshot",
+      "name": "restoreSnapshot",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "POST",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes/{{variables.selectedVolumeUuid}}/snapshots/{{variables.selectedSnapshotUuid}}/restore",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {},
+        "url_params": [
+          { "key": "return_timeout", "value": "0" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "restoreJobUuid", "value": "{{queries.restoreSnapshot.data.job.uuid}}" },
+          { "action": "setVariable", "variable": "restoreState", "value": "polling" },
+          { "action": "setVariable", "variable": "showConfirmDialog", "value": false },
+          { "action": "runQuery", "queryName": "pollJobStatus" }
+        ],
+        "onError": [
+          { "action": "setVariable", "variable": "restoreState", "value": "failure" },
+          { "action": "setVariable", "variable": "restoreErrorCode", "value": "{{queries.restoreSnapshot.data.error.code || 'UNKNOWN'}}" },
+          { "action": "setVariable", "variable": "restoreErrorMessage", "value": "{{queries.restoreSnapshot.data.error.message || queries.restoreSnapshot.error || 'An unexpected error occurred'}}" },
+          { "action": "setVariable", "variable": "showConfirmDialog", "value": false }
+        ]
+      }
+    },
+    {
+      "id": "q_poll_job_status",
+      "name": "pollJobStatus",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/cluster/jobs/{{variables.restoreJobUuid}}"
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "jobState", "value": "{{queries.pollJobStatus.data.state}}" },
+          { "action": "setVariable", "variable": "jobMessage", "value": "{{queries.pollJobStatus.data.message || ''}}" },
+          {
+            "action": "runConditional",
+            "conditions": [
+              {
+                "condition": "{{queries.pollJobStatus.data.state === 'success'}}",
+                "actions": [
+                  { "action": "setVariable", "variable": "restoreState", "value": "success" },
+                  { "action": "setVariable", "variable": "restoreCompletionTime", "value": "{{queries.pollJobStatus.data.end_time || new Date().toISOString()}}" }
+                ]
+              },
+              {
+                "condition": "{{queries.pollJobStatus.data.state === 'failure'}}",
+                "actions": [
+                  { "action": "setVariable", "variable": "restoreState", "value": "failure" },
+                  { "action": "setVariable", "variable": "restoreErrorCode", "value": "{{queries.pollJobStatus.data.code || 'UNKNOWN'}}" },
+                  { "action": "setVariable", "variable": "restoreErrorMessage", "value": "{{queries.pollJobStatus.data.message || 'Restore operation failed'}}" }
+                ]
+              },
+              {
+                "condition": "{{queries.pollJobStatus.data.state === 'queued' || queries.pollJobStatus.data.state === 'running'}}",
+                "actions": [
+                  { "action": "setTimeout", "delay": 5000, "queryName": "pollJobStatus" }
+                ]
+              }
+            ]
+          }
+        ],
+        "onError": [
+          { "action": "setVariable", "variable": "restoreState", "value": "polling" },
+          { "action": "setVariable", "variable": "jobMessage", "value": "Connection lost — retrying..." },
+          { "action": "setTimeout", "delay": 5000, "queryName": "pollJobStatus" }
+        ]
+      }
+    }
+  ],
+  "components": [
+    {
+      "id": "c_page_header",
+      "type": "text",
+      "name": "pageHeader",
+      "properties": {
+        "text": "## Snapshot Restore",
+        "markdown": true
+      }
+    },
+    {
+      "id": "c_page_description",
+      "type": "text",
+      "name": "pageDescription",
+      "properties": {
+        "text": "Restore a volume to a previous point-in-time state from a snapshot. Select a volume, choose a snapshot, and confirm the restore operation.",
+        "visible": "{{variables.restoreState === 'idle'}}"
+      }
+    },
+    {
+      "id": "c_volume_select",
+      "type": "dropdown",
+      "name": "volumeSelect",
+      "properties": {
+        "label": "Select Volume",
+        "options": "{{(variables.volumes || []).map(v => ({label: v.name + ' (' + v.svm.name + ')', value: v.uuid}))}}",
+        "placeholder": "Choose a volume to restore",
+        "visible": "{{variables.restoreState === 'idle'}}",
+        "disabled": "{{queries.listVolumes.isLoading}}"
+      },
+      "events": {
+        "onChange": [
+          { "action": "setVariable", "variable": "selectedVolumeUuid", "value": "{{components.volumeSelect.value}}" },
+          {
+            "action": "setVariable",
+            "variable": "selectedVolumeName",
+            "value": "{{(variables.volumes || []).find(v => v.uuid === components.volumeSelect.value)?.name || ''}}"
+          },
+          {
+            "action": "setVariable",
+            "variable": "selectedVolumeHasNas",
+            "value": "{{!!(variables.volumes || []).find(v => v.uuid === components.volumeSelect.value)?.nas?.path}}"
+          },
+          { "action": "setVariable", "variable": "selectedSnapshotUuid", "value": null },
+          { "action": "setVariable", "variable": "selectedSnapshotName", "value": null },
+          { "action": "setVariable", "variable": "selectedSnapshotCreateTime", "value": null },
+          { "action": "runQuery", "queryName": "listSnapshots" }
+        ]
+      }
+    },
+    {
+      "id": "c_snapshot_table",
+      "type": "table",
+      "name": "snapshotTable",
+      "properties": {
+        "data": "{{variables.snapshots || []}}",
+        "columns": [
+          { "name": "Snapshot Name", "key": "name", "sortable": true },
+          { "name": "Creation Time", "key": "create_time", "sortable": true, "cellRenderer": "{{new Date(cell).toLocaleString()}}" },
+          { "name": "Size", "key": "size", "sortable": true, "cellRenderer": "{{cell ? (cell / 1048576).toFixed(1) + ' MB' : 'N/A'}}" }
+        ],
+        "pagination": { "enabled": true, "pageSize": 50 },
+        "search": { "enabled": true },
+        "loading": "{{queries.listSnapshots.isLoading}}",
+        "visible": "{{variables.selectedVolumeUuid != null && variables.restoreState === 'idle'}}",
+        "emptyMessage": "No snapshots found for this volume"
+      },
+      "events": {
+        "onRowClick": [
+          { "action": "setVariable", "variable": "selectedSnapshotUuid", "value": "{{snapshotTable.selectedRow.uuid}}" },
+          { "action": "setVariable", "variable": "selectedSnapshotName", "value": "{{snapshotTable.selectedRow.name}}" },
+          { "action": "setVariable", "variable": "selectedSnapshotCreateTime", "value": "{{snapshotTable.selectedRow.create_time}}" }
+        ]
+      }
+    },
+    {
+      "id": "c_restore_btn",
+      "type": "button",
+      "name": "restoreBtn",
+      "properties": {
+        "text": "Restore from Selected Snapshot",
+        "variant": "danger",
+        "visible": "{{variables.selectedSnapshotUuid != null && variables.restoreState === 'idle'}}",
+        "disabled": "{{!variables.selectedSnapshotUuid}}"
+      },
+      "events": {
+        "onClick": [
+          { "action": "setVariable", "variable": "showConfirmDialog", "value": true }
+        ]
+      }
+    },
+    {
+      "id": "c_restore_confirm_modal",
+      "type": "modal",
+      "name": "restoreConfirmModal",
+      "properties": {
+        "visible": "{{variables.showConfirmDialog}}",
+        "title": "Confirm Snapshot Restore",
+        "size": "medium"
+      },
+      "children": [
+        {
+          "id": "c_restore_details",
+          "type": "text",
+          "name": "restoreDetailsText",
+          "properties": {
+            "text": "**Volume:** {{variables.selectedVolumeName}}\n\n**Snapshot:** {{variables.selectedSnapshotName}}\n\n**Snapshot Created:** {{new Date(variables.selectedSnapshotCreateTime).toLocaleString()}}",
+            "markdown": true
+          }
+        },
+        {
+          "id": "c_data_loss_warning",
+          "type": "text",
+          "name": "dataLossWarning",
+          "properties": {
+            "text": "⚠️ **WARNING: Data Loss**\n\nAll data written after {{new Date(variables.selectedSnapshotCreateTime).toLocaleString()}} will be **permanently lost**. This operation cannot be undone.",
+            "markdown": true,
+            "style": {
+              "backgroundColor": "#FFF3CD",
+              "border": "1px solid #FFC107",
+              "borderRadius": "4px",
+              "padding": "12px"
+            }
+          }
+        },
+        {
+          "id": "c_nas_disruption_warning",
+          "type": "text",
+          "name": "nasDisruptionWarning",
+          "properties": {
+            "text": "⚠️ **NFS/CIFS Client Disruption**\n\nThis volume has active NAS shares. Connected NFS/CIFS clients may experience disruption during the restore operation. Clients may need to remount the volume after restore completes.",
+            "markdown": true,
+            "visible": "{{variables.selectedVolumeHasNas}}",
+            "style": {
+              "backgroundColor": "#F8D7DA",
+              "border": "1px solid #DC3545",
+              "borderRadius": "4px",
+              "padding": "12px",
+              "marginTop": "8px"
+            }
+          }
+        },
+        {
+          "id": "c_confirm_restore_btn",
+          "type": "button",
+          "name": "confirmRestoreBtn",
+          "properties": {
+            "text": "Confirm Restore",
+            "variant": "danger",
+            "disabled": "{{queries.restoreSnapshot.isLoading}}"
+          },
+          "events": {
+            "onClick": [
+              { "action": "runQuery", "queryName": "restoreSnapshot" }
+            ]
+          }
+        },
+        {
+          "id": "c_cancel_restore_btn",
+          "type": "button",
+          "name": "cancelRestoreBtn",
+          "properties": {
+            "text": "Cancel",
+            "variant": "secondary"
+          },
+          "events": {
+            "onClick": [
+              { "action": "setVariable", "variable": "showConfirmDialog", "value": false }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_progress_container",
+      "type": "container",
+      "name": "progressContainer",
+      "properties": {
+        "visible": "{{variables.restoreState === 'polling'}}",
+        "title": "Restore In Progress"
+      },
+      "children": [
+        {
+          "id": "c_progress_spinner",
+          "type": "spinner",
+          "name": "progressSpinner",
+          "properties": {
+            "size": "large"
+          }
+        },
+        {
+          "id": "c_progress_text",
+          "type": "text",
+          "name": "progressText",
+          "properties": {
+            "text": "**Restoring volume '{{variables.selectedVolumeName}}' from snapshot '{{variables.selectedSnapshotName}}'...**\n\nJob State: {{variables.jobState || 'queued'}}\n\n{{variables.jobMessage}}",
+            "markdown": true
+          }
+        },
+        {
+          "id": "c_progress_status_badge",
+          "type": "text",
+          "name": "progressStatusBadge",
+          "properties": {
+            "text": "{{variables.jobState === 'running' ? '🔄 Running' : '⏳ Queued'}}",
+            "style": {
+              "fontSize": "14px",
+              "fontWeight": "bold",
+              "color": "{{variables.jobState === 'running' ? '#0D6EFD' : '#6C757D'}}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_success_container",
+      "type": "container",
+      "name": "successContainer",
+      "properties": {
+        "visible": "{{variables.restoreState === 'success'}}",
+        "title": "Restore Completed Successfully"
+      },
+      "children": [
+        {
+          "id": "c_success_icon",
+          "type": "text",
+          "name": "successIcon",
+          "properties": {
+            "text": "✅",
+            "style": { "fontSize": "48px", "textAlign": "center" }
+          }
+        },
+        {
+          "id": "c_success_text",
+          "type": "text",
+          "name": "successText",
+          "properties": {
+            "text": "**Snapshot Restore Completed**\n\n**Volume:** {{variables.selectedVolumeName}}\n\n**Restored Snapshot:** {{variables.selectedSnapshotName}}\n\n**Completed At:** {{new Date(variables.restoreCompletionTime).toLocaleString()}}",
+            "markdown": true,
+            "style": {
+              "backgroundColor": "#D4EDDA",
+              "border": "1px solid #28A745",
+              "borderRadius": "4px",
+              "padding": "16px"
+            }
+          }
+        },
+        {
+          "id": "c_success_done_btn",
+          "type": "button",
+          "name": "successDoneBtn",
+          "properties": {
+            "text": "Done",
+            "variant": "primary"
+          },
+          "events": {
+            "onClick": [
+              { "action": "setVariable", "variable": "restoreState", "value": "idle" },
+              { "action": "setVariable", "variable": "selectedSnapshotUuid", "value": null },
+              { "action": "setVariable", "variable": "selectedSnapshotName", "value": null },
+              { "action": "setVariable", "variable": "selectedSnapshotCreateTime", "value": null },
+              { "action": "setVariable", "variable": "restoreJobUuid", "value": null },
+              { "action": "setVariable", "variable": "restoreCompletionTime", "value": null },
+              { "action": "runQuery", "queryName": "listSnapshots" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_failure_container",
+      "type": "container",
+      "name": "failureContainer",
+      "properties": {
+        "visible": "{{variables.restoreState === 'failure'}}",
+        "title": "Restore Failed"
+      },
+      "children": [
+        {
+          "id": "c_failure_icon",
+          "type": "text",
+          "name": "failureIcon",
+          "properties": {
+            "text": "❌",
+            "style": { "fontSize": "48px", "textAlign": "center" }
+          }
+        },
+        {
+          "id": "c_failure_text",
+          "type": "text",
+          "name": "failureText",
+          "properties": {
+            "text": "**Snapshot Restore Failed**\n\n**Volume:** {{variables.selectedVolumeName}}\n\n**Snapshot:** {{variables.selectedSnapshotName}}\n\n**Error Code:** {{variables.restoreErrorCode}}\n\n**Error Message:** {{variables.restoreErrorMessage}}",
+            "markdown": true,
+            "style": {
+              "backgroundColor": "#F8D7DA",
+              "border": "1px solid #DC3545",
+              "borderRadius": "4px",
+              "padding": "16px"
+            }
+          }
+        },
+        {
+          "id": "c_volume_detail_link",
+          "type": "button",
+          "name": "volumeDetailLink",
+          "properties": {
+            "text": "Go to Volume Detail",
+            "variant": "outline"
+          },
+          "events": {
+            "onClick": [
+              { "action": "navigateTo", "page": "volume-management", "params": { "volumeUuid": "{{variables.selectedVolumeUuid}}" } }
+            ]
+          }
+        },
+        {
+          "id": "c_failure_retry_btn",
+          "type": "button",
+          "name": "failureRetryBtn",
+          "properties": {
+            "text": "Back to Snapshot List",
+            "variant": "secondary"
+          },
+          "events": {
+            "onClick": [
+              { "action": "setVariable", "variable": "restoreState", "value": "idle" },
+              { "action": "setVariable", "variable": "restoreErrorCode", "value": null },
+              { "action": "setVariable", "variable": "restoreErrorMessage", "value": null },
+              { "action": "setVariable", "variable": "restoreJobUuid", "value": null },
+              { "action": "runQuery", "queryName": "listSnapshots" }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "volumes": [],
+    "snapshots": [],
+    "selectedVolumeUuid": null,
+    "selectedVolumeName": null,
+    "selectedVolumeHasNas": false,
+    "selectedSnapshotUuid": null,
+    "selectedSnapshotName": null,
+    "selectedSnapshotCreateTime": null,
+    "showConfirmDialog": false,
+    "restoreState": "idle",
+    "restoreJobUuid": null,
+    "jobState": null,
+    "jobMessage": null,
+    "restoreCompletionTime": null,
+    "restoreErrorCode": null,
+    "restoreErrorMessage": null
+  }
+}

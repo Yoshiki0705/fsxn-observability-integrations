@@ -92,18 +92,21 @@ OTel Collector を使って、同一の監査ログを Grafana Cloud と Honeyco
 
 1. **準備**: OTel Collector 統合デプロイ + Collector 設定
    ```yaml
-   # otel-collector-config.yaml
+   # otel-collector-config.yaml (verified working)
    exporters:
-     loki:
-       endpoint: https://logs-prod.grafana.net/loki/api/v1/push
+     otlp_http/grafana:
+       endpoint: https://otlp-gateway-prod-ap-southeast-0.grafana.net/otlp
+       headers:
+         Authorization: Basic ${GRAFANA_BASIC_AUTH}
      otlp_http/honeycomb:
        endpoint: https://api.honeycomb.io
        headers:
          x-honeycomb-team: ${HONEYCOMB_KEY}
+         x-honeycomb-dataset: fsxn-audit
    service:
      pipelines:
        logs:
-         exporters: [loki, otlp_http/honeycomb]
+         exporters: [otlp_http/grafana, otlp_http/honeycomb]
    ```
 2. **操作**: FSx ONTAP でファイル操作
 3. **確認**:

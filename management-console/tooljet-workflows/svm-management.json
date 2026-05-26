@@ -1,0 +1,324 @@
+{
+  "schemaVersion": "2.0",
+  "name": "SVM Management",
+  "description": "FSx ONTAP SVM list and configuration management",
+  "dataSources": [
+    {
+      "id": "ds_ontap_rest",
+      "name": "FSxN ONTAP REST",
+      "kind": "restapi",
+      "options": {
+        "url": "{{globals.ontap_base_url}}",
+        "auth_type": "basic",
+        "headers": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "credentials": {
+          "username": "{{globals.ontap_username}}",
+          "password": "{{globals.ontap_password}}"
+        },
+        "ssl_certificate": "none"
+      }
+    }
+  ],
+  "queries": [
+    {
+      "id": "q_list_svms",
+      "name": "listSvms",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/svm/svms",
+        "url_params": [
+          { "key": "fields", "value": "name,state,ip_interfaces,dns,nfs,cifs,s3,volumes,aggregates,subtype" },
+          { "key": "max_records", "value": "50" },
+          { "key": "order_by", "value": "name asc" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "svms", "value": "{{queries.listSvms.data.records}}" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to load SVMs: {{queries.listSvms.error}}" }
+        ]
+      },
+      "runOnPageLoad": true
+    },
+    {
+      "id": "q_get_svm_details",
+      "name": "getSvmDetails",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/svm/svms/{{variables.selectedSvmUuid}}",
+        "url_params": [
+          { "key": "fields", "value": "name,state,ip_interfaces,dns,nfs,cifs,s3,volumes,aggregates,subtype,language,comment,max_volumes" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "svmDetail", "value": "{{queries.getSvmDetails.data}}" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to load SVM details: {{queries.getSvmDetails.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_list_svm_interfaces",
+      "name": "listSvmInterfaces",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/network/ip/interfaces",
+        "url_params": [
+          { "key": "svm.uuid", "value": "{{variables.selectedSvmUuid}}" },
+          { "key": "fields", "value": "name,ip.address,ip.netmask,state,service_policy.name,location.port.name,location.node.name" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "svmInterfaces", "value": "{{queries.listSvmInterfaces.data.records}}" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to load network interfaces: {{queries.listSvmInterfaces.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_get_svm_dns",
+      "name": "getSvmDns",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/name-services/dns",
+        "url_params": [
+          { "key": "svm.uuid", "value": "{{variables.selectedSvmUuid}}" },
+          { "key": "fields", "value": "domains,servers" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "svmDns", "value": "{{queries.getSvmDns.data.records}}" }
+        ],
+        "onError": [
+          { "action": "setVariable", "variable": "svmDns", "value": [] }
+        ]
+      }
+    },
+    {
+      "id": "q_update_svm_dns",
+      "name": "updateSvmDns",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "PATCH",
+        "url": "{{globals.ontap_base_url}}/api/name-services/dns/{{variables.selectedSvmUuid}}",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "domains": "{{components.dnsDomainsInput.value.split(',').map(d => d.trim())}}",
+          "servers": "{{components.dnsServersInput.value.split(',').map(s => s.trim())}}"
+        }
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "showAlert", "alertType": "success", "message": "DNS settings updated successfully" },
+          { "action": "runQuery", "queryName": "getSvmDns" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to update DNS settings: {{queries.updateSvmDns.data.error.message || queries.updateSvmDns.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_list_export_policies",
+      "name": "listExportPolicies",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/protocols/nfs/export-policies",
+        "url_params": [
+          { "key": "svm.uuid", "value": "{{variables.selectedSvmUuid}}" },
+          { "key": "fields", "value": "name,rules" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "exportPolicies", "value": "{{queries.listExportPolicies.data.records}}" }
+        ],
+        "onError": [
+          { "action": "setVariable", "variable": "exportPolicies", "value": [] }
+        ]
+      }
+    }
+  ],
+  "components": [
+    {
+      "id": "c_svm_table",
+      "type": "table",
+      "name": "svmTable",
+      "properties": {
+        "data": "{{queries.listSvms.data.records}}",
+        "columns": [
+          { "name": "Name", "key": "name", "sortable": true },
+          { "name": "State", "key": "state", "sortable": true, "cellRenderer": "{{cell === 'running' ? 'running' : cell}}", "conditionalStyle": "{{cell !== 'running' ? {color: 'orange', fontWeight: 'bold'} : {}}}" },
+          { "name": "NFS", "key": "nfs.enabled", "cellRenderer": "{{cell ? 'Enabled' : 'Disabled'}}" },
+          { "name": "CIFS", "key": "cifs.enabled", "cellRenderer": "{{cell ? 'Enabled' : 'Disabled'}}" },
+          { "name": "S3", "key": "s3.enabled", "cellRenderer": "{{cell ? 'Enabled' : 'Disabled'}}" },
+          { "name": "Subtype", "key": "subtype" }
+        ],
+        "pagination": { "enabled": true, "pageSize": 50 },
+        "search": { "enabled": true },
+        "loading": "{{queries.listSvms.isLoading}}"
+      },
+      "events": {
+        "onRowClick": [
+          { "action": "setVariable", "variable": "selectedSvmUuid", "value": "{{svmTable.selectedRow.uuid}}" },
+          { "action": "setVariable", "variable": "selectedSvmName", "value": "{{svmTable.selectedRow.name}}" },
+          { "action": "setVariable", "variable": "showSvmDetail", "value": true },
+          { "action": "runQuery", "queryName": "getSvmDetails" },
+          { "action": "runQuery", "queryName": "listSvmInterfaces" },
+          { "action": "runQuery", "queryName": "getSvmDns" },
+          { "action": "runQuery", "queryName": "listExportPolicies" }
+        ]
+      }
+    },
+    {
+      "id": "c_svm_detail_panel",
+      "type": "container",
+      "name": "svmDetailPanel",
+      "properties": {
+        "visible": "{{variables.showSvmDetail}}",
+        "title": "SVM Details: {{variables.selectedSvmName}}"
+      },
+      "children": [
+        {
+          "id": "c_svm_info",
+          "type": "text",
+          "name": "svmInfoText",
+          "properties": {
+            "text": "State: {{variables.svmDetail.state}} | Language: {{variables.svmDetail.language}} | Max Volumes: {{variables.svmDetail.max_volumes}}"
+          }
+        },
+        {
+          "id": "c_interfaces_table",
+          "type": "table",
+          "name": "interfacesTable",
+          "properties": {
+            "title": "Network Interfaces",
+            "data": "{{variables.svmInterfaces}}",
+            "columns": [
+              { "name": "Name", "key": "name" },
+              { "name": "IP Address", "key": "ip.address" },
+              { "name": "Netmask", "key": "ip.netmask" },
+              { "name": "State", "key": "state" },
+              { "name": "Service Policy", "key": "service_policy.name" },
+              { "name": "Node", "key": "location.node.name" },
+              { "name": "Port", "key": "location.port.name" }
+            ]
+          }
+        },
+        {
+          "id": "c_dns_section",
+          "type": "container",
+          "name": "dnsSection",
+          "properties": {
+            "title": "DNS Configuration"
+          },
+          "children": [
+            {
+              "id": "c_dns_domains_input",
+              "type": "textInput",
+              "name": "dnsDomainsInput",
+              "properties": {
+                "label": "DNS Domains (comma-separated)",
+                "value": "{{variables.svmDns[0]?.domains?.join(', ') || ''}}",
+                "placeholder": "example.com, corp.example.com"
+              }
+            },
+            {
+              "id": "c_dns_servers_input",
+              "type": "textInput",
+              "name": "dnsServersInput",
+              "properties": {
+                "label": "DNS Servers (comma-separated)",
+                "value": "{{variables.svmDns[0]?.servers?.join(', ') || ''}}",
+                "placeholder": "10.0.x.x, 10.0.x.x"
+              }
+            },
+            {
+              "id": "c_update_dns_btn",
+              "type": "button",
+              "name": "updateDnsBtn",
+              "properties": {
+                "text": "Update DNS",
+                "variant": "primary",
+                "disabled": "{{queries.updateSvmDns.isLoading}}"
+              },
+              "events": {
+                "onClick": [
+                  { "action": "runQuery", "queryName": "updateSvmDns" }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "c_export_policies_table",
+          "type": "table",
+          "name": "exportPoliciesTable",
+          "properties": {
+            "title": "Export Policies",
+            "data": "{{variables.exportPolicies}}",
+            "columns": [
+              { "name": "Policy Name", "key": "name" },
+              { "name": "Rules Count", "key": "rules", "cellRenderer": "{{cell?.length || 0}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_back_btn",
+      "type": "button",
+      "name": "backToListBtn",
+      "properties": {
+        "text": "Back to SVM List",
+        "variant": "outline",
+        "visible": "{{variables.showSvmDetail}}"
+      },
+      "events": {
+        "onClick": [
+          { "action": "setVariable", "variable": "showSvmDetail", "value": false }
+        ]
+      }
+    },
+    {
+      "id": "c_refresh_btn",
+      "type": "button",
+      "name": "refreshBtn",
+      "properties": {
+        "text": "Refresh",
+        "variant": "outline"
+      },
+      "events": {
+        "onClick": [
+          { "action": "runQuery", "queryName": "listSvms" }
+        ]
+      }
+    }
+  ],
+  "variables": {
+    "selectedSvmUuid": null,
+    "selectedSvmName": null,
+    "showSvmDetail": false,
+    "svms": [],
+    "svmDetail": null,
+    "svmInterfaces": [],
+    "svmDns": [],
+    "exportPolicies": []
+  }
+}

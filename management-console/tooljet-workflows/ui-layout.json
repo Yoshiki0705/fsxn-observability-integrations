@@ -1,0 +1,764 @@
+{
+  "_schema": "tooljet-ui-layout/v1",
+  "description": "FSxN Management Console UI layout configuration for ToolJet",
+  "version": "1.0.0",
+  "theme": {
+    "colorScheme": "light",
+    "colors": {
+      "primary": "#1976D2",
+      "primaryDark": "#1565C0",
+      "primaryLight": "#42A5F5",
+      "secondary": "#424242",
+      "success": "#2E7D32",
+      "warning": "#ED6C02",
+      "error": "#D32F2F",
+      "info": "#0288D1",
+      "background": "#F5F5F5",
+      "surface": "#FFFFFF",
+      "textPrimary": "#212121",
+      "textSecondary": "#757575",
+      "border": "#E0E0E0",
+      "activeTab": "#1976D2",
+      "inactiveTab": "#9E9E9E",
+      "accordionHeader": "#FAFAFA",
+      "accordionHeaderActive": "#E3F2FD",
+      "destructiveAction": "#D32F2F",
+      "destructiveHover": "#B71C1C"
+    },
+    "typography": {
+      "fontFamily": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "headingSize": "1.25rem",
+      "bodySize": "0.875rem",
+      "smallSize": "0.75rem"
+    },
+    "spacing": {
+      "tabBarHeight": "48px",
+      "accordionHeaderHeight": "44px",
+      "panelPadding": "16px",
+      "sectionGap": "12px"
+    },
+    "breakpoints": {
+      "minWidth": 1280,
+      "maxWidth": 2560
+    },
+    "darkMode": {
+      "enabled": true,
+      "colors": {
+        "primary": "#90CAF9",
+        "primaryDark": "#42A5F5",
+        "primaryLight": "#BBDEFB",
+        "secondary": "#B0BEC5",
+        "success": "#66BB6A",
+        "warning": "#FFA726",
+        "error": "#EF5350",
+        "info": "#29B6F6",
+        "background": "#121212",
+        "surface": "#1E1E1E",
+        "textPrimary": "#FFFFFF",
+        "textSecondary": "#B0BEC5",
+        "border": "#333333",
+        "activeTab": "#90CAF9",
+        "inactiveTab": "#616161",
+        "accordionHeader": "#1E1E1E",
+        "accordionHeaderActive": "#1A237E",
+        "destructiveAction": "#EF5350",
+        "destructiveHover": "#C62828"
+      },
+      "note": "Dark mode recommended for NOC/SOC environments. Toggle via Settings tab."
+    },
+    "accessibility": {
+      "minimumContrastRatio": 4.5,
+      "focusIndicator": "2px solid #1976D2",
+      "keyboardNavigation": true,
+      "ariaLabels": true,
+      "reducedMotion": "respectsPreference",
+      "note": "WCAG 2.1 AA compliance target. Full validation requires manual testing with assistive technologies."
+    },
+    "loadingStates": {
+      "tableLoading": "skeleton",
+      "panelLoading": "spinner",
+      "formSubmitting": "disableButton",
+      "grafanaEmbed": {
+        "loading": "skeleton",
+        "timeout": 10000,
+        "fallback": "errorMessage"
+      }
+    },
+    "errorPatterns": {
+      "apiError": "toast",
+      "validationError": "inline",
+      "connectionLost": "banner",
+      "destructiveConfirmation": "modal"
+    }
+  },
+  "navigation": {
+    "type": "tab-bar",
+    "position": "top",
+    "urlSync": true,
+    "urlPattern": "/app/{tab}/{accordion}",
+    "historyMode": "pushState",
+    "fileSystemSelector": {
+      "enabled": true,
+      "position": "header-right",
+      "type": "dropdown",
+      "dataSource": "env:ONTAP_MGMT_ENDPOINTS",
+      "labelFormat": "FSx ONTAP: {{endpoint}}",
+      "onSelect": {
+        "updateGlobals": ["ontap_base_url", "ontap_username", "ontap_password"],
+        "refreshCurrentView": true,
+        "maxRefreshTime": 3000
+      },
+      "credentialMapping": {
+        "source": "env:ONTAP_CREDENTIALS_SECRET_ARNS",
+        "positionalMatch": true
+      },
+      "visualIndicator": {
+        "showOnAllPages": true,
+        "style": {
+          "backgroundColor": "#E3F2FD",
+          "borderRadius": "4px",
+          "padding": "4px 12px",
+          "fontSize": "12px",
+          "fontWeight": "600"
+        }
+      },
+      "errorHandling": {
+        "unreachableEndpoint": {
+          "showError": true,
+          "allowSwitch": true,
+          "message": "File system unreachable. You can switch to another file system."
+        }
+      }
+    },
+    "tabs": [
+      {
+        "id": "dashboard",
+        "label": "Dashboard",
+        "icon": "dashboard",
+        "urlSlug": "dashboard",
+        "default": true
+      },
+      {
+        "id": "volumes",
+        "label": "Volumes",
+        "icon": "storage",
+        "urlSlug": "volumes"
+      },
+      {
+        "id": "svms",
+        "label": "SVMs",
+        "icon": "dns",
+        "urlSlug": "svms"
+      },
+      {
+        "id": "snapshots",
+        "label": "Snapshots",
+        "icon": "camera",
+        "urlSlug": "snapshots"
+      },
+      {
+        "id": "replication",
+        "label": "Replication",
+        "icon": "sync",
+        "urlSlug": "replication"
+      },
+      {
+        "id": "s3files",
+        "label": "S3 Files",
+        "icon": "folder",
+        "urlSlug": "s3-files"
+      },
+      {
+        "id": "settings",
+        "label": "Settings",
+        "icon": "settings",
+        "urlSlug": "settings"
+      }
+    ]
+  },
+  "sections": {
+    "dashboard": {
+      "layout": "grid",
+      "accordions": [
+        {
+          "id": "overview",
+          "label": "System Overview",
+          "defaultExpanded": true,
+          "components": [
+            {
+              "type": "grafana-embed",
+              "panelRef": "cluster-overview",
+              "height": "300px",
+              "width": "100%"
+            }
+          ]
+        },
+        {
+          "id": "volume-summary",
+          "label": "Volume Performance Summary",
+          "defaultExpanded": false,
+          "components": [
+            {
+              "type": "grafana-embed",
+              "panelRef": "volume-iops-overview",
+              "height": "250px",
+              "width": "50%"
+            },
+            {
+              "type": "grafana-embed",
+              "panelRef": "volume-throughput-overview",
+              "height": "250px",
+              "width": "50%"
+            }
+          ]
+        },
+        {
+          "id": "capacity",
+          "label": "Capacity Utilization",
+          "defaultExpanded": false,
+          "components": [
+            {
+              "type": "grafana-embed",
+              "panelRef": "aggregate-capacity",
+              "height": "250px",
+              "width": "100%"
+            }
+          ]
+        },
+        {
+          "id": "alerts",
+          "label": "Active Alerts",
+          "defaultExpanded": false,
+          "components": [
+            {
+              "type": "alert-list",
+              "dataSource": "cloudwatch-alarms",
+              "maxItems": 10
+            }
+          ]
+        }
+      ]
+    },
+    "volumes": {
+      "layout": "single-column",
+      "accordionMode": "single",
+      "accordions": [
+        {
+          "id": "volume-list",
+          "label": "Volume List",
+          "defaultExpanded": true,
+          "components": [
+            {
+              "type": "data-table",
+              "dataSource": "ontap-rest",
+              "endpoint": "/api/storage/volumes",
+              "columns": [
+                { "field": "name", "label": "Name", "sortable": true },
+                { "field": "svm.name", "label": "SVM", "sortable": true },
+                { "field": "space.used", "label": "Used", "format": "bytes" },
+                { "field": "space.size", "label": "Total", "format": "bytes" },
+                { "field": "space.percent_used", "label": "% Used", "format": "percent" },
+                { "field": "state", "label": "State", "badge": true }
+              ],
+              "pagination": { "pageSize": 50 },
+              "actions": ["view", "resize", "delete"]
+            }
+          ]
+        },
+        {
+          "id": "volume-create",
+          "label": "Create Volume",
+          "defaultExpanded": false,
+          "components": [
+            {
+              "type": "form",
+              "formId": "volume-create-form",
+              "fields": [
+                {
+                  "name": "name",
+                  "label": "Volume Name",
+                  "type": "text",
+                  "required": true,
+                  "validation": {
+                    "pattern": "^[a-zA-Z0-9_]{1,203}$",
+                    "message": "1-203 characters, alphanumeric and underscores only"
+                  }
+                },
+                {
+                  "name": "svm",
+                  "label": "SVM",
+                  "type": "select",
+                  "required": true,
+                  "dataSource": "ontap-rest",
+                  "endpoint": "/api/svm/svms"
+                },
+                {
+                  "name": "size",
+                  "label": "Size",
+                  "type": "size-input",
+                  "required": true,
+                  "min": "20MB",
+                  "max": "100TB"
+                },
+                {
+                  "name": "aggregate",
+                  "label": "Aggregate",
+                  "type": "select",
+                  "required": true,
+                  "dataSource": "ontap-rest",
+                  "endpoint": "/api/storage/aggregates"
+                },
+                {
+                  "name": "junction_path",
+                  "label": "Junction Path",
+                  "type": "text",
+                  "required": true,
+                  "placeholder": "/vol_name"
+                },
+                {
+                  "name": "export_policy",
+                  "label": "Export Policy",
+                  "type": "select",
+                  "required": true,
+                  "dataSource": "ontap-rest",
+                  "endpoint": "/api/protocols/nfs/export-policies"
+                }
+              ],
+              "submitLabel": "Create Volume",
+              "submitAction": "workflow:volume-create"
+            }
+          ]
+        },
+        {
+          "id": "volume-resize",
+          "label": "Resize Volume",
+          "defaultExpanded": false,
+          "components": [
+            {
+              "type": "form",
+              "formId": "volume-resize-form",
+              "fields": [
+                {
+                  "name": "volume",
+                  "label": "Volume",
+                  "type": "select",
+                  "required": true,
+                  "dataSource": "ontap-rest",
+                  "endpoint": "/api/storage/volumes"
+                },
+                {
+                  "name": "new_size",
+                  "label": "New Size",
+                  "type": "size-input",
+                  "required": true,
+                  "min": "20MB",
+                  "max": "100TB"
+                }
+              ],
+              "submitLabel": "Resize Volume",
+              "submitAction": "workflow:volume-resize"
+            }
+          ]
+        },
+        {
+          "id": "volume-detail",
+          "label": "Volume Detail & Metrics",
+          "defaultExpanded": false,
+          "components": [
+            {
+              "type": "volume-selector",
+              "dataSource": "ontap-rest",
+              "endpoint": "/api/storage/volumes"
+            },
+            {
+              "type": "grafana-embed",
+              "panelRef": "volume-iops",
+              "height": "200px",
+              "width": "33%",
+              "filters": { "volume": "{{selectedVolume}}" }
+            },
+            {
+              "type": "grafana-embed",
+              "panelRef": "volume-throughput",
+              "height": "200px",
+              "width": "33%",
+              "filters": { "volume": "{{selectedVolume}}" }
+            },
+            {
+              "type": "grafana-embed",
+              "panelRef": "volume-latency",
+              "height": "200px",
+              "width": "34%",
+              "filters": { "volume": "{{selectedVolume}}" }
+            }
+          ]
+        }
+      ]
+    },
+    "svms": {
+      "layout": "single-column",
+      "accordionMode": "single",
+      "accordions": [
+        {
+          "id": "svm-list",
+          "label": "SVM List",
+          "defaultExpanded": true,
+          "components": [
+            {
+              "type": "data-table",
+              "dataSource": "ontap-rest",
+              "endpoint": "/api/svm/svms",
+              "columns": [
+                { "field": "name", "label": "Name", "sortable": true },
+                { "field": "state", "label": "State", "badge": true },
+                { "field": "ip_interfaces", "label": "IP Addresses", "format": "list" },
+                { "field": "protocols", "label": "Protocols", "format": "tags" },
+                { "field": "volumes_count", "label": "Volumes", "sortable": true }
+              ],
+              "pagination": { "pageSize": 50 },
+              "warningIndicator": {
+                "condition": "state !== 'running'",
+                "message": "SVM is not in running state"
+              }
+            }
+          ]
+        },
+        {
+          "id": "svm-detail",
+          "label": "SVM Configuration",
+          "defaultExpanded": false,
+          "components": [
+            {
+              "type": "svm-selector",
+              "dataSource": "ontap-rest",
+              "endpoint": "/api/svm/svms"
+            },
+            {
+              "type": "detail-panel",
+              "sections": [
+                "network-interfaces",
+                "dns-settings",
+                "protocol-status",
+                "export-policies"
+              ]
+            },
+            {
+              "type": "grafana-embed",
+              "panelRef": "svm-iops",
+              "height": "200px",
+              "width": "50%",
+              "filters": { "svm": "{{selectedSvm}}" }
+            },
+            {
+              "type": "grafana-embed",
+              "panelRef": "svm-throughput",
+              "height": "200px",
+              "width": "50%",
+              "filters": { "svm": "{{selectedSvm}}" }
+            }
+          ]
+        }
+      ]
+    },
+    "snapshots": {
+      "layout": "single-column",
+      "accordionMode": "single",
+      "accordions": [
+        {
+          "id": "snapshot-list",
+          "label": "Snapshot List",
+          "defaultExpanded": true,
+          "components": [
+            {
+              "type": "volume-selector",
+              "dataSource": "ontap-rest",
+              "endpoint": "/api/storage/volumes"
+            },
+            {
+              "type": "data-table",
+              "dataSource": "ontap-rest",
+              "endpoint": "/api/storage/volumes/{{selectedVolume}}/snapshots",
+              "columns": [
+                { "field": "name", "label": "Name", "sortable": true },
+                { "field": "create_time", "label": "Created", "format": "datetime", "sortable": true },
+                { "field": "size", "label": "Size", "format": "bytes" },
+                { "field": "snapmirror_label", "label": "Retention Policy" }
+              ],
+              "defaultSort": { "field": "create_time", "direction": "desc" },
+              "pagination": { "pageSize": 50 },
+              "actions": ["restore", "delete"]
+            }
+          ]
+        },
+        {
+          "id": "snapshot-create",
+          "label": "Create Snapshot",
+          "defaultExpanded": false,
+          "components": [
+            {
+              "type": "form",
+              "formId": "snapshot-create-form",
+              "fields": [
+                {
+                  "name": "volume",
+                  "label": "Volume",
+                  "type": "select",
+                  "required": true,
+                  "dataSource": "ontap-rest",
+                  "endpoint": "/api/storage/volumes"
+                },
+                {
+                  "name": "name",
+                  "label": "Snapshot Name",
+                  "type": "text",
+                  "required": true,
+                  "validation": {
+                    "pattern": "^[a-zA-Z0-9_-]{1,255}$",
+                    "message": "1-255 characters, alphanumeric, hyphens, and underscores only"
+                  }
+                }
+              ],
+              "submitLabel": "Create Snapshot",
+              "submitAction": "workflow:snapshot-create"
+            }
+          ]
+        }
+      ]
+    },
+    "replication": {
+      "layout": "single-column",
+      "accordionMode": "single",
+      "accordions": [
+        {
+          "id": "snapmirror-list",
+          "label": "SnapMirror Relationships",
+          "defaultExpanded": true,
+          "components": [
+            {
+              "type": "data-table",
+              "dataSource": "ontap-rest",
+              "endpoint": "/api/snapmirror/relationships",
+              "columns": [
+                { "field": "source.path", "label": "Source", "sortable": true },
+                { "field": "destination.path", "label": "Destination", "sortable": true },
+                { "field": "state", "label": "State", "badge": true },
+                { "field": "lag_time", "label": "Lag Time", "format": "duration" },
+                { "field": "transfer.bytes_transferred", "label": "Last Transfer", "format": "bytes" }
+              ],
+              "warningIndicator": {
+                "condition": "state === 'broken_off'",
+                "message": "Relationship is broken-off",
+                "showTimestamp": true
+              },
+              "actions": ["update", "resync"]
+            }
+          ]
+        },
+        {
+          "id": "snapmirror-progress",
+          "label": "Transfer Progress",
+          "defaultExpanded": false,
+          "components": [
+            {
+              "type": "transfer-progress",
+              "pollingInterval": 10000,
+              "fields": ["percentage_complete", "bytes_transferred", "state"]
+            }
+          ]
+        }
+      ]
+    },
+    "s3files": {
+      "layout": "single-column",
+      "accordionMode": "single",
+      "accordions": [
+        {
+          "id": "file-browser",
+          "label": "S3 File Browser",
+          "defaultExpanded": true,
+          "components": [
+            {
+              "type": "s3-browser",
+              "dataSource": "lambda:s3-copy",
+              "pagination": { "pageSize": 1000 },
+              "prefixNavigation": true,
+              "columns": [
+                { "field": "key", "label": "Name" },
+                { "field": "size", "label": "Size", "format": "bytes" },
+                { "field": "last_modified", "label": "Last Modified", "format": "datetime" },
+                { "field": "storage_class", "label": "Storage Class" }
+              ],
+              "actions": ["download"],
+              "downloadConfig": {
+                "maxFileSize": "5GB",
+                "presignExpiry": 3600,
+                "errorMessages": {
+                  "sizeExceeded": "File size exceeds the maximum downloadable limit of 5 GB",
+                  "copyFailed": "Download failed. Please try again.",
+                  "apUnreachable": "S3 Access Point is unreachable. Verify VPC endpoint configuration."
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "settings": {
+      "layout": "single-column",
+      "accordionMode": "single",
+      "accordions": [
+        {
+          "id": "connection",
+          "label": "ONTAP Connection",
+          "defaultExpanded": true,
+          "components": [
+            {
+              "type": "connection-status",
+              "endpoint": "/api/cluster",
+              "fields": ["name", "version", "management_interfaces"]
+            }
+          ]
+        },
+        {
+          "id": "grafana",
+          "label": "Grafana Integration",
+          "defaultExpanded": false,
+          "components": [
+            {
+              "type": "config-display",
+              "fields": [
+                { "label": "Grafana URL", "value": "{{env.GRAFANA_URL}}" },
+                { "label": "Auto-refresh", "value": "60 seconds" },
+                { "label": "Default Time Range", "value": "1 hour" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "authentication",
+          "label": "Authentication",
+          "defaultExpanded": false,
+          "components": [
+            {
+              "type": "config-display",
+              "fields": [
+                { "label": "Provider", "value": "Amazon Cognito" },
+                { "label": "MFA", "value": "{{env.MFA_CONFIGURATION}}" },
+                { "label": "Session Duration", "value": "{{env.SESSION_DURATION_HOURS}} hours" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "grafanaEmbed": {
+    "baseUrl": "{{env.GRAFANA_URL}}",
+    "authMode": "cookie",
+    "cookieDomain": "{{env.ALB_DOMAIN}}",
+    "defaultTimeRange": "1h",
+    "autoRefreshInterval": 60,
+    "loadTimeout": 10000,
+    "fallback": {
+      "enabled": true,
+      "message": "Metrics panel is temporarily unavailable.",
+      "showDirectLink": true,
+      "directLinkLabel": "Open in Grafana"
+    },
+    "panels": {
+      "cluster-overview": {
+        "dashboardUid": "harvest-cluster-overview",
+        "panelId": 1,
+        "description": "Cluster-wide performance overview"
+      },
+      "volume-iops-overview": {
+        "dashboardUid": "harvest-volume-performance",
+        "panelId": 2,
+        "description": "All volumes IOPS summary"
+      },
+      "volume-throughput-overview": {
+        "dashboardUid": "harvest-volume-performance",
+        "panelId": 3,
+        "description": "All volumes throughput summary"
+      },
+      "aggregate-capacity": {
+        "dashboardUid": "harvest-aggregate-utilization",
+        "panelId": 1,
+        "description": "Aggregate capacity utilization"
+      },
+      "volume-iops": {
+        "dashboardUid": "harvest-volume-performance",
+        "panelId": 4,
+        "description": "Single volume IOPS (filtered)",
+        "variables": { "volume": "{{selectedVolume}}" }
+      },
+      "volume-throughput": {
+        "dashboardUid": "harvest-volume-performance",
+        "panelId": 5,
+        "description": "Single volume throughput (filtered)",
+        "variables": { "volume": "{{selectedVolume}}" }
+      },
+      "volume-latency": {
+        "dashboardUid": "harvest-volume-performance",
+        "panelId": 6,
+        "description": "Single volume latency (filtered)",
+        "variables": { "volume": "{{selectedVolume}}" }
+      },
+      "svm-iops": {
+        "dashboardUid": "harvest-svm-health",
+        "panelId": 1,
+        "description": "SVM-level IOPS (filtered)",
+        "variables": { "svm": "{{selectedSvm}}" }
+      },
+      "svm-throughput": {
+        "dashboardUid": "harvest-svm-health",
+        "panelId": 2,
+        "description": "SVM-level throughput (filtered)",
+        "variables": { "svm": "{{selectedSvm}}" }
+      }
+    }
+  },
+  "confirmationDialogs": {
+    "volume-delete": {
+      "title": "Delete Volume",
+      "message": "Are you sure you want to delete volume '{{resourceName}}'? This action will offline the volume and permanently delete all data.",
+      "severity": "destructive",
+      "confirmLabel": "Delete Volume",
+      "cancelLabel": "Cancel",
+      "requireTypedConfirmation": false,
+      "icon": "warning"
+    },
+    "snapshot-delete": {
+      "title": "Delete Snapshot",
+      "message": "Are you sure you want to delete snapshot '{{resourceName}}' from volume '{{parentVolume}}'?\n\nCreated: {{createTime}}",
+      "severity": "destructive",
+      "confirmLabel": "Delete Snapshot",
+      "cancelLabel": "Cancel",
+      "requireTypedConfirmation": false,
+      "icon": "warning"
+    },
+    "volume-offline": {
+      "title": "Offline Volume",
+      "message": "Are you sure you want to take volume '{{resourceName}}' offline? Clients will lose access to data on this volume.",
+      "severity": "destructive",
+      "confirmLabel": "Offline Volume",
+      "cancelLabel": "Cancel",
+      "requireTypedConfirmation": false,
+      "icon": "warning"
+    },
+    "snapmirror-resync": {
+      "title": "Resync SnapMirror Relationship",
+      "message": "Are you sure you want to resync the relationship from '{{sourcePath}}' to '{{destinationPath}}'? This may overwrite changes on the destination.",
+      "severity": "warning",
+      "confirmLabel": "Resync",
+      "cancelLabel": "Cancel",
+      "requireTypedConfirmation": false,
+      "icon": "sync"
+    }
+  },
+  "tabSwitchBehavior": {
+    "transitionTarget": "200ms",
+    "preserveState": true,
+    "updateUrl": true
+  }
+}

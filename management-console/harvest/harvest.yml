@@ -1,0 +1,105 @@
+# =============================================================================
+# NetApp Harvest Configuration for FSx for ONTAP
+# =============================================================================
+#
+# This configuration defines how Harvest collects metrics from FSx ONTAP
+# and exports them for Prometheus scraping (by ADOT sidecar → AMP).
+#
+# Deployment context:
+#   - Runs as ECS Fargate container alongside ADOT sidecar
+#   - Credentials injected via ECS task definition from Secrets Manager
+#   - ONTAP management endpoint passed as environment variable
+#
+# References:
+#   - Harvest docs: https://netapp.github.io/harvest/
+#   - FSx ONTAP REST API: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Pollers: Define ONTAP cluster connections
+# -----------------------------------------------------------------------------
+# Each poller represents one FSx ONTAP file system to monitor.
+# The Harvest container connects to the ONTAP management endpoint (port 443)
+# using REST API to collect performance and configuration metrics.
+Pollers:
+  fsxn-cluster:
+    # Datacenter label applied to all metrics from this poller.
+    # Used for filtering in Grafana dashboards when monitoring multiple clusters.
+    datacenter: aws
+
+    # FSx ONTAP management endpoint (DNS name or IP address).
+    # Injected as environment variable by ECS task definition.
+    # Example: fs-0123456789abcdef0.fsx.ap-northeast-1.amazonaws.com
+    addr: ${ONTAP_MGMT_ENDPOINT}
+
+    # Authentication style: basic_auth uses username/password from credentials file.
+    auth_style: basic_auth
+
+    # Required for FSx ONTAP: self-signed certificate + IP-based connection.
+    # Without this, TLS verification fails because the certificate CN/SAN
+    # does not match the management endpoint IP address.
+    use_insecure_tls: true
+
+    # Path to credentials file containing ONTAP admin username and password.
+    # This file is injected by the ECS task definition init container
+    # which reads from AWS Secrets Manager and writes to this path.
+    # File format (YAML):
+    #   username: fsxadmin
+    #   password: <secret-value>
+    credentials_file: /run/secrets/ontap-creds
+
+    # Collectors define which ONTAP data sources to poll.
+    # - Rest: Collects configuration and capacity metrics via ONTAP REST API
+    #         (volumes, aggregates, SVMs, network interfaces, disks)
+    # - RestPerf: Collects performance counters via ONTAP REST API
+    #             (IOPS, throughput, latency per volume/aggregate/LIF)
+    collectors:
+      - Rest
+      - RestPerf
+
+    # Exporters define where collected metrics are sent.
+    # The prometheus exporter exposes metrics on an HTTP endpoint
+    # that the ADOT sidecar scrapes and remote-writes to AMP.
+    exporters:
+      - prometheus
+
+    # Polling schedule: how frequently Harvest queries ONTAP for new data.
+    # 60 seconds balances metric freshness with ONTAP API load.
+    # FSx ONTAP management endpoint handles this polling rate without issues.
+    schedule:
+      - data: 60s
+
+# -----------------------------------------------------------------------------
+# Exporters: Define metric output destinations
+# -----------------------------------------------------------------------------
+# The Prometheus exporter exposes collected metrics on an HTTP endpoint.
+# The ADOT sidecar container (in the same ECS task) scrapes this endpoint
+# and remote-writes metrics to Amazon Managed Prometheus (AMP).
+Exporters:
+  prometheus:
+    exporter: Prometheus
+
+    # Port range for the Prometheus metrics HTTP endpoint.
+    # Harvest binds to the first available port in this range.
+    # The ADOT sidecar scrapes localhost:12990 for metrics.
+    # Range allows multiple pollers if monitoring multiple FSx ONTAP systems.
+    port_range: 12990-12999
+
+# -----------------------------------------------------------------------------
+# Defaults: Global settings applied to all pollers
+# -----------------------------------------------------------------------------
+# These settings apply to all pollers unless overridden at the poller level.
+Defaults:
+  # Use ONTAP REST API (not legacy ZAPI) for all data collection.
+  # FSx ONTAP fully supports REST API and this is the recommended approach.
+  use_insecure_tls: true
+
+  # Collectors to load by default for all pollers.
+  # Can be overridden per-poller (as done above for explicit clarity).
+  collectors:
+    - Rest
+    - RestPerf
+
+  # Exporters to use by default for all pollers.
+  exporters:
+    - prometheus

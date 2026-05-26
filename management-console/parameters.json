@@ -1,0 +1,206 @@
+{
+  "_description": "Shared CloudFormation parameters for FSxN Management Console stacks. All 5 stacks reference a subset of these parameters.",
+  "parameters": {
+    "VpcId": {
+      "type": "AWS::EC2::VPC::Id",
+      "description": "Target VPC where all management console resources will be deployed.",
+      "required": true,
+      "usedBy": ["network", "observability", "console"],
+      "constraints": {
+        "allowedPattern": "^vpc-[a-z0-9]{8,17}$"
+      }
+    },
+    "PrivateSubnetIds": {
+      "type": "List<AWS::EC2::Subnet::Id>",
+      "description": "Private subnets for ECS Fargate tasks and Lambda. Must span at least 2 Availability Zones.",
+      "required": true,
+      "usedBy": ["network", "observability", "console"],
+      "constraints": {
+        "minItems": 2,
+        "note": "Subnets must be in different AZs for high availability"
+      }
+    },
+    "PublicSubnetIds": {
+      "type": "List<AWS::EC2::Subnet::Id>",
+      "description": "Public subnets for ALB and NAT Gateway. Must span at least 2 Availability Zones.",
+      "required": true,
+      "usedBy": ["network", "console"],
+      "constraints": {
+        "minItems": 2,
+        "note": "Subnets must be in different AZs for ALB requirement"
+      }
+    },
+    "OntapManagementEndpoint": {
+      "type": "String",
+      "description": "FSx ONTAP management endpoint IP address or DNS name. Used by Harvest and ToolJet for REST API access on port 443.",
+      "required": true,
+      "usedBy": ["network", "observability", "console"],
+      "constraints": {
+        "allowedPattern": "^[a-zA-Z0-9._-]+$",
+        "note": "IP address (e.g., 10.0.x.x) or DNS name (e.g., management.fs-xxx.fsx.ap-northeast-1.amazonaws.com)"
+      }
+    },
+    "OntapCredentialsSecretArn": {
+      "type": "String",
+      "description": "ARN of the Secrets Manager secret containing ONTAP admin credentials (username/password JSON).",
+      "required": true,
+      "usedBy": ["observability", "console"],
+      "constraints": {
+        "allowedPattern": "^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$",
+        "note": "Secret must contain JSON with 'username' and 'password' keys"
+      }
+    },
+    "CognitoUserPoolId": {
+      "type": "String",
+      "description": "Cognito User Pool ID for unified authentication. Created by the auth stack (Stack 2).",
+      "required": true,
+      "usedBy": ["observability", "console"],
+      "constraints": {
+        "allowedPattern": "^[a-z0-9-]+_[A-Za-z0-9]+$",
+        "note": "Format: <region>_<id> (e.g., ap-northeast-1_AbCdEfGhI)"
+      }
+    },
+    "CognitoAppClientId": {
+      "type": "String",
+      "description": "Cognito App Client ID configured for ALB integration with authorization code grant.",
+      "required": true,
+      "usedBy": ["console"],
+      "constraints": {
+        "allowedPattern": "^[a-z0-9]{26}$"
+      }
+    },
+    "CognitoDomain": {
+      "type": "String",
+      "description": "Cognito hosted UI domain prefix (e.g., 'fsxn-mgmt'). Full URL: https://<prefix>.auth.<region>.amazoncognito.com",
+      "required": true,
+      "usedBy": ["console"],
+      "constraints": {
+        "allowedPattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$",
+        "minLength": 1,
+        "maxLength": 63
+      }
+    },
+    "HarvestImageTag": {
+      "type": "String",
+      "description": "Container image tag for NetApp Harvest collector. Used for version pinning and updates.",
+      "required": true,
+      "usedBy": ["observability"],
+      "constraints": {
+        "default": "latest",
+        "note": "Recommend pinning to a specific version (e.g., '24.05.2') for production stability"
+      }
+    },
+    "ToolJetImageTag": {
+      "type": "String",
+      "description": "Container image tag for ToolJet management UI. Used for version pinning and updates.",
+      "required": true,
+      "usedBy": ["console"],
+      "constraints": {
+        "default": "latest",
+        "note": "Recommend pinning to an LTS version for production stability"
+      }
+    },
+    "S3AccessPointArn": {
+      "type": "String",
+      "description": "ARN of the FSx ONTAP S3 Access Point for file browsing. Used by S3 Copy Lambda for file download operations.",
+      "required": true,
+      "usedBy": ["console"],
+      "constraints": {
+        "allowedPattern": "^arn:aws:s3:[a-z0-9-]+:[0-9]{12}:accesspoint/[a-z0-9-]+$",
+        "note": "FSx ONTAP S3 APs do not support presigned URLs — copy-to-bucket pattern required"
+      }
+    },
+    "MfaConfiguration": {
+      "type": "String",
+      "description": "Multi-factor authentication mode for Cognito User Pool.",
+      "required": true,
+      "usedBy": ["auth"],
+      "constraints": {
+        "allowedValues": ["OFF", "OPTIONAL", "REQUIRED"],
+        "default": "OPTIONAL"
+      }
+    },
+    "SessionDurationHours": {
+      "type": "Number",
+      "description": "Session duration in hours for authenticated users. Applies to ALB Cognito session cookie.",
+      "required": true,
+      "usedBy": ["auth", "console"],
+      "constraints": {
+        "minValue": 1,
+        "maxValue": 12,
+        "default": 8
+      }
+    },
+    "AlertSnsTopicArn": {
+      "type": "String",
+      "description": "ARN of the SNS topic for CloudWatch alarm notifications. If empty, a new topic is created by the monitoring stack.",
+      "required": false,
+      "usedBy": ["monitoring"],
+      "constraints": {
+        "allowedPattern": "^(arn:aws:sns:[a-z0-9-]+:[0-9]{12}:.+)?$",
+        "default": "",
+        "note": "Leave empty to create a new SNS topic in the monitoring stack"
+      }
+    },
+    "FsxnSecurityGroupId": {
+      "type": "String",
+      "description": "Security Group ID of the FSx ONTAP file system. Required for deploy.sh to auto-add access rules for Harvest/ToolJet task SGs.",
+      "required": false,
+      "usedBy": ["deploy-script", "cleanup-script"],
+      "constraints": {
+        "allowedPattern": "^sg-[a-z0-9]{8,17}$",
+        "note": "Set as FSXN_SECURITY_GROUP_ID env var. If not set, you must manually add SG rules."
+      }
+    }
+  },
+  "stackParameterMapping": {
+    "network": [
+      "VpcId",
+      "PrivateSubnetIds",
+      "PublicSubnetIds",
+      "OntapManagementEndpoint"
+    ],
+    "auth": [
+      "MfaConfiguration",
+      "SessionDurationHours"
+    ],
+    "observability": [
+      "VpcId",
+      "PrivateSubnetIds",
+      "OntapManagementEndpoint",
+      "OntapCredentialsSecretArn",
+      "CognitoUserPoolId",
+      "HarvestImageTag"
+    ],
+    "console": [
+      "VpcId",
+      "PrivateSubnetIds",
+      "PublicSubnetIds",
+      "OntapManagementEndpoint",
+      "OntapCredentialsSecretArn",
+      "CognitoUserPoolId",
+      "CognitoAppClientId",
+      "CognitoDomain",
+      "ToolJetImageTag",
+      "S3AccessPointArn",
+      "SessionDurationHours"
+    ],
+    "monitoring": [
+      "AlertSnsTopicArn"
+    ]
+  },
+  "deploymentOrder": [
+    "fsxn-mgmt-network",
+    "fsxn-mgmt-auth",
+    "fsxn-mgmt-observability",
+    "fsxn-mgmt-console",
+    "fsxn-mgmt-monitoring"
+  ],
+  "cleanupOrder": [
+    "fsxn-mgmt-monitoring",
+    "fsxn-mgmt-console",
+    "fsxn-mgmt-observability",
+    "fsxn-mgmt-auth",
+    "fsxn-mgmt-network"
+  ]
+}

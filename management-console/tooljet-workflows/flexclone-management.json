@@ -1,0 +1,381 @@
+{
+  "schemaVersion": "2.0",
+  "name": "FlexClone Management",
+  "description": "FSx ONTAP FlexClone creation from volumes or snapshots with validation and job tracking",
+  "dataSources": [
+    {
+      "id": "ds_ontap_rest",
+      "name": "FSxN ONTAP REST",
+      "kind": "restapi",
+      "options": {
+        "url": "{{globals.ontap_base_url}}",
+        "auth_type": "basic",
+        "headers": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "credentials": {
+          "username": "{{globals.ontap_username}}",
+          "password": "{{globals.ontap_password}}"
+        },
+        "ssl_certificate": "none"
+      }
+    }
+  ],
+  "queries": [
+    {
+      "id": "q_list_volumes",
+      "name": "listVolumes",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes",
+        "url_params": [
+          { "key": "fields", "value": "name,svm.name,svm.uuid" },
+          { "key": "max_records", "value": "200" }
+        ]
+      },
+      "runOnPageLoad": true,
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "volumes", "value": "{{queries.listVolumes.data.records}}" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to load volumes: {{queries.listVolumes.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_list_snapshots_for_clone",
+      "name": "listSnapshotsForClone",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes/{{variables.parentVolumeUuid}}/snapshots",
+        "url_params": [
+          { "key": "fields", "value": "name,create_time,uuid" },
+          { "key": "max_records", "value": "100" },
+          { "key": "order_by", "value": "create_time desc" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "availableSnapshots", "value": "{{queries.listSnapshotsForClone.data.records}}" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to load snapshots: {{queries.listSnapshotsForClone.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_create_flexclone",
+      "name": "createFlexClone",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "POST",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": "{{variables.cloneRequestBody}}"
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "cloneJobUuid", "value": "{{queries.createFlexClone.data.job.uuid}}" },
+          { "action": "setVariable", "variable": "cloneState", "value": "polling" },
+          { "action": "runQuery", "queryName": "pollCloneJob" }
+        ],
+        "onError": [
+          { "action": "setVariable", "variable": "cloneState", "value": "error" },
+          { "action": "setVariable", "variable": "cloneError", "value": "{{queries.createFlexClone.data.error || queries.createFlexClone.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_poll_clone_job",
+      "name": "pollCloneJob",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/cluster/jobs/{{variables.cloneJobUuid}}"
+      },
+      "events": {
+        "onSuccess": [
+          {
+            "action": "runJavaScript",
+            "code": "const jobState = queries.pollCloneJob.data.state; if (jobState === 'success') { setVariable('cloneState', 'success'); } else if (jobState === 'failure') { setVariable('cloneState', 'error'); setVariable('cloneError', { code: queries.pollCloneJob.data.code, message: queries.pollCloneJob.data.message }); } else { setVariable('cloneJobState', jobState); setTimeout(() => { queries.pollCloneJob.run(); }, 5000); }"
+          }
+        ],
+        "onError": [
+          { "action": "setVariable", "variable": "cloneState", "value": "error" },
+          { "action": "setVariable", "variable": "cloneError", "value": "{{queries.pollCloneJob.error}}" }
+        ]
+      }
+    }
+  ],
+  "components": [
+    {
+      "id": "c_page_header",
+      "type": "text",
+      "name": "pageHeader",
+      "properties": {
+        "text": "FlexClone Management",
+        "style": { "fontSize": "24px", "fontWeight": "bold" }
+      }
+    },
+    {
+      "id": "c_parent_volume_select",
+      "type": "dropdown",
+      "name": "parentVolumeSelect",
+      "properties": {
+        "label": "Parent Volume",
+        "options": "{{variables.volumes.map(v => ({label: v.name + ' (' + v.svm.name + ')', value: v.uuid}))}}",
+        "placeholder": "Select parent volume for clone",
+        "disabled": "{{variables.cloneState === 'polling'}}"
+      },
+      "events": {
+        "onChange": [
+          { "action": "setVariable", "variable": "parentVolumeUuid", "value": "{{components.parentVolumeSelect.value}}" },
+          { "action": "setVariable", "variable": "parentVolumeName", "value": "{{variables.volumes.find(v => v.uuid === components.parentVolumeSelect.value)?.name}}" },
+          { "action": "setVariable", "variable": "parentSvmUuid", "value": "{{variables.volumes.find(v => v.uuid === components.parentVolumeSelect.value)?.svm.uuid}}" },
+          { "action": "runQuery", "queryName": "listSnapshotsForClone" }
+        ]
+      }
+    },
+    {
+      "id": "c_parent_snapshot_select",
+      "type": "dropdown",
+      "name": "parentSnapshotSelect",
+      "properties": {
+        "label": "Parent Snapshot (optional)",
+        "options": "{{[{label: '(None - clone from active volume)', value: ''}].concat((variables.availableSnapshots || []).map(s => ({label: s.name + ' (' + new Date(s.create_time).toLocaleString() + ')', value: s.uuid})))}}",
+        "placeholder": "Select snapshot to clone from (optional)",
+        "value": "{{variables.preselectedSnapshotUuid || ''}}",
+        "visible": "{{variables.parentVolumeUuid != null}}",
+        "disabled": "{{variables.cloneState === 'polling'}}"
+      },
+      "events": {
+        "onChange": [
+          { "action": "setVariable", "variable": "selectedSnapshotUuid", "value": "{{components.parentSnapshotSelect.value}}" },
+          { "action": "setVariable", "variable": "selectedSnapshotName", "value": "{{(variables.availableSnapshots || []).find(s => s.uuid === components.parentSnapshotSelect.value)?.name || ''}}" }
+        ]
+      }
+    },
+    {
+      "id": "c_clone_name_input",
+      "type": "textInput",
+      "name": "cloneNameInput",
+      "properties": {
+        "label": "Clone Name",
+        "placeholder": "my_clone_volume",
+        "required": true,
+        "visible": "{{variables.parentVolumeUuid != null}}",
+        "disabled": "{{variables.cloneState === 'polling'}}"
+      },
+      "validation": {
+        "regex": "^[a-zA-Z0-9_]{1,203}$",
+        "errorMessage": "Clone name must be 1-203 characters, alphanumeric and underscores only"
+      }
+    },
+    {
+      "id": "c_junction_path_input",
+      "type": "textInput",
+      "name": "junctionPathInput",
+      "properties": {
+        "label": "Junction Path",
+        "placeholder": "/my_clone_volume",
+        "required": true,
+        "visible": "{{variables.parentVolumeUuid != null}}",
+        "disabled": "{{variables.cloneState === 'polling'}}"
+      },
+      "validation": {
+        "regex": "^/[a-zA-Z0-9_/\\-]+$",
+        "errorMessage": "Junction path must start with / and contain only valid path characters (alphanumeric, underscores, hyphens, slashes)"
+      }
+    },
+    {
+      "id": "c_clone_name_error",
+      "type": "text",
+      "name": "cloneNameError",
+      "properties": {
+        "text": "Clone name must be 1-203 characters, alphanumeric and underscores only",
+        "style": { "color": "#DC3545", "fontSize": "12px" },
+        "visible": "{{components.cloneNameInput.value && !components.cloneNameInput.isValid}}"
+      }
+    },
+    {
+      "id": "c_junction_path_error",
+      "type": "text",
+      "name": "junctionPathError",
+      "properties": {
+        "text": "Junction path must start with / and contain only valid path characters (alphanumeric, underscores, hyphens, slashes)",
+        "style": { "color": "#DC3545", "fontSize": "12px" },
+        "visible": "{{components.junctionPathInput.value && !components.junctionPathInput.isValid}}"
+      }
+    },
+    {
+      "id": "c_create_clone_btn",
+      "type": "button",
+      "name": "createCloneBtn",
+      "properties": {
+        "text": "Create FlexClone",
+        "variant": "primary",
+        "visible": "{{variables.parentVolumeUuid != null}}",
+        "disabled": "{{!components.cloneNameInput.isValid || !components.junctionPathInput.isValid || !components.cloneNameInput.value || !components.junctionPathInput.value || variables.cloneState === 'polling'}}"
+      },
+      "events": {
+        "onClick": [
+          {
+            "action": "runJavaScript",
+            "code": "const body = { name: components.cloneNameInput.value, clone: { parent_volume: { uuid: variables.parentVolumeUuid }, is_flexclone: true }, nas: { path: components.junctionPathInput.value }, svm: { uuid: variables.parentSvmUuid } }; if (variables.selectedSnapshotUuid) { body.clone.parent_snapshot = { uuid: variables.selectedSnapshotUuid }; } setVariable('cloneRequestBody', body); setVariable('cloneState', 'submitting'); setVariable('submittedCloneName', components.cloneNameInput.value); setVariable('submittedJunctionPath', components.junctionPathInput.value); setVariable('submittedParentSnapshot', variables.selectedSnapshotName || null);"
+          },
+          { "action": "runQuery", "queryName": "createFlexClone" }
+        ]
+      }
+    },
+    {
+      "id": "c_polling_indicator",
+      "type": "container",
+      "name": "pollingIndicator",
+      "properties": {
+        "visible": "{{variables.cloneState === 'polling' || variables.cloneState === 'submitting'}}"
+      },
+      "children": [
+        {
+          "id": "c_polling_spinner",
+          "type": "spinner",
+          "name": "pollingSpinner",
+          "properties": {}
+        },
+        {
+          "id": "c_polling_text",
+          "type": "text",
+          "name": "pollingText",
+          "properties": {
+            "text": "Creating FlexClone... Job state: {{variables.cloneJobState || 'submitting'}} (polling every 5 seconds)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_success_panel",
+      "type": "container",
+      "name": "successPanel",
+      "properties": {
+        "visible": "{{variables.cloneState === 'success'}}"
+      },
+      "children": [
+        {
+          "id": "c_success_icon",
+          "type": "text",
+          "name": "successIcon",
+          "properties": {
+            "text": "✅ FlexClone Created Successfully",
+            "style": { "fontSize": "18px", "fontWeight": "bold", "color": "#28A745" }
+          }
+        },
+        {
+          "id": "c_success_details",
+          "type": "text",
+          "name": "successDetails",
+          "properties": {
+            "text": "Clone Name: {{variables.submittedCloneName}}\nParent Volume: {{variables.parentVolumeName}}{{variables.submittedParentSnapshot ? '\\nParent Snapshot: ' + variables.submittedParentSnapshot : ''}}\nJunction Path: {{variables.submittedJunctionPath}}"
+          }
+        },
+        {
+          "id": "c_view_clone_link",
+          "type": "button",
+          "name": "viewCloneLink",
+          "properties": {
+            "text": "View in Volume List →",
+            "variant": "outline"
+          },
+          "events": {
+            "onClick": [
+              { "action": "navigateTo", "page": "volume-management" }
+            ]
+          }
+        },
+        {
+          "id": "c_create_another_btn",
+          "type": "button",
+          "name": "createAnotherBtn",
+          "properties": {
+            "text": "Create Another Clone",
+            "variant": "secondary"
+          },
+          "events": {
+            "onClick": [
+              { "action": "setVariable", "variable": "cloneState", "value": "idle" },
+              { "action": "setVariable", "variable": "cloneError", "value": null },
+              { "action": "setVariable", "variable": "cloneJobUuid", "value": null },
+              { "action": "setVariable", "variable": "cloneJobState", "value": null }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_error_panel",
+      "type": "container",
+      "name": "errorPanel",
+      "properties": {
+        "visible": "{{variables.cloneState === 'error'}}"
+      },
+      "children": [
+        {
+          "id": "c_error_icon",
+          "type": "text",
+          "name": "errorIcon",
+          "properties": {
+            "text": "❌ FlexClone Creation Failed",
+            "style": { "fontSize": "18px", "fontWeight": "bold", "color": "#DC3545" }
+          }
+        },
+        {
+          "id": "c_error_details",
+          "type": "text",
+          "name": "errorDetails",
+          "properties": {
+            "text": "{{variables.cloneError?.code ? 'Error Code: ' + variables.cloneError.code + '\\n' : ''}}{{variables.cloneError?.message || variables.cloneError || 'An unknown error occurred'}}"
+          }
+        },
+        {
+          "id": "c_retry_btn",
+          "type": "button",
+          "name": "retryBtn",
+          "properties": {
+            "text": "Correct and Retry",
+            "variant": "primary"
+          },
+          "events": {
+            "onClick": [
+              { "action": "setVariable", "variable": "cloneState", "value": "idle" },
+              { "action": "setVariable", "variable": "cloneError", "value": null },
+              { "action": "setVariable", "variable": "cloneJobUuid", "value": null },
+              { "action": "setVariable", "variable": "cloneJobState", "value": null }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "volumes": [],
+    "availableSnapshots": [],
+    "parentVolumeUuid": null,
+    "parentVolumeName": null,
+    "parentSvmUuid": null,
+    "selectedSnapshotUuid": null,
+    "selectedSnapshotName": null,
+    "preselectedSnapshotUuid": null,
+    "cloneRequestBody": null,
+    "cloneJobUuid": null,
+    "cloneJobState": null,
+    "cloneState": "idle",
+    "cloneError": null,
+    "submittedCloneName": null,
+    "submittedJunctionPath": null,
+    "submittedParentSnapshot": null
+  }
+}

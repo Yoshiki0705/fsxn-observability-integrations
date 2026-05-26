@@ -1,0 +1,339 @@
+{
+  "schemaVersion": "2.0",
+  "name": "Snapshot Management",
+  "description": "FSx ONTAP Snapshot CRUD and restore operations",
+  "dataSources": [
+    {
+      "id": "ds_ontap_rest",
+      "name": "FSxN ONTAP REST",
+      "kind": "restapi",
+      "options": {
+        "url": "{{globals.ontap_base_url}}",
+        "auth_type": "basic",
+        "headers": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "credentials": {
+          "username": "{{globals.ontap_username}}",
+          "password": "{{globals.ontap_password}}"
+        },
+        "ssl_certificate": "none"
+      }
+    }
+  ],
+  "queries": [
+    {
+      "id": "q_list_volumes_for_select",
+      "name": "listVolumesForSelect",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes",
+        "url_params": [
+          { "key": "fields", "value": "name,svm.name" },
+          { "key": "max_records", "value": "200" }
+        ]
+      },
+      "runOnPageLoad": true
+    },
+    {
+      "id": "q_list_snapshots",
+      "name": "listSnapshots",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes/{{variables.selectedVolumeUuid}}/snapshots",
+        "url_params": [
+          { "key": "fields", "value": "name,create_time,size,comment,snapmirror_label" },
+          { "key": "max_records", "value": "50" },
+          { "key": "order_by", "value": "create_time desc" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "snapshots", "value": "{{queries.listSnapshots.data.records}}" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to load snapshots: {{queries.listSnapshots.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_create_snapshot",
+      "name": "createSnapshot",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "POST",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes/{{variables.selectedVolumeUuid}}/snapshots",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "name": "{{components.snapshotNameInput.value}}",
+          "comment": "{{components.snapshotCommentInput.value || ''}}"
+        }
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "showAlert", "alertType": "success", "message": "Snapshot '{{components.snapshotNameInput.value}}' created successfully" },
+          { "action": "runQuery", "queryName": "listSnapshots" },
+          { "action": "setVariable", "variable": "showCreateForm", "value": false }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Snapshot creation failed: {{queries.createSnapshot.data.error.message || queries.createSnapshot.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_delete_snapshot",
+      "name": "deleteSnapshot",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "DELETE",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes/{{variables.selectedVolumeUuid}}/snapshots/{{variables.selectedSnapshotUuid}}"
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "showAlert", "alertType": "success", "message": "Snapshot '{{variables.selectedSnapshotName}}' deleted successfully" },
+          { "action": "runQuery", "queryName": "listSnapshots" },
+          { "action": "setVariable", "variable": "showDeleteConfirm", "value": false }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Snapshot deletion failed: {{queries.deleteSnapshot.data.error.message || queries.deleteSnapshot.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_restore_snapshot",
+      "name": "restoreSnapshot",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "POST",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes/{{variables.selectedVolumeUuid}}/snapshots/{{variables.selectedSnapshotUuid}}/restore",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {}
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "showAlert", "alertType": "success", "message": "Volume restored from snapshot '{{variables.selectedSnapshotName}}' successfully" },
+          { "action": "setVariable", "variable": "showRestoreConfirm", "value": false }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Snapshot restore failed: {{queries.restoreSnapshot.data.error.message || queries.restoreSnapshot.error}}" }
+        ]
+      }
+    }
+  ],
+  "components": [
+    {
+      "id": "c_volume_select",
+      "type": "dropdown",
+      "name": "volumeSelect",
+      "properties": {
+        "label": "Select Volume",
+        "options": "{{queries.listVolumesForSelect.data.records.map(v => ({label: v.name + ' (' + v.svm.name + ')', value: v.uuid}))}}",
+        "placeholder": "Choose a volume to view snapshots"
+      },
+      "events": {
+        "onChange": [
+          { "action": "setVariable", "variable": "selectedVolumeUuid", "value": "{{components.volumeSelect.value}}" },
+          { "action": "setVariable", "variable": "selectedVolumeName", "value": "{{queries.listVolumesForSelect.data.records.find(v => v.uuid === components.volumeSelect.value)?.name}}" },
+          { "action": "runQuery", "queryName": "listSnapshots" }
+        ]
+      }
+    },
+    {
+      "id": "c_snapshot_table",
+      "type": "table",
+      "name": "snapshotTable",
+      "properties": {
+        "data": "{{variables.snapshots}}",
+        "columns": [
+          { "name": "Name", "key": "name", "sortable": true },
+          { "name": "Created", "key": "create_time", "sortable": true, "cellRenderer": "{{new Date(cell).toLocaleString()}}" },
+          { "name": "Size", "key": "size", "cellRenderer": "{{cell ? (cell / 1048576).toFixed(1) + ' MB' : 'N/A'}}" },
+          { "name": "SnapMirror Label", "key": "snapmirror_label" },
+          { "name": "Comment", "key": "comment" },
+          { "name": "Actions", "key": "actions", "cellRenderer": "actionButtons" }
+        ],
+        "pagination": { "enabled": true, "pageSize": 50 },
+        "search": { "enabled": true },
+        "loading": "{{queries.listSnapshots.isLoading}}",
+        "visible": "{{variables.selectedVolumeUuid != null}}"
+      },
+      "events": {
+        "onRowClick": [
+          { "action": "setVariable", "variable": "selectedSnapshotUuid", "value": "{{snapshotTable.selectedRow.uuid}}" },
+          { "action": "setVariable", "variable": "selectedSnapshotName", "value": "{{snapshotTable.selectedRow.name}}" },
+          { "action": "setVariable", "variable": "selectedSnapshotCreateTime", "value": "{{snapshotTable.selectedRow.create_time}}" }
+        ]
+      }
+    },
+    {
+      "id": "c_create_snapshot_form",
+      "type": "container",
+      "name": "createSnapshotForm",
+      "properties": {
+        "visible": "{{variables.showCreateForm && variables.selectedVolumeUuid}}",
+        "title": "Create Snapshot for: {{variables.selectedVolumeName}}"
+      },
+      "children": [
+        {
+          "id": "c_snapshot_name_input",
+          "type": "textInput",
+          "name": "snapshotNameInput",
+          "properties": {
+            "label": "Snapshot Name",
+            "placeholder": "my-snapshot-2024",
+            "required": true
+          },
+          "validation": {
+            "regex": "^[a-zA-Z0-9_\\-]{1,255}$",
+            "errorMessage": "Snapshot name must be 1-255 characters, alphanumeric, hyphens, and underscores only"
+          }
+        },
+        {
+          "id": "c_snapshot_comment_input",
+          "type": "textInput",
+          "name": "snapshotCommentInput",
+          "properties": {
+            "label": "Comment (optional)",
+            "placeholder": "Pre-maintenance snapshot"
+          }
+        },
+        {
+          "id": "c_submit_snapshot_btn",
+          "type": "button",
+          "name": "submitSnapshotBtn",
+          "properties": {
+            "text": "Create Snapshot",
+            "variant": "primary",
+            "disabled": "{{!components.snapshotNameInput.isValid || queries.createSnapshot.isLoading}}"
+          },
+          "events": {
+            "onClick": [
+              { "action": "runQuery", "queryName": "createSnapshot" }
+            ]
+          }
+        },
+        {
+          "id": "c_cancel_create_btn",
+          "type": "button",
+          "name": "cancelCreateBtn",
+          "properties": {
+            "text": "Cancel",
+            "variant": "secondary"
+          },
+          "events": {
+            "onClick": [
+              { "action": "setVariable", "variable": "showCreateForm", "value": false }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_create_btn",
+      "type": "button",
+      "name": "createSnapshotBtn",
+      "properties": {
+        "text": "Create Snapshot",
+        "variant": "primary",
+        "visible": "{{variables.selectedVolumeUuid != null}}",
+        "disabled": "{{!variables.selectedVolumeUuid}}"
+      },
+      "events": {
+        "onClick": [
+          { "action": "setVariable", "variable": "showCreateForm", "value": true }
+        ]
+      }
+    },
+    {
+      "id": "c_delete_confirm_modal",
+      "type": "modal",
+      "name": "deleteConfirmModal",
+      "properties": {
+        "visible": "{{variables.showDeleteConfirm}}",
+        "title": "Confirm Snapshot Deletion"
+      },
+      "children": [
+        {
+          "id": "c_delete_warning",
+          "type": "text",
+          "name": "deleteWarningText",
+          "properties": {
+            "text": "Are you sure you want to delete snapshot '{{variables.selectedSnapshotName}}'?\n\nVolume: {{variables.selectedVolumeName}}\nCreated: {{new Date(variables.selectedSnapshotCreateTime).toLocaleString()}}\n\nThis action cannot be undone."
+          }
+        },
+        {
+          "id": "c_confirm_delete_btn",
+          "type": "button",
+          "name": "confirmDeleteBtn",
+          "properties": { "text": "Delete Snapshot", "variant": "danger", "disabled": "{{queries.deleteSnapshot.isLoading}}" },
+          "events": { "onClick": [{ "action": "runQuery", "queryName": "deleteSnapshot" }] }
+        },
+        {
+          "id": "c_cancel_delete_btn",
+          "type": "button",
+          "name": "cancelDeleteBtn",
+          "properties": { "text": "Cancel", "variant": "secondary" },
+          "events": { "onClick": [{ "action": "setVariable", "variable": "showDeleteConfirm", "value": false }] }
+        }
+      ]
+    },
+    {
+      "id": "c_restore_confirm_modal",
+      "type": "modal",
+      "name": "restoreConfirmModal",
+      "properties": {
+        "visible": "{{variables.showRestoreConfirm}}",
+        "title": "Confirm Snapshot Restore"
+      },
+      "children": [
+        {
+          "id": "c_restore_warning",
+          "type": "text",
+          "name": "restoreWarningText",
+          "properties": {
+            "text": "Are you sure you want to restore volume '{{variables.selectedVolumeName}}' from snapshot '{{variables.selectedSnapshotName}}'?\n\nThis will revert the volume to the state at: {{new Date(variables.selectedSnapshotCreateTime).toLocaleString()}}\n\nAll data written after this snapshot will be lost."
+          }
+        },
+        {
+          "id": "c_confirm_restore_btn",
+          "type": "button",
+          "name": "confirmRestoreBtn",
+          "properties": { "text": "Restore Volume", "variant": "danger", "disabled": "{{queries.restoreSnapshot.isLoading}}" },
+          "events": { "onClick": [{ "action": "runQuery", "queryName": "restoreSnapshot" }] }
+        },
+        {
+          "id": "c_cancel_restore_btn",
+          "type": "button",
+          "name": "cancelRestoreBtn",
+          "properties": { "text": "Cancel", "variant": "secondary" },
+          "events": { "onClick": [{ "action": "setVariable", "variable": "showRestoreConfirm", "value": false }] }
+        }
+      ]
+    },
+    {
+      "id": "c_refresh_btn",
+      "type": "button",
+      "name": "refreshBtn",
+      "properties": { "text": "Refresh", "variant": "outline", "visible": "{{variables.selectedVolumeUuid != null}}" },
+      "events": { "onClick": [{ "action": "runQuery", "queryName": "listSnapshots" }] }
+    }
+  ],
+  "variables": {
+    "selectedVolumeUuid": null,
+    "selectedVolumeName": null,
+    "selectedSnapshotUuid": null,
+    "selectedSnapshotName": null,
+    "selectedSnapshotCreateTime": null,
+    "showCreateForm": false,
+    "showDeleteConfirm": false,
+    "showRestoreConfirm": false,
+    "snapshots": []
+  }
+}
