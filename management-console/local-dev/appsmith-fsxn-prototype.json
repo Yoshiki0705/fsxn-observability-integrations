@@ -1,0 +1,57 @@
+{
+  "exportedApplication": {
+    "name": "FSxN Management Console",
+    "isPublic": false,
+    "pages": [
+      {
+        "name": "Dashboard",
+        "slug": "dashboard"
+      }
+    ],
+    "publishedPages": []
+  },
+  "datasourceList": [],
+  "customJSLibList": [],
+  "pageList": [
+    {
+      "name": "Dashboard",
+      "slug": "dashboard",
+      "layouts": [
+        {
+          "viewMode": false,
+          "dsl": {
+            "widgetName": "MainContainer",
+            "backgroundColor": "none",
+            "type": "CANVAS_WIDGET",
+            "minHeight": 1292,
+            "canExtend": true,
+            "version": 1,
+            "children": [
+              {
+                "widgetName": "Tabs1",
+                "type": "TABS_WIDGET",
+                "tabsObj": {
+                  "dashboard": { "label": "Dashboard", "id": "dashboard", "index": 0 },
+                  "volumes": { "label": "Volumes", "id": "volumes", "index": 1 },
+                  "svms": { "label": "SVMs", "id": "svms", "index": 2 },
+                  "snapshots": { "label": "Snapshots", "id": "snapshots", "index": 3 },
+                  "replication": { "label": "Replication", "id": "replication", "index": 4 },
+                  "s3files": { "label": "S3 Files", "id": "s3files", "index": 5 },
+                  "settings": { "label": "Settings", "id": "settings", "index": 6 }
+                },
+                "defaultTab": "Dashboard",
+                "topRow": 0,
+                "bottomRow": 80,
+                "leftColumn": 0,
+                "rightColumn": 64,
+                "isVisible": true,
+                "shouldScrollContents": true,
+                "children": []
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

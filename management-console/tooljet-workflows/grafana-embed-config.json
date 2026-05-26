@@ -1,0 +1,221 @@
+{
+  "_schema": "grafana-embed-config/v1",
+  "description": "Grafana panel embed URL patterns and configuration for ToolJet integration with Amazon Managed Grafana",
+  "version": "1.0.0",
+  "connection": {
+    "grafanaBaseUrl": "{{env.GRAFANA_URL}}",
+    "authMode": "cookie-passthrough",
+    "cookieDomain": "{{env.ALB_DOMAIN}}",
+    "description": "AMG panels are embedded via iframe. Authentication uses the shared ALB Cognito session cookie (same domain for /app and /grafana paths)."
+  },
+  "embedUrlPattern": {
+    "template": "{{grafanaBaseUrl}}/d-solo/{{dashboardUid}}/{{dashboardSlug}}?orgId=1&panelId={{panelId}}&var-{{variableName}}={{variableValue}}&from={{from}}&to={{to}}&refresh={{refresh}}",
+    "description": "Standard Grafana solo panel embed URL pattern. Variables are substituted at render time.",
+    "parameters": {
+      "grafanaBaseUrl": "AMG workspace URL (e.g., https://g-xxxxxxxxxx.grafana-workspace.ap-northeast-1.amazonaws.com)",
+      "dashboardUid": "Unique dashboard identifier assigned by Grafana on import",
+      "dashboardSlug": "URL-friendly dashboard name (lowercase, hyphens)",
+      "orgId": "Grafana organization ID (always 1 for AMG)",
+      "panelId": "Numeric panel ID within the dashboard",
+      "variableName": "Dashboard variable name for filtering (e.g., volume, svm)",
+      "variableValue": "Value to filter by (e.g., vol_data_01, svm-prod-01)",
+      "from": "Start time (relative: now-1h, or absolute epoch ms)",
+      "to": "End time (relative: now, or absolute epoch ms)",
+      "refresh": "Auto-refresh interval (e.g., 1m, 5m, 30s)"
+    }
+  },
+  "autoRefresh": {
+    "interval": 60,
+    "unit": "seconds",
+    "grafanaRefreshParam": "1m",
+    "description": "Panels auto-refresh every 60 seconds. The Grafana refresh parameter is set to 1m to match."
+  },
+  "defaultTimeRange": {
+    "from": "now-1h",
+    "to": "now",
+    "selectableRanges": [
+      { "label": "Last 15 minutes", "from": "now-15m", "to": "now" },
+      { "label": "Last 1 hour", "from": "now-1h", "to": "now" },
+      { "label": "Last 6 hours", "from": "now-6h", "to": "now" },
+      { "label": "Last 24 hours", "from": "now-24h", "to": "now" },
+      { "label": "Last 7 days", "from": "now-7d", "to": "now" }
+    ]
+  },
+  "loadBehavior": {
+    "timeout": 10000,
+    "timeoutUnit": "milliseconds",
+    "fallbackMessage": "Metrics panel is temporarily unavailable.",
+    "fallbackAction": {
+      "type": "direct-link",
+      "label": "Open in Grafana",
+      "urlPattern": "{{grafanaBaseUrl}}/d/{{dashboardUid}}/{{dashboardSlug}}?orgId=1&var-{{variableName}}={{variableValue}}&from={{from}}&to={{to}}"
+    }
+  },
+  "volumeMetrics": {
+    "description": "Panel embed patterns for volume-level performance metrics from Harvest dashboards",
+    "dashboardUid": "harvest-volume-performance",
+    "dashboardSlug": "harvest-volume-performance",
+    "variable": {
+      "name": "volume",
+      "description": "ONTAP volume name to filter metrics",
+      "source": "ONTAP REST API /api/storage/volumes → name field"
+    },
+    "panels": {
+      "iops": {
+        "panelId": 4,
+        "title": "Volume IOPS",
+        "description": "Read/Write/Other IOPS for a specific volume",
+        "metrics": ["volume_read_ops", "volume_write_ops", "volume_other_ops"],
+        "embedUrl": "{{grafanaBaseUrl}}/d-solo/harvest-volume-performance/harvest-volume-performance?orgId=1&panelId=4&var-volume={{volumeName}}&from={{from}}&to={{to}}&refresh=1m",
+        "unit": "iops"
+      },
+      "throughput": {
+        "panelId": 5,
+        "title": "Volume Throughput",
+        "description": "Read/Write throughput in bytes/sec for a specific volume",
+        "metrics": ["volume_read_data", "volume_write_data"],
+        "embedUrl": "{{grafanaBaseUrl}}/d-solo/harvest-volume-performance/harvest-volume-performance?orgId=1&panelId=5&var-volume={{volumeName}}&from={{from}}&to={{to}}&refresh=1m",
+        "unit": "bytes/sec"
+      },
+      "latency": {
+        "panelId": 6,
+        "title": "Volume Latency",
+        "description": "Average read/write latency in microseconds for a specific volume",
+        "metrics": ["volume_read_latency", "volume_write_latency"],
+        "embedUrl": "{{grafanaBaseUrl}}/d-solo/harvest-volume-performance/harvest-volume-performance?orgId=1&panelId=6&var-volume={{volumeName}}&from={{from}}&to={{to}}&refresh=1m",
+        "unit": "microseconds"
+      },
+      "iopsOverview": {
+        "panelId": 2,
+        "title": "All Volumes IOPS Overview",
+        "description": "Aggregated IOPS across all volumes (no volume filter)",
+        "metrics": ["volume_read_ops", "volume_write_ops"],
+        "embedUrl": "{{grafanaBaseUrl}}/d-solo/harvest-volume-performance/harvest-volume-performance?orgId=1&panelId=2&from={{from}}&to={{to}}&refresh=1m",
+        "unit": "iops"
+      },
+      "throughputOverview": {
+        "panelId": 3,
+        "title": "All Volumes Throughput Overview",
+        "description": "Aggregated throughput across all volumes (no volume filter)",
+        "metrics": ["volume_read_data", "volume_write_data"],
+        "embedUrl": "{{grafanaBaseUrl}}/d-solo/harvest-volume-performance/harvest-volume-performance?orgId=1&panelId=3&from={{from}}&to={{to}}&refresh=1m",
+        "unit": "bytes/sec"
+      }
+    }
+  },
+  "svmMetrics": {
+    "description": "Panel embed patterns for SVM-level metrics from Harvest dashboards",
+    "dashboardUid": "harvest-svm-health",
+    "dashboardSlug": "harvest-svm-health",
+    "variable": {
+      "name": "svm",
+      "description": "ONTAP SVM name to filter metrics",
+      "source": "ONTAP REST API /api/svm/svms → name field"
+    },
+    "panels": {
+      "iops": {
+        "panelId": 1,
+        "title": "SVM IOPS",
+        "description": "Aggregated IOPS across all volumes within the SVM",
+        "metrics": ["svm_read_ops", "svm_write_ops", "svm_other_ops"],
+        "embedUrl": "{{grafanaBaseUrl}}/d-solo/harvest-svm-health/harvest-svm-health?orgId=1&panelId=1&var-svm={{svmName}}&from={{from}}&to={{to}}&refresh=1m",
+        "unit": "iops"
+      },
+      "throughput": {
+        "panelId": 2,
+        "title": "SVM Throughput",
+        "description": "Aggregated read/write throughput within the SVM",
+        "metrics": ["svm_read_data", "svm_write_data"],
+        "embedUrl": "{{grafanaBaseUrl}}/d-solo/harvest-svm-health/harvest-svm-health?orgId=1&panelId=2&var-svm={{svmName}}&from={{from}}&to={{to}}&refresh=1m",
+        "unit": "bytes/sec"
+      },
+      "latency": {
+        "panelId": 3,
+        "title": "SVM Latency",
+        "description": "Average latency for operations within the SVM",
+        "metrics": ["svm_read_latency", "svm_write_latency"],
+        "embedUrl": "{{grafanaBaseUrl}}/d-solo/harvest-svm-health/harvest-svm-health?orgId=1&panelId=3&var-svm={{svmName}}&from={{from}}&to={{to}}&refresh=1m",
+        "unit": "microseconds"
+      },
+      "capacity": {
+        "panelId": 4,
+        "title": "SVM Capacity Utilization",
+        "description": "Used vs available capacity across all volumes in the SVM",
+        "metrics": ["svm_total_space", "svm_used_space", "svm_available_space"],
+        "embedUrl": "{{grafanaBaseUrl}}/d-solo/harvest-svm-health/harvest-svm-health?orgId=1&panelId=4&var-svm={{svmName}}&from={{from}}&to={{to}}&refresh=1m",
+        "unit": "bytes"
+      }
+    }
+  },
+  "clusterMetrics": {
+    "description": "Panel embed patterns for cluster-level overview metrics",
+    "dashboardUid": "harvest-cluster-overview",
+    "dashboardSlug": "harvest-cluster-overview",
+    "panels": {
+      "overview": {
+        "panelId": 1,
+        "title": "Cluster Overview",
+        "description": "High-level cluster health and performance summary",
+        "embedUrl": "{{grafanaBaseUrl}}/d-solo/harvest-cluster-overview/harvest-cluster-overview?orgId=1&panelId=1&from={{from}}&to={{to}}&refresh=1m"
+      }
+    }
+  },
+  "aggregateMetrics": {
+    "description": "Panel embed patterns for aggregate utilization metrics",
+    "dashboardUid": "harvest-aggregate-utilization",
+    "dashboardSlug": "harvest-aggregate-utilization",
+    "panels": {
+      "capacity": {
+        "panelId": 1,
+        "title": "Aggregate Capacity",
+        "description": "Used, available, and total capacity per aggregate",
+        "embedUrl": "{{grafanaBaseUrl}}/d-solo/harvest-aggregate-utilization/harvest-aggregate-utilization?orgId=1&panelId=1&from={{from}}&to={{to}}&refresh=1m",
+        "unit": "bytes"
+      }
+    }
+  },
+  "variableSubstitution": {
+    "description": "Variable substitution patterns used in embed URLs",
+    "patterns": {
+      "{{grafanaBaseUrl}}": {
+        "source": "environment",
+        "envVar": "GRAFANA_URL",
+        "example": "https://g-xxxxxxxxxx.grafana-workspace.ap-northeast-1.amazonaws.com"
+      },
+      "{{volumeName}}": {
+        "source": "ui-selection",
+        "description": "Selected volume name from the volume selector component",
+        "apiField": "name",
+        "apiEndpoint": "/api/storage/volumes"
+      },
+      "{{svmName}}": {
+        "source": "ui-selection",
+        "description": "Selected SVM name from the SVM selector component",
+        "apiField": "name",
+        "apiEndpoint": "/api/svm/svms"
+      },
+      "{{from}}": {
+        "source": "time-range-picker",
+        "default": "now-1h",
+        "format": "Grafana relative time (now-Xh/m/d) or epoch milliseconds"
+      },
+      "{{to}}": {
+        "source": "time-range-picker",
+        "default": "now",
+        "format": "Grafana relative time (now) or epoch milliseconds"
+      }
+    }
+  },
+  "iframeConfig": {
+    "sandbox": "allow-scripts allow-same-origin",
+    "style": {
+      "border": "none",
+      "borderRadius": "4px",
+      "backgroundColor": "#FFFFFF"
+    },
+    "responsive": {
+      "minHeight": "200px",
+      "maxHeight": "400px"
+    }
+  }
+}

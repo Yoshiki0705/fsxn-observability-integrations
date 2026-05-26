@@ -1,0 +1,455 @@
+{
+  "schemaVersion": "2.0",
+  "name": "S3 File Browser",
+  "description": "S3 Access Point file browser with Lambda invocation for download (copy-to-bucket + presigned URL)",
+  "dataSources": [
+    {
+      "id": "ds_ontap_rest",
+      "name": "FSxN ONTAP REST",
+      "kind": "restapi",
+      "options": {
+        "url": "{{globals.ontap_base_url}}",
+        "auth_type": "basic",
+        "headers": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "credentials": {
+          "username": "{{globals.ontap_username}}",
+          "password": "{{globals.ontap_password}}"
+        },
+        "ssl_certificate": "none"
+      }
+    },
+    {
+      "id": "ds_lambda",
+      "name": "S3 Copy Lambda",
+      "kind": "restapi",
+      "options": {
+        "url": "{{globals.lambda_invoke_url}}",
+        "auth_type": "aws_iam",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      }
+    }
+  ],
+  "queries": [
+    {
+      "id": "q_list_objects",
+      "name": "listObjects",
+      "dataSourceId": "ds_lambda",
+      "options": {
+        "method": "POST",
+        "url": "{{globals.lambda_invoke_url}}",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "action": "list",
+          "s3_access_point_arn": "{{globals.s3_access_point_arn}}",
+          "prefix": "{{variables.currentPrefix}}",
+          "max_keys": 1000,
+          "continuation_token": "{{variables.continuationToken || null}}"
+        }
+      },
+      "events": {
+        "onSuccess": [
+          {
+            "action": "setVariable",
+            "variable": "objects",
+            "value": "{{queries.listObjects.data.objects || []}}"
+          },
+          {
+            "action": "setVariable",
+            "variable": "prefixes",
+            "value": "{{queries.listObjects.data.common_prefixes || []}}"
+          },
+          {
+            "action": "setVariable",
+            "variable": "continuationToken",
+            "value": "{{queries.listObjects.data.next_continuation_token || null}}"
+          },
+          {
+            "action": "setVariable",
+            "variable": "isTruncated",
+            "value": "{{queries.listObjects.data.is_truncated || false}}"
+          }
+        ],
+        "onError": [
+          {
+            "action": "showAlert",
+            "alertType": "error",
+            "message": "Failed to list objects. The S3 Access Point may be unreachable. Verify VPC endpoint configuration."
+          }
+        ]
+      },
+      "runOnPageLoad": true
+    },
+    {
+      "id": "q_download_file",
+      "name": "downloadFile",
+      "dataSourceId": "ds_lambda",
+      "options": {
+        "method": "POST",
+        "url": "{{globals.lambda_invoke_url}}",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "action": "download",
+          "s3_access_point_arn": "{{globals.s3_access_point_arn}}",
+          "key": "{{variables.selectedObjectKey}}"
+        },
+        "timeout": 60000
+      },
+      "events": {
+        "onSuccess": [
+          {
+            "action": "setVariable",
+            "variable": "presignedUrl",
+            "value": "{{queries.downloadFile.data.presigned_url}}"
+          },
+          {
+            "action": "setVariable",
+            "variable": "showDownloadLink",
+            "value": true
+          },
+          {
+            "action": "showAlert",
+            "alertType": "success",
+            "message": "Download link generated (expires in 1 hour)"
+          }
+        ],
+        "onError": [
+          {
+            "action": "showAlert",
+            "alertType": "error",
+            "message": "Download failed. The file browser state has been preserved."
+          }
+        ]
+      }
+    },
+    {
+      "id": "q_get_object_metadata",
+      "name": "getObjectMetadata",
+      "dataSourceId": "ds_lambda",
+      "options": {
+        "method": "POST",
+        "url": "{{globals.lambda_invoke_url}}",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "action": "metadata",
+          "s3_access_point_arn": "{{globals.s3_access_point_arn}}",
+          "key": "{{variables.selectedObjectKey}}"
+        }
+      },
+      "events": {
+        "onSuccess": [
+          {
+            "action": "setVariable",
+            "variable": "objectMetadata",
+            "value": "{{queries.getObjectMetadata.data}}"
+          },
+          {
+            "action": "setVariable",
+            "variable": "showMetadata",
+            "value": true
+          }
+        ],
+        "onError": [
+          {
+            "action": "showAlert",
+            "alertType": "error",
+            "message": "Failed to get file metadata"
+          }
+        ]
+      }
+    }
+  ],
+  "components": [
+    {
+      "id": "c_breadcrumb",
+      "type": "text",
+      "name": "breadcrumb",
+      "properties": {
+        "text": "Path: / {{variables.currentPrefix || '(root)'}}"
+      }
+    },
+    {
+      "id": "c_navigate_up_btn",
+      "type": "button",
+      "name": "navigateUpBtn",
+      "properties": {
+        "text": "Go Up",
+        "variant": "outline",
+        "disabled": "{{!variables.currentPrefix}}"
+      },
+      "events": {
+        "onClick": [
+          {
+            "action": "setVariable",
+            "variable": "currentPrefix",
+            "value": "{{variables.currentPrefix.split('/').slice(0, -2).join('/') + (variables.currentPrefix.split('/').slice(0, -2).length > 0 ? '/' : '')}}"
+          },
+          {
+            "action": "setVariable",
+            "variable": "continuationToken",
+            "value": null
+          },
+          {
+            "action": "runQuery",
+            "queryName": "listObjects"
+          }
+        ]
+      }
+    },
+    {
+      "id": "c_folders_table",
+      "type": "table",
+      "name": "foldersTable",
+      "properties": {
+        "title": "Folders",
+        "data": "{{variables.prefixes.map(p => ({name: p.replace(variables.currentPrefix, '').replace('/', ''), fullPrefix: p}))}}",
+        "columns": [
+          {
+            "name": "Folder Name",
+            "key": "name"
+          }
+        ],
+        "visible": "{{variables.prefixes && variables.prefixes.length > 0}}"
+      },
+      "events": {
+        "onRowClick": [
+          {
+            "action": "setVariable",
+            "variable": "currentPrefix",
+            "value": "{{foldersTable.selectedRow.fullPrefix}}"
+          },
+          {
+            "action": "setVariable",
+            "variable": "continuationToken",
+            "value": null
+          },
+          {
+            "action": "runQuery",
+            "queryName": "listObjects"
+          }
+        ]
+      }
+    },
+    {
+      "id": "c_files_table",
+      "type": "table",
+      "name": "filesTable",
+      "properties": {
+        "title": "Files",
+        "data": "{{variables.objects}}",
+        "columns": [
+          {
+            "name": "Name",
+            "key": "key",
+            "sortable": true
+          },
+          {
+            "name": "Size",
+            "key": "size",
+            "sortable": true
+          },
+          {
+            "name": "Last Modified",
+            "key": "last_modified",
+            "sortable": true
+          },
+          {
+            "name": "Storage Class",
+            "key": "storage_class"
+          }
+        ],
+        "pagination": {
+          "enabled": true,
+          "pageSize": 50
+        },
+        "search": {
+          "enabled": true
+        },
+        "loading": "{{queries.listObjects.isLoading}}"
+      },
+      "events": {
+        "onRowClick": [
+          {
+            "action": "setVariable",
+            "variable": "selectedObjectKey",
+            "value": "{{filesTable.selectedRow.key}}"
+          },
+          {
+            "action": "setVariable",
+            "variable": "selectedObjectSize",
+            "value": "{{filesTable.selectedRow.size}}"
+          },
+          {
+            "action": "setVariable",
+            "variable": "showDownloadLink",
+            "value": false
+          },
+          {
+            "action": "runQuery",
+            "queryName": "getObjectMetadata"
+          }
+        ]
+      }
+    },
+    {
+      "id": "c_metadata_panel",
+      "type": "container",
+      "name": "metadataPanel",
+      "properties": {
+        "visible": "{{variables.showMetadata}}",
+        "title": "File Details"
+      },
+      "children": [
+        {
+          "id": "c_metadata_text",
+          "type": "text",
+          "name": "metadataText",
+          "properties": {
+            "text": "Key: {{variables.selectedObjectKey}}\nSize: {{variables.objectMetadata?.content_length || 'N/A'}}\nLast Modified: {{variables.objectMetadata?.last_modified || 'N/A'}}\nContent Type: {{variables.objectMetadata?.content_type || 'N/A'}}\nStorage Class: {{variables.objectMetadata?.storage_class || 'STANDARD'}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_download_btn",
+      "type": "button",
+      "name": "downloadBtn",
+      "properties": {
+        "text": "Download",
+        "variant": "primary",
+        "disabled": "{{!variables.selectedObjectKey || queries.downloadFile.isLoading || variables.selectedObjectSize > 5368709120}}",
+        "visible": "{{variables.selectedObjectKey != null}}"
+      },
+      "events": {
+        "onClick": [
+          {
+            "action": "runQuery",
+            "queryName": "downloadFile"
+          }
+        ]
+      }
+    },
+    {
+      "id": "c_size_warning",
+      "type": "text",
+      "name": "sizeWarningText",
+      "properties": {
+        "text": "This file exceeds 5 GB and cannot be downloaded through the browser.",
+        "visible": "{{variables.selectedObjectSize > 5368709120}}"
+      }
+    },
+    {
+      "id": "c_download_link_panel",
+      "type": "container",
+      "name": "downloadLinkPanel",
+      "properties": {
+        "visible": "{{variables.showDownloadLink && variables.presignedUrl}}"
+      },
+      "children": [
+        {
+          "id": "c_download_link_text",
+          "type": "text",
+          "name": "downloadLinkText",
+          "properties": {
+            "text": "Download link generated. Click below to download (link expires in 1 hour):"
+          }
+        },
+        {
+          "id": "c_download_link_btn",
+          "type": "button",
+          "name": "downloadLinkBtn",
+          "properties": {
+            "text": "Open Download Link",
+            "variant": "success"
+          },
+          "events": {
+            "onClick": [
+              {
+                "action": "openUrl",
+                "url": "{{variables.presignedUrl}}",
+                "newTab": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_load_more_btn",
+      "type": "button",
+      "name": "loadMoreBtn",
+      "properties": {
+        "text": "Load More",
+        "variant": "outline",
+        "visible": "{{variables.isTruncated}}"
+      },
+      "events": {
+        "onClick": [
+          {
+            "action": "runQuery",
+            "queryName": "listObjects"
+          }
+        ]
+      }
+    },
+    {
+      "id": "c_refresh_btn",
+      "type": "button",
+      "name": "refreshBtn",
+      "properties": {
+        "text": "Refresh",
+        "variant": "outline"
+      },
+      "events": {
+        "onClick": [
+          {
+            "action": "setVariable",
+            "variable": "continuationToken",
+            "value": null
+          },
+          {
+            "action": "runQuery",
+            "queryName": "listObjects"
+          }
+        ]
+      }
+    }
+  ],
+  "variables": {
+    "currentPrefix": "",
+    "objects": [],
+    "prefixes": [],
+    "continuationToken": null,
+    "isTruncated": false,
+    "selectedObjectKey": null,
+    "selectedObjectSize": 0,
+    "objectMetadata": null,
+    "showMetadata": false,
+    "presignedUrl": null,
+    "showDownloadLink": false
+  }
+}

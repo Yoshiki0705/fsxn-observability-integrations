@@ -1,0 +1,432 @@
+{
+  "schemaVersion": "2.0",
+  "name": "Volume Management",
+  "description": "FSx ONTAP Volume CRUD operations (create, list, resize, delete with confirmation)",
+  "dataSources": [
+    {
+      "id": "ds_ontap_rest",
+      "name": "FSxN ONTAP REST",
+      "kind": "restapi",
+      "options": {
+        "url": "{{globals.ontap_base_url}}",
+        "auth_type": "basic",
+        "headers": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "credentials": {
+          "username": "{{globals.ontap_username}}",
+          "password": "{{globals.ontap_password}}"
+        },
+        "ssl_certificate": "none"
+      }
+    }
+  ],
+  "queries": [
+    {
+      "id": "q_list_volumes",
+      "name": "listVolumes",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes",
+        "url_params": [
+          { "key": "fields", "value": "name,size,space.used,space.available,state,svm.name,aggregates.name,nas.path,style,type" },
+          { "key": "max_records", "value": "50" },
+          { "key": "order_by", "value": "name asc" }
+        ],
+        "headers": [
+          { "key": "Accept", "value": "application/json" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "volumes", "value": "{{queries.listVolumes.data.records}}" },
+          { "action": "setVariable", "variable": "volumeCount", "value": "{{queries.listVolumes.data.num_records}}" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to load volumes: {{queries.listVolumes.error}}" }
+        ]
+      },
+      "runOnPageLoad": true
+    },
+    {
+      "id": "q_create_volume",
+      "name": "createVolume",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "POST",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes",
+        "headers": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "name": "{{components.volumeNameInput.value}}",
+          "svm": {
+            "name": "{{components.svmSelect.value}}"
+          },
+          "size": "{{components.volumeSizeInput.value * 1073741824}}",
+          "aggregates": [
+            { "name": "{{components.aggregateSelect.value}}" }
+          ],
+          "nas": {
+            "path": "{{components.junctionPathInput.value}}",
+            "export_policy": {
+              "name": "{{components.exportPolicySelect.value}}"
+            }
+          }
+        }
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "showAlert", "alertType": "success", "message": "Volume '{{components.volumeNameInput.value}}' created successfully" },
+          { "action": "runQuery", "queryName": "listVolumes" },
+          { "action": "setVariable", "variable": "showCreateForm", "value": false }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Volume creation failed: {{queries.createVolume.data.error.message || queries.createVolume.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_resize_volume",
+      "name": "resizeVolume",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "PATCH",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes/{{variables.selectedVolumeUuid}}",
+        "headers": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "size": "{{components.newSizeInput.value * 1073741824}}"
+        }
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "showAlert", "alertType": "success", "message": "Volume resized successfully" },
+          { "action": "runQuery", "queryName": "listVolumes" },
+          { "action": "setVariable", "variable": "showResizeModal", "value": false }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Volume resize failed: {{queries.resizeVolume.data.error.message || queries.resizeVolume.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_offline_volume",
+      "name": "offlineVolume",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "PATCH",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes/{{variables.selectedVolumeUuid}}",
+        "headers": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "state": "offline"
+        }
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "runQuery", "queryName": "deleteVolume" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to offline volume: {{queries.offlineVolume.data.error.message || queries.offlineVolume.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_delete_volume",
+      "name": "deleteVolume",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "DELETE",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes/{{variables.selectedVolumeUuid}}"
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "showAlert", "alertType": "success", "message": "Volume '{{variables.selectedVolumeName}}' deleted successfully" },
+          { "action": "runQuery", "queryName": "listVolumes" },
+          { "action": "setVariable", "variable": "showDeleteConfirm", "value": false }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Volume deletion failed: {{queries.deleteVolume.data.error.message || queries.deleteVolume.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_list_svms",
+      "name": "listSvmsForSelect",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/svm/svms",
+        "url_params": [
+          { "key": "fields", "value": "name" }
+        ]
+      },
+      "runOnPageLoad": true
+    },
+    {
+      "id": "q_list_aggregates",
+      "name": "listAggregates",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/storage/aggregates",
+        "url_params": [
+          { "key": "fields", "value": "name,space.block_storage.available" }
+        ]
+      },
+      "runOnPageLoad": true
+    }
+  ],
+  "components": [
+    {
+      "id": "c_volume_table",
+      "type": "table",
+      "name": "volumeTable",
+      "properties": {
+        "data": "{{queries.listVolumes.data.records}}",
+        "columns": [
+          { "name": "Name", "key": "name", "sortable": true },
+          { "name": "SVM", "key": "svm.name", "sortable": true },
+          { "name": "Size (GB)", "key": "size", "cellRenderer": "{{(cell / 1073741824).toFixed(1)}}" },
+          { "name": "Used (GB)", "key": "space.used", "cellRenderer": "{{(cell / 1073741824).toFixed(1)}}" },
+          { "name": "Used %", "key": "space.used", "cellRenderer": "{{((row.space.used / row.size) * 100).toFixed(1)}}%" },
+          { "name": "State", "key": "state", "sortable": true },
+          { "name": "Junction Path", "key": "nas.path" },
+          { "name": "Actions", "key": "actions", "cellRenderer": "actionButtons" }
+        ],
+        "pagination": { "enabled": true, "pageSize": 20 },
+        "search": { "enabled": true },
+        "loading": "{{queries.listVolumes.isLoading}}"
+      },
+      "events": {
+        "onRowClick": [
+          { "action": "setVariable", "variable": "selectedVolumeUuid", "value": "{{volumeTable.selectedRow.uuid}}" },
+          { "action": "setVariable", "variable": "selectedVolumeName", "value": "{{volumeTable.selectedRow.name}}" }
+        ]
+      }
+    },
+    {
+      "id": "c_create_form",
+      "type": "form",
+      "name": "createVolumeForm",
+      "properties": {
+        "visible": "{{variables.showCreateForm}}",
+        "title": "Create Volume"
+      },
+      "children": [
+        {
+          "id": "c_volume_name_input",
+          "type": "textInput",
+          "name": "volumeNameInput",
+          "properties": {
+            "label": "Volume Name",
+            "placeholder": "my_volume_01",
+            "required": true
+          },
+          "validation": {
+            "regex": "^[a-zA-Z0-9_]{1,203}$",
+            "errorMessage": "Volume name must be 1-203 characters, alphanumeric and underscores only"
+          }
+        },
+        {
+          "id": "c_svm_select",
+          "type": "dropdown",
+          "name": "svmSelect",
+          "properties": {
+            "label": "SVM",
+            "options": "{{queries.listSvmsForSelect.data.records.map(s => ({label: s.name, value: s.name}))}}",
+            "required": true
+          }
+        },
+        {
+          "id": "c_volume_size_input",
+          "type": "numberInput",
+          "name": "volumeSizeInput",
+          "properties": {
+            "label": "Size (GB)",
+            "placeholder": "100",
+            "min": 1,
+            "max": 107374,
+            "required": true
+          },
+          "validation": {
+            "min": 1,
+            "max": 107374,
+            "errorMessage": "Size must be between 20 MB (0.02 GB) and 100 TB (107374 GB)"
+          }
+        },
+        {
+          "id": "c_aggregate_select",
+          "type": "dropdown",
+          "name": "aggregateSelect",
+          "properties": {
+            "label": "Aggregate",
+            "options": "{{queries.listAggregates.data.records.map(a => ({label: a.name, value: a.name}))}}",
+            "required": true
+          }
+        },
+        {
+          "id": "c_junction_path_input",
+          "type": "textInput",
+          "name": "junctionPathInput",
+          "properties": {
+            "label": "Junction Path",
+            "placeholder": "/vol_name",
+            "required": true
+          },
+          "validation": {
+            "regex": "^/[a-zA-Z0-9_/\\-]+$",
+            "errorMessage": "Junction path must start with / and contain only alphanumeric, underscore, hyphen, and slash characters"
+          }
+        },
+        {
+          "id": "c_export_policy_select",
+          "type": "dropdown",
+          "name": "exportPolicySelect",
+          "properties": {
+            "label": "Export Policy",
+            "options": [
+              { "label": "default", "value": "default" }
+            ],
+            "required": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_create_btn",
+      "type": "button",
+      "name": "createVolumeBtn",
+      "properties": {
+        "text": "Create Volume",
+        "variant": "primary"
+      },
+      "events": {
+        "onClick": [
+          { "action": "setVariable", "variable": "showCreateForm", "value": true }
+        ]
+      }
+    },
+    {
+      "id": "c_submit_create_btn",
+      "type": "button",
+      "name": "submitCreateBtn",
+      "properties": {
+        "text": "Submit",
+        "variant": "primary",
+        "visible": "{{variables.showCreateForm}}",
+        "disabled": "{{!components.volumeNameInput.isValid || !components.svmSelect.value || !components.volumeSizeInput.isValid || !components.aggregateSelect.value || !components.junctionPathInput.isValid}}"
+      },
+      "events": {
+        "onClick": [
+          { "action": "runQuery", "queryName": "createVolume" }
+        ]
+      }
+    },
+    {
+      "id": "c_resize_modal",
+      "type": "modal",
+      "name": "resizeModal",
+      "properties": {
+        "visible": "{{variables.showResizeModal}}",
+        "title": "Resize Volume: {{variables.selectedVolumeName}}"
+      },
+      "children": [
+        {
+          "id": "c_new_size_input",
+          "type": "numberInput",
+          "name": "newSizeInput",
+          "properties": {
+            "label": "New Size (GB)",
+            "min": 1,
+            "max": 107374,
+            "required": true
+          },
+          "validation": {
+            "min": 1,
+            "max": 107374,
+            "errorMessage": "Size must be between 20 MB and 100 TB"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_delete_confirm_modal",
+      "type": "modal",
+      "name": "deleteConfirmModal",
+      "properties": {
+        "visible": "{{variables.showDeleteConfirm}}",
+        "title": "Confirm Volume Deletion"
+      },
+      "children": [
+        {
+          "id": "c_delete_warning",
+          "type": "text",
+          "name": "deleteWarningText",
+          "properties": {
+            "text": "Are you sure you want to delete volume '{{variables.selectedVolumeName}}'? This action will offline the volume and permanently delete all data. This cannot be undone."
+          }
+        },
+        {
+          "id": "c_confirm_delete_btn",
+          "type": "button",
+          "name": "confirmDeleteBtn",
+          "properties": {
+            "text": "Delete Volume",
+            "variant": "danger"
+          },
+          "events": {
+            "onClick": [
+              { "action": "runQuery", "queryName": "offlineVolume" }
+            ]
+          }
+        },
+        {
+          "id": "c_cancel_delete_btn",
+          "type": "button",
+          "name": "cancelDeleteBtn",
+          "properties": {
+            "text": "Cancel",
+            "variant": "secondary"
+          },
+          "events": {
+            "onClick": [
+              { "action": "setVariable", "variable": "showDeleteConfirm", "value": false }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_refresh_btn",
+      "type": "button",
+      "name": "refreshBtn",
+      "properties": {
+        "text": "Refresh",
+        "variant": "outline"
+      },
+      "events": {
+        "onClick": [
+          { "action": "runQuery", "queryName": "listVolumes" }
+        ]
+      }
+    }
+  ],
+  "variables": {
+    "showCreateForm": false,
+    "showResizeModal": false,
+    "showDeleteConfirm": false,
+    "selectedVolumeUuid": null,
+    "selectedVolumeName": null,
+    "volumes": [],
+    "volumeCount": 0
+  }
+}

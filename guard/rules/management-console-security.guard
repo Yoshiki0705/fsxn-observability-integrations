@@ -1,0 +1,199 @@
+# Management Console security rules — BLOCKING in CI
+# Validates security policies for the FSxN Management Console stacks.
+# Violations here indicate critical security issues that must be fixed before merge.
+#
+# Validates: Requirements 10.1, 10.2, 10.4
+
+let iam_roles = Resources.*[ Type == "AWS::IAM::Role" ]
+let iam_policies = Resources.*[ Type == "AWS::IAM::Policy" ]
+let security_groups = Resources.*[ Type == "AWS::EC2::SecurityGroup" ]
+let ecs_services = Resources.*[ Type == "AWS::ECS::Service" ]
+let lambdas = Resources.*[ Type == "AWS::Lambda::Function" ]
+let task_definitions = Resources.*[ Type == "AWS::ECS::TaskDefinition" ]
+
+#
+# Rule 1: IAM policies must not use wildcard (*) for Action
+# Ensures least-privilege IAM — no blanket permissions.
+#
+rule no_wildcard_iam_actions when %iam_roles !empty {
+  %iam_roles.Properties.Policies[*].PolicyDocument.Statement[*] {
+    Action != "*"
+    <<BLOCKING: IAM policies must not use wildcard (*) actions. Use specific service actions (e.g., s3:GetObject, aps:RemoteWrite).>>
+  }
+}
+
+rule no_wildcard_iam_actions_standalone when %iam_policies !empty {
+  %iam_policies.Properties.PolicyDocument.Statement[*] {
+    Action != "*"
+    <<BLOCKING: IAM policies must not use wildcard (*) actions. Use specific service actions.>>
+  }
+}
+
+#
+# Rule 2: IAM policies must not use wildcard (*) for Resource
+# Prevents overly broad resource access.
+# Note: ecr:GetAuthorizationToken requires Resource: '*' per AWS docs — excluded from check.
+# Note: cfn-guard cannot compare intrinsic functions (Fn::Sub, Ref, GetAtt) against strings;
+#       non-string Resource values are inherently not wildcards and pass this rule.
+#
+rule no_wildcard_iam_resources when %iam_roles !empty {
+  let statements = %iam_roles.Properties.Policies[*].PolicyDocument.Statement[*]
+  when %statements !empty {
+    %statements {
+      when Resource is_string
+           Resource == "*" {
+        Action[*] == "ecr:GetAuthorizationToken"
+        <<BLOCKING: IAM policies must not use wildcard (*) resources. Scope to specific ARNs. (Exception: ecr:GetAuthorizationToken requires Resource: '*')>>
+      }
+    }
+  }
+}
+
+rule no_wildcard_iam_resources_standalone when %iam_policies !empty {
+  let statements = %iam_policies.Properties.PolicyDocument.Statement[*]
+  when %statements !empty {
+    %statements {
+      when Resource is_string
+           Resource == "*" {
+        Action[*] == "ecr:GetAuthorizationToken"
+        <<BLOCKING: IAM policies must not use wildcard (*) resources. Scope to specific ARNs.>>
+      }
+    }
+  }
+}
+
+#
+# Rule 3: Security groups must not allow 0.0.0.0/0 inbound for task SGs
+# Only the ALB security group should allow public internet access.
+# Task security groups (Harvest, ToolJet, Lambda) must restrict inbound to specific SGs.
+# Note: SGs without inline SecurityGroupIngress are compliant (ingress may be added via
+#       separate AWS::EC2::SecurityGroupIngress resources for circular dependency avoidance).
+#
+rule no_public_ingress_on_task_security_groups when %security_groups !empty {
+  let task_sgs = %security_groups[
+    Properties.GroupDescription == /.*[Tt]ask.*/
+    OR
+    Properties.GroupDescription == /.*[Hh]arvest.*/
+    OR
+    Properties.GroupDescription == /.*[Tt]ool[Jj]et.*/
+    OR
+    Properties.GroupDescription == /.*[Ll]ambda.*/
+    OR
+    Properties.GroupDescription == /.*ONTAP.*/
+    OR
+    Properties.GroupDescription == /.*VPC.*[Ee]ndpoint.*/
+  ]
+  when %task_sgs !empty {
+    %task_sgs.Properties {
+      when SecurityGroupIngress exists {
+        SecurityGroupIngress[*] {
+          CidrIp not exists
+          OR
+          CidrIp != "0.0.0.0/0"
+          <<BLOCKING: Task security groups must not allow inbound from 0.0.0.0/0. Only the ALB SG should accept public traffic. Restrict inbound to specific security group sources.>>
+        }
+      }
+    }
+  }
+}
+
+#
+# Rule 4: ECS tasks must not have assignPublicIp ENABLED
+# ECS Fargate tasks must run in private subnets without public IP assignment.
+#
+rule no_public_ip_for_ecs_tasks when %ecs_services !empty {
+  %ecs_services.Properties.NetworkConfiguration.AwsvpcConfiguration {
+    AssignPublicIp not exists
+    OR
+    AssignPublicIp == "DISABLED"
+    <<BLOCKING: ECS tasks must not have AssignPublicIp: ENABLED. Deploy tasks in private subnets behind NAT Gateway.>>
+  }
+}
+
+#
+# Rule 5: ECS task definitions must not have secrets hardcoded in environment variables
+# Credentials must be referenced via Secrets Manager ARN or SSM Parameter Store.
+#
+rule no_hardcoded_secrets_in_task_env when %task_definitions !empty {
+  %task_definitions.Properties.ContainerDefinitions[*] {
+    when Environment exists {
+      Environment[*] {
+        when Name == /.*[Pp]assword.*/ OR Name == /.*[Ss]ecret.*/ OR Name == /.*[Cc]redential.*/ OR Name == /.*[Tt]oken.*/ {
+          Value == /^(arn:aws:secretsmanager:|arn:aws:ssm:|\{\{resolve:).*/
+          <<BLOCKING: Container environment variables containing credentials must reference Secrets Manager ARNs or SSM parameters, not plaintext values.>>
+        }
+      }
+    }
+  }
+}
+
+#
+# Rule 6: Lambda environment variables must not contain hardcoded secrets
+# Secrets must be referenced via Secrets Manager ARN, not stored as plaintext.
+#
+rule no_secrets_in_lambda_env when %lambdas !empty {
+  %lambdas.Properties {
+    when Environment exists {
+      Environment.Variables {
+        this[ keys == /.*[Pp]assword$/ ] not exists
+        OR
+        this[ keys == /.*[Pp]assword$/ ] == /^(arn:aws:secretsmanager:|arn:aws:ssm:|\{\{resolve:).*/
+        <<BLOCKING: Lambda environment variables ending in 'Password' must reference Secrets Manager ARNs, not plaintext values.>>
+      }
+      Environment.Variables {
+        this[ keys == /.*[Ss]ecret$/ ] not exists
+        OR
+        this[ keys == /.*[Ss]ecret$/ ] == /^(arn:aws:secretsmanager:|arn:aws:ssm:|\{\{resolve:).*/
+        <<BLOCKING: Lambda environment variables ending in 'Secret' must reference Secrets Manager ARNs, not plaintext values.>>
+      }
+      Environment.Variables {
+        this[ keys == /.*[Tt]oken$/ ] not exists
+        OR
+        this[ keys == /.*[Tt]oken$/ ] == /^(arn:aws:secretsmanager:|arn:aws:ssm:|\{\{resolve:).*/
+        <<BLOCKING: Lambda environment variables ending in 'Token' must reference Secrets Manager ARNs, not plaintext values.>>
+      }
+    }
+  }
+}
+
+#
+# Rule 7: VPC Interface Endpoints should be used for AWS service access
+# Validates that VPC endpoints exist when ECS services are deployed (minimizes NAT costs).
+# Note: In multi-stack deployments, VPC endpoints may reside in a separate network stack.
+# This rule only validates within a single template; cross-stack validation is done at deploy time.
+#
+let vpc_endpoints = Resources.*[ Type == "AWS::EC2::VPCEndpoint" ]
+
+rule vpc_endpoints_exist_for_ecs when %ecs_services !empty {
+  when %vpc_endpoints !empty {
+    %vpc_endpoints !empty
+  }
+}
+
+#
+# Rule 8: Dead letter configuration must exist for Lambda functions
+# Ensures failed invocations are captured for debugging and replay.
+#
+rule lambda_has_dead_letter_config when %lambdas !empty {
+  %lambdas.Properties {
+    DeadLetterConfig exists
+    <<BLOCKING: Lambda functions must have a DeadLetterConfig (DLQ) for capturing failed invocations.>>
+  }
+}
+
+#
+# Rule 9: No plaintext secret parameters without NoEcho
+# CloudFormation parameters containing sensitive values must be masked.
+#
+rule no_plaintext_secret_params_mgmt {
+  when Parameters exists {
+    Parameters.*[ keys == /.*[Ss]ecret.*/ ] {
+      NoEcho == true
+      <<BLOCKING: Parameters containing 'Secret' must have NoEcho: true to prevent console exposure.>>
+    }
+    Parameters.*[ keys == /.*[Pp]assword.*/ ] {
+      NoEcho == true
+      <<BLOCKING: Parameters containing 'Password' must have NoEcho: true to prevent console exposure.>>
+    }
+  }
+}

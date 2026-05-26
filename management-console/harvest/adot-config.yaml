@@ -1,0 +1,87 @@
+# ADOT Collector Configuration for FSxN Management Console
+#
+# This configuration runs as a sidecar container alongside the Harvest collector
+# in the same ECS Fargate task. It scrapes Harvest's Prometheus metrics endpoint
+# and remote-writes them to Amazon Managed Prometheus (AMP) using SigV4 authentication.
+#
+# Environment Variables Required:
+#   AMP_REMOTE_WRITE_ENDPOINT - AMP workspace remote write endpoint URL
+#     Example: https://aps-workspaces.ap-northeast-1.amazonaws.com/workspaces/ws-xxxxxxxx-xxxx/api/v1/remote_write
+#
+# IAM Requirements:
+#   The ECS task role must have aps:RemoteWrite permission on the AMP workspace.
+
+# =============================================================================
+# Receivers
+# =============================================================================
+# The prometheus receiver scrapes Harvest's metrics endpoint running in the same
+# ECS task (localhost). Harvest exposes Prometheus-format metrics on port 12990.
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: "harvest"
+          scrape_interval: 15s
+          static_configs:
+            - targets:
+                - "localhost:12990"
+          # Harvest exposes metrics at /metrics (default Prometheus path)
+          metrics_path: /metrics
+
+# =============================================================================
+# Processors
+# =============================================================================
+# The batch processor groups metrics before export for efficient network usage.
+# This reduces the number of remote-write requests to AMP.
+processors:
+  batch:
+    # Send a batch when 1000 metrics are buffered or after 10 seconds, whichever first
+    send_batch_size: 1000
+    timeout: 10s
+
+# =============================================================================
+# Exporters
+# =============================================================================
+exporters:
+  # PrometheusRemoteWrite exporter sends metrics to AMP using SigV4 authentication.
+  # The ECS task IAM role provides credentials automatically — no static keys needed.
+  prometheusremotewrite:
+    endpoint: "${AMP_REMOTE_WRITE_ENDPOINT}"
+    auth:
+      authenticator: sigv4auth
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # Logging exporter for troubleshooting — outputs metric data to CloudWatch Logs
+  # via the ADOT container's stdout. Set to debug level for detailed output.
+  logging:
+    loglevel: debug
+
+# =============================================================================
+# Extensions
+# =============================================================================
+# SigV4 authenticator extension provides AWS Signature Version 4 signing for
+# requests to AMP. It uses the ECS task role credentials from the container's
+# metadata endpoint automatically.
+extensions:
+  sigv4auth:
+    service: "aps"
+    region: "${AWS_REGION}"
+
+# =============================================================================
+# Service
+# =============================================================================
+# Wire the pipeline: prometheus receiver → batch processor → exporters.
+# Metrics flow: Harvest:12990 → prometheus receiver → batch → AMP + CloudWatch Logs
+service:
+  extensions:
+    - sigv4auth
+  pipelines:
+    metrics:
+      receivers:
+        - prometheus
+      processors:
+        - batch
+      exporters:
+        - prometheusremotewrite
+        - logging
