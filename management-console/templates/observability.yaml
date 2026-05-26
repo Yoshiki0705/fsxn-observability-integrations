@@ -397,7 +397,7 @@ Resources:
               echo "=== Starting pollers: $POLLER_NAMES ==="
 
               # Start all pollers
-              exec bin/poller --config /opt/harvest/harvest.yml --pollers "$POLLER_NAMES"
+              exec bin/poller --config /opt/harvest/harvest.yml -p "$POLLER_NAMES"
           PortMappings:
             - ContainerPort: 12990
               Protocol: tcp
