@@ -11,7 +11,9 @@ class TestFormatDocument:
                "Result": "Success", "SVMName": "svm-01", "timestamp": "2026-01-15T12:00:00Z"}
         doc = handler._format_document(log, "audit/test.json")
         assert doc["@timestamp"] == "2026-01-15T12:00:00Z"
-        assert doc["event"]["type"] == "4663"
+        assert doc["event"]["code"] == "4663"
+        assert doc["event"]["type"] == ["access"]
+        assert doc["event"]["category"] == ["file"]
         assert doc["user"]["name"] == "admin"
         assert doc["fsxn"]["operation"] == "ReadData"
 
