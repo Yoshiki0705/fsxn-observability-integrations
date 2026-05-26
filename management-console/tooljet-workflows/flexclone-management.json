@@ -68,6 +68,35 @@
       }
     },
     {
+      "id": "q_check_admin_role",
+      "name": "checkAdminRole",
+      "kind": "runJavaScript",
+      "options": {
+        "code": "function checkAdminRole() { try { const oidcHeader = server.headers['x-amzn-oidc-data'] || ''; if (!oidcHeader) { return { isAdmin: false, groups: [], reason: 'no-oidc-header' }; } const parts = oidcHeader.split('.'); if (parts.length !== 3) { return { isAdmin: false, groups: [], reason: 'invalid-jwt-format' }; } const payload = parts[1]; const base64 = payload.replace(/-/g, '+').replace(/_/g, '/'); const padded = base64 + '=='.slice(0, (4 - base64.length % 4) % 4); const decoded = atob(padded); const claims = JSON.parse(decoded); const groups = claims['cognito:groups'] || []; const isAdmin = Array.isArray(groups) && groups.includes('fsxn-admins'); return { isAdmin: isAdmin, groups: groups, reason: 'ok' }; } catch (e) { return { isAdmin: false, groups: [], reason: 'decode-error: ' + e.message }; } } return checkAdminRole();"
+      },
+      "events": {
+        "onSuccess": [
+          {
+            "action": "runConditional",
+            "conditions": [
+              {
+                "condition": "{{queries.checkAdminRole.data.isAdmin === true}}",
+                "actions": [
+                  { "action": "runQuery", "queryName": "createFlexClone" }
+                ]
+              },
+              {
+                "condition": "{{queries.checkAdminRole.data.isAdmin === false}}",
+                "actions": [
+                  { "action": "showAlert", "alertType": "error", "message": "Insufficient permissions — Admin role required for this operation" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "id": "q_create_flexclone",
       "name": "createFlexClone",
       "dataSourceId": "ds_ontap_rest",
@@ -229,7 +258,7 @@
             "action": "runJavaScript",
             "code": "const body = { name: components.cloneNameInput.value, clone: { parent_volume: { uuid: variables.parentVolumeUuid }, is_flexclone: true }, nas: { path: components.junctionPathInput.value }, svm: { uuid: variables.parentSvmUuid } }; if (variables.selectedSnapshotUuid) { body.clone.parent_snapshot = { uuid: variables.selectedSnapshotUuid }; } setVariable('cloneRequestBody', body); setVariable('cloneState', 'submitting'); setVariable('submittedCloneName', components.cloneNameInput.value); setVariable('submittedJunctionPath', components.junctionPathInput.value); setVariable('submittedParentSnapshot', variables.selectedSnapshotName || null);"
           },
-          { "action": "runQuery", "queryName": "createFlexClone" }
+          { "action": "runQuery", "queryName": "checkAdminRole" }
         ]
       }
     },

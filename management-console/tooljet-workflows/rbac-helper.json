@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "2.0",
+  "name": "RBAC Helper",
+  "description": "Reusable RBAC role extraction logic. Decodes the x-amzn-oidc-data JWT header from ALB to extract Cognito group membership and determine admin/viewer role.",
+  "usage": {
+    "description": "Add a 'checkAdminRole' query (type: runJavaScript) to any workflow that requires admin access before write operations. The query decodes the ALB OIDC JWT, extracts cognito:groups, and returns isAdmin status.",
+    "queryTemplate": {
+      "id": "q_check_admin_role",
+      "name": "checkAdminRole",
+      "kind": "runJavaScript",
+      "options": {
+        "code": "// RBAC Role Check — Decode ALB OIDC JWT and extract Cognito groups\n// The x-amzn-oidc-data header is set by ALB after OIDC authentication.\n// JWT format: header.payload.signature — we decode the payload (middle segment).\n\nfunction checkAdminRole() {\n  try {\n    const oidcHeader = server.headers['x-amzn-oidc-data'] || '';\n    \n    if (!oidcHeader) {\n      // No OIDC header present — default to viewer (non-admin)\n      return { isAdmin: false, groups: [], reason: 'no-oidc-header' };\n    }\n    \n    // Split JWT into parts\n    const parts = oidcHeader.split('.');\n    if (parts.length !== 3) {\n      return { isAdmin: false, groups: [], reason: 'invalid-jwt-format' };\n    }\n    \n    // Decode base64url payload (middle segment)\n    const payload = parts[1];\n    // base64url to base64: replace - with +, _ with /\n    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');\n    // Pad with = if needed\n    const padded = base64 + '=='.slice(0, (4 - base64.length % 4) % 4);\n    const decoded = atob(padded);\n    const claims = JSON.parse(decoded);\n    \n    // Extract cognito:groups claim\n    const groups = claims['cognito:groups'] || [];\n    const isAdmin = Array.isArray(groups) && groups.includes('fsxn-admins');\n    \n    return { isAdmin: isAdmin, groups: groups, reason: 'ok' };\n  } catch (e) {\n    // On any decode error, default to viewer (non-admin) for safety\n    return { isAdmin: false, groups: [], reason: 'decode-error: ' + e.message };\n  }\n}\n\nreturn checkAdminRole();"
+      }
+    },
+    "conditionalCheck": {
+      "description": "After running checkAdminRole, check the result before executing write operations",
+      "pattern": {
+        "condition": "{{queries.checkAdminRole.data.isAdmin === false}}",
+        "actions": [
+          { "action": "showAlert", "alertType": "error", "message": "Insufficient permissions — Admin role required for this operation" },
+          { "action": "setVariable", "variable": "writeBlocked", "value": true }
+        ]
+      }
+    }
+  },
+  "rbacConfig": {
+    "adminGroup": "fsxn-admins",
+    "viewerGroup": "fsxn-viewers",
+    "headerName": "x-amzn-oidc-data",
+    "defaultRole": "viewer",
+    "notes": [
+      "ALB sets x-amzn-oidc-data header after OIDC authentication with Cognito",
+      "JWT payload contains cognito:groups claim as an array of group names",
+      "If header is missing (e.g., local development), user defaults to viewer role",
+      "Read operations (GET) do not require role checks — viewer access is sufficient",
+      "Write operations (POST, PATCH, DELETE) require fsxn-admins group membership"
+    ]
+  }
+}

@@ -18,6 +18,7 @@ TEMPLATE_DIR="${SCRIPT_DIR}/../templates"
 STACK_PREFIX="${STACK_PREFIX:-fsxn-mgmt}"
 AWS_REGION="${AWS_REGION:-$(aws configure get region 2>/dev/null || echo "ap-northeast-1")}"
 DRY_RUN="${DRY_RUN:-false}"
+SKIP_DASHBOARD_IMPORT="${SKIP_DASHBOARD_IMPORT:-false}"
 
 # ---------------------------------------------------------------------------
 # Usage
@@ -48,13 +49,17 @@ Optional environment variables:
   TOOLJET_IMAGE_TAG           ToolJet container image tag (default: latest)
   S3_ACCESS_POINT_ARN         FSx ONTAP S3 Access Point ARN
   CERTIFICATE_ARN             ACM certificate ARN for ALB HTTPS
+  CUSTOM_DOMAIN_NAME          Custom domain for the console (e.g., console.example.com)
+  HOSTED_ZONE_ID              Route 53 Hosted Zone ID for the custom domain
   ALERT_SNS_TOPIC_ARN         Existing SNS topic ARN for alarms (optional)
   FSXN_SECURITY_GROUP_ID      FSx ONTAP file system security group ID (for auto-adding access rules)
   AWS_REGION                  AWS region (default: from aws configure or ap-northeast-1)
   STACK_PREFIX                Stack name prefix (default: fsxn-mgmt)
 
 Options:
-  --help, -h    Show this help message
+  --help, -h                Show this help message
+  --dry-run                 Validate templates without deploying
+  --skip-dashboard-import   Skip Grafana dashboard import in Stack 3
 
 Examples:
   # Single file system deployment (backward compatible)
@@ -96,6 +101,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --dry-run)
       DRY_RUN=true
+      shift
+      ;;
+    --skip-dashboard-import)
+      SKIP_DASHBOARD_IMPORT=true
       shift
       ;;
     *)
@@ -160,6 +169,23 @@ validate_env() {
   fi
 
   log_info "Validated ${#EP_ARRAY[@]} FSx ONTAP endpoint(s) with matching credentials"
+
+  # -------------------------------------------------------------------------
+  # Custom domain validation: if CUSTOM_DOMAIN_NAME is set, require related vars
+  # -------------------------------------------------------------------------
+  if [[ -n "${CUSTOM_DOMAIN_NAME:-}" ]]; then
+    if [[ -z "${CERTIFICATE_ARN:-}" ]]; then
+      log_error "CUSTOM_DOMAIN_NAME is set but CERTIFICATE_ARN is not provided"
+      log_error "An ACM certificate is required for custom domain HTTPS."
+      exit 1
+    fi
+    if [[ -z "${HOSTED_ZONE_ID:-}" ]]; then
+      log_error "CUSTOM_DOMAIN_NAME is set but HOSTED_ZONE_ID is not provided"
+      log_error "A Route 53 Hosted Zone ID is required to create the DNS record."
+      exit 1
+    fi
+    log_info "Custom domain configured: ${CUSTOM_DOMAIN_NAME}"
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -173,6 +199,8 @@ HARVEST_IMAGE_TAG="${HARVEST_IMAGE_TAG:-latest}"
 TOOLJET_IMAGE_TAG="${TOOLJET_IMAGE_TAG:-latest}"
 S3_ACCESS_POINT_ARN="${S3_ACCESS_POINT_ARN:-}"
 CERTIFICATE_ARN="${CERTIFICATE_ARN:-}"
+CUSTOM_DOMAIN_NAME="${CUSTOM_DOMAIN_NAME:-}"
+HOSTED_ZONE_ID="${HOSTED_ZONE_ID:-}"
 ALERT_SNS_TOPIC_ARN="${ALERT_SNS_TOPIC_ARN:-}"
 
 # ---------------------------------------------------------------------------
@@ -335,17 +363,86 @@ main() {
   log_info "  CognitoDomain: ${COGNITO_DOMAIN}"
 
   # =========================================================================
+  # Pre-Stack 3: Upload dashboards to S3 and ensure AMG API key secret
+  # =========================================================================
+  log_step "Pre-Stack 3: Dashboard upload & AMG API key secret"
+
+  # Resolve AWS Account ID dynamically
+  AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+  DASHBOARD_BUCKET_NAME="fsxn-mgmt-dashboards-${AWS_ACCOUNT_ID}-${AWS_REGION}"
+  DASHBOARD_SOURCE_DIR="${SCRIPT_DIR}/../harvest/dashboards"
+
+  # Upload dashboard JSONs to S3 (bucket created by observability stack on first deploy)
+  if [[ -d "${DASHBOARD_SOURCE_DIR}" ]]; then
+    local json_count
+    json_count=$(find "${DASHBOARD_SOURCE_DIR}" -name "*.json" 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "${json_count}" -gt 0 ]]; then
+      log_info "Uploading ${json_count} dashboard JSON(s) to s3://${DASHBOARD_BUCKET_NAME}/dashboards/"
+      if [[ "${DRY_RUN}" == "true" ]]; then
+        log_info "[DRY-RUN] Would sync ${DASHBOARD_SOURCE_DIR}/*.json to s3://${DASHBOARD_BUCKET_NAME}/dashboards/"
+      else
+        aws s3 sync "${DASHBOARD_SOURCE_DIR}" "s3://${DASHBOARD_BUCKET_NAME}/dashboards/" \
+          --exclude "*" --include "*.json" \
+          --region "${AWS_REGION}" 2>/dev/null || \
+          log_info "Dashboard bucket may not exist yet (will be created by Stack 3). Upload will retry after stack deploy."
+        log_success "Dashboard JSONs uploaded to S3"
+      fi
+    else
+      log_info "No dashboard JSON files found in ${DASHBOARD_SOURCE_DIR} — skipping upload"
+    fi
+  else
+    log_info "Dashboard source directory not found: ${DASHBOARD_SOURCE_DIR} — skipping upload"
+  fi
+
+  # Ensure AMG API key secret exists in Secrets Manager
+  AMG_API_KEY_SECRET_NAME="fsxn-mgmt-amg-api-key"
+  AMG_API_KEY_SECRET_ARN=""
+
+  if aws secretsmanager describe-secret \
+    --secret-id "${AMG_API_KEY_SECRET_NAME}" \
+    --region "${AWS_REGION}" > /dev/null 2>&1; then
+    AMG_API_KEY_SECRET_ARN=$(aws secretsmanager describe-secret \
+      --secret-id "${AMG_API_KEY_SECRET_NAME}" \
+      --region "${AWS_REGION}" \
+      --query "ARN" --output text)
+    log_info "AMG API key secret already exists: ${AMG_API_KEY_SECRET_NAME}"
+  else
+    if [[ "${DRY_RUN}" == "true" ]]; then
+      log_info "[DRY-RUN] Would create Secrets Manager secret: ${AMG_API_KEY_SECRET_NAME}"
+      AMG_API_KEY_SECRET_ARN="arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:${AMG_API_KEY_SECRET_NAME}-XXXXXX"
+    else
+      AMG_API_KEY_SECRET_ARN=$(aws secretsmanager create-secret \
+        --name "${AMG_API_KEY_SECRET_NAME}" \
+        --description "AMG API key for FSxN Management Console dashboard import" \
+        --secret-string "PLACEHOLDER_UPDATE_WITH_REAL_AMG_API_KEY" \
+        --region "${AWS_REGION}" \
+        --query "ARN" --output text)
+      log_success "Created AMG API key secret: ${AMG_API_KEY_SECRET_NAME}"
+      log_info "⚠️  ACTION REQUIRED: Update the secret with a real AMG API key:"
+      log_info "  aws secretsmanager put-secret-value --secret-id ${AMG_API_KEY_SECRET_NAME} --secret-string '<your-amg-api-key>' --region ${AWS_REGION}"
+    fi
+  fi
+
+  log_info "AMG API key secret ARN: ${AMG_API_KEY_SECRET_ARN}"
+  log_info "Skip dashboard import: ${SKIP_DASHBOARD_IMPORT}"
+
+  # =========================================================================
   # Stack 3: Observability
   # =========================================================================
   log_step "Stack 3/5: ${STACK_PREFIX}-observability"
 
-  deploy_stack "${STACK_PREFIX}-observability" "${TEMPLATE_DIR}/observability.yaml" \
-    "PrivateSubnetIds=${PRIVATE_SUBNET_IDS}" \
-    "HarvestTaskSgId=${HARVEST_TASK_SG}" \
-    "OntapManagementEndpoints=${ONTAP_MGMT_ENDPOINTS}" \
-    "OntapCredentialsSecretArns=${ONTAP_CREDENTIALS_SECRET_ARNS}" \
-    "CognitoUserPoolArn=${COGNITO_USER_POOL_ARN}" \
+  local observability_params=(
+    "PrivateSubnetIds=${PRIVATE_SUBNET_IDS}"
+    "HarvestTaskSgId=${HARVEST_TASK_SG}"
+    "OntapManagementEndpoints=${ONTAP_MGMT_ENDPOINTS}"
+    "OntapCredentialsSecretArns=${ONTAP_CREDENTIALS_SECRET_ARNS}"
+    "CognitoUserPoolArn=${COGNITO_USER_POOL_ARN}"
     "HarvestImageTag=${HARVEST_IMAGE_TAG}"
+    "SkipDashboardImport=${SKIP_DASHBOARD_IMPORT}"
+    "AmgApiKeySecretArn=${AMG_API_KEY_SECRET_ARN}"
+  )
+
+  deploy_stack "${STACK_PREFIX}-observability" "${TEMPLATE_DIR}/observability.yaml" "${observability_params[@]}"
 
   # Retrieve observability stack outputs
   AMP_WORKSPACE_ID=$(get_stack_output "${STACK_PREFIX}-observability" "AmpWorkspaceId")
@@ -385,6 +482,8 @@ main() {
   # Optional parameters — only pass if set
   [[ -n "${S3_ACCESS_POINT_ARN}" ]] && console_params+=("S3AccessPointArn=${S3_ACCESS_POINT_ARN}")
   [[ -n "${CERTIFICATE_ARN}" ]] && console_params+=("CertificateArn=${CERTIFICATE_ARN}")
+  [[ -n "${CUSTOM_DOMAIN_NAME}" ]] && console_params+=("CustomDomainName=${CUSTOM_DOMAIN_NAME}")
+  [[ -n "${HOSTED_ZONE_ID}" ]] && console_params+=("HostedZoneId=${HOSTED_ZONE_ID}")
 
   deploy_stack "${STACK_PREFIX}-console" "${TEMPLATE_DIR}/console.yaml" "${console_params[@]}"
 
@@ -394,8 +493,15 @@ main() {
   TOOLJET_SERVICE_NAME=$(get_stack_output "${STACK_PREFIX}-console" "ToolJetServiceName")
   TEMP_BUCKET_NAME=$(get_stack_output "${STACK_PREFIX}-console" "TempBucketName")
 
+  # Retrieve console URL (custom domain if configured, otherwise ALB DNS)
+  CONSOLE_URL=$(get_stack_output "${STACK_PREFIX}-console" "ConsoleUrl")
+  if [[ -z "${CONSOLE_URL}" ]]; then
+    CONSOLE_URL="https://${ALB_DNS_NAME}"
+  fi
+
   log_info "Console outputs retrieved:"
   log_info "  ALB DNS: ${ALB_DNS_NAME}"
+  log_info "  Console URL: ${CONSOLE_URL}"
   log_info "  ToolJet Service: ${TOOLJET_SERVICE_ARN}"
 
   # =========================================================================
@@ -424,7 +530,10 @@ main() {
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo ""
   echo "Access the console:"
-  echo "  ALB endpoint: https://${ALB_DNS_NAME}"
+  echo "  Console URL: ${CONSOLE_URL}"
+  if [[ -n "${CUSTOM_DOMAIN_NAME}" ]]; then
+    echo "  ALB endpoint: https://${ALB_DNS_NAME}"
+  fi
   echo "  Grafana:      ${AMG_WORKSPACE_URL}"
   echo ""
   echo "Stacks deployed:"

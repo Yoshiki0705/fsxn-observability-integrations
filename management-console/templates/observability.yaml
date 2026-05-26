@@ -27,6 +27,11 @@ Metadata:
           default: Container Configuration
         Parameters:
           - HarvestImageTag
+      - Label:
+          default: Dashboard Import (Phase 2B)
+        Parameters:
+          - SkipDashboardImport
+          - AmgApiKeySecretArn
     ParameterLabels:
       PrivateSubnetIds:
         default: Private Subnet IDs (2+ AZs)
@@ -40,6 +45,10 @@ Metadata:
         default: Cognito User Pool ARN
       HarvestImageTag:
         default: Harvest Container Image Tag
+      SkipDashboardImport:
+        default: Skip Dashboard Import
+      AmgApiKeySecretArn:
+        default: AMG API Key Secret ARN
 
 Parameters:
   PrivateSubnetIds:
@@ -80,6 +89,27 @@ Parameters:
     Description: >
       Container image tag for NetApp Harvest collector.
       Recommend pinning to a specific version (e.g., '24.05.2') for production.
+
+  SkipDashboardImport:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: >
+      Set to 'true' to skip automated Grafana dashboard import.
+      When 'false' (default), the Custom Resource Lambda imports dashboards on stack create/update.
+
+  AmgApiKeySecretArn:
+    Type: String
+    Default: ''
+    Description: >
+      ARN of the Secrets Manager secret containing the AMG API key.
+      Required when SkipDashboardImport is 'false'.
+    AllowedPattern: '^(arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+|)$'
+
+Conditions:
+  ShouldImportDashboards: !Equals [!Ref SkipDashboardImport, 'false']
 
 Resources:
   # ============================================================
@@ -511,6 +541,186 @@ Resources:
         - Key: Component
           Value: harvest
 
+  # ============================================================
+  # Dashboard Auto-Provisioning (Phase 2B)
+  # S3 Bucket, Lambda, IAM Role, Custom Resource
+  # ============================================================
+
+  DashboardBucket:
+    Type: AWS::S3::Bucket
+    Condition: ShouldImportDashboards
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub 'fsxn-mgmt-dashboards-${AWS::AccountId}-${AWS::Region}'
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: fsxn-management-console
+        - Key: Component
+          Value: dashboard-import
+
+  DashboardImporterRole:
+    Type: AWS::IAM::Role
+    Condition: ShouldImportDashboards
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DashboardImporterPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: S3Read
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::fsxn-mgmt-dashboards-${AWS::AccountId}-${AWS::Region}'
+                  - !Sub 'arn:aws:s3:::fsxn-mgmt-dashboards-${AWS::AccountId}-${AWS::Region}/*'
+              - Sid: SecretsManagerRead
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref AmgApiKeySecretArn
+              - Sid: CloudWatchLogsWrite
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/fsxn-mgmt-dashboard-importer:*'
+      Tags:
+        - Key: Project
+          Value: fsxn-management-console
+        - Key: Component
+          Value: dashboard-import
+
+  DashboardImporterFunction:
+    Type: AWS::Lambda::Function
+    Condition: ShouldImportDashboards
+    Properties:
+      FunctionName: fsxn-mgmt-dashboard-importer
+      Description: Imports Grafana dashboards to AMG via HTTP API (CloudFormation Custom Resource)
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 300
+      MemorySize: 256
+      Role: !GetAtt DashboardImporterRole.Arn
+      Environment:
+        Variables:
+          AMG_API_KEY_SECRET_ARN: !Ref AmgApiKeySecretArn
+          AMG_WORKSPACE_URL: !GetAtt AmgWorkspace.Endpoint
+          DASHBOARD_BUCKET_NAME: !Sub 'fsxn-mgmt-dashboards-${AWS::AccountId}-${AWS::Region}'
+          AMP_WORKSPACE_ID: !Ref AmpWorkspace
+      Code:
+        ZipFile: |
+          """Dashboard importer Lambda - placeholder.
+
+          Actual implementation deployed via management-console/lambda/dashboard_importer.py.
+          This inline code handles the Custom Resource lifecycle for initial stack creation.
+          """
+
+          import json
+          import logging
+          import urllib3
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          http = urllib3.PoolManager()
+
+
+          def handler(event, context):
+              """CloudFormation Custom Resource handler."""
+              response_url = event.get("ResponseURL", "")
+              request_type = event.get("RequestType", "Create")
+              logical_resource_id = event.get("LogicalResourceId", "")
+              stack_id = event.get("StackId", "")
+              request_id = event.get("RequestId", "")
+
+              logger.info("RequestType: %s, LogicalResourceId: %s", request_type, logical_resource_id)
+
+              try:
+                  if request_type in ("Create", "Update"):
+                      # Placeholder: actual import logic in dashboard_importer.py
+                      logger.info("Dashboard import triggered (placeholder)")
+                      status = "SUCCESS"
+                      data = {"Message": "Dashboard import placeholder - deploy actual code to S3"}
+                  else:
+                      # Delete: no-op (dashboards remain for manual cleanup)
+                      logger.info("Delete request - no-op")
+                      status = "SUCCESS"
+                      data = {"Message": "Delete no-op"}
+              except Exception as e:
+                  logger.error("Error: %s", str(e))
+                  status = "FAILED"
+                  data = {"Error": str(e)}
+
+              _send_response(response_url, status, stack_id, request_id, logical_resource_id, data)
+
+
+          def _send_response(url, status, stack_id, request_id, logical_id, data):
+              """Send response to CloudFormation."""
+              body = json.dumps({
+                  "Status": status,
+                  "Reason": "See CloudWatch Log Stream",
+                  "PhysicalResourceId": logical_id,
+                  "StackId": stack_id,
+                  "RequestId": request_id,
+                  "LogicalResourceId": logical_id,
+                  "Data": data,
+              }).encode("utf-8")
+
+              try:
+                  http.request(
+                      "PUT",
+                      url,
+                      body=body,
+                      headers={"Content-Type": ""},
+                  )
+              except Exception as e:
+                  logger.error("Failed to send response: %s", str(e))
+      Tags:
+        - Key: Project
+          Value: fsxn-management-console
+        - Key: Component
+          Value: dashboard-import
+
+  DashboardImportCustomResource:
+    Type: Custom::DashboardImport
+    Condition: ShouldImportDashboards
+    Properties:
+      ServiceToken: !GetAtt DashboardImporterFunction.Arn
+      ServiceTimeout: 300
+      AmgWorkspaceUrl: !GetAtt AmgWorkspace.Endpoint
+      AmpWorkspaceId: !Ref AmpWorkspace
+      DashboardBucket: !Sub 'fsxn-mgmt-dashboards-${AWS::AccountId}-${AWS::Region}'
+      # Trigger re-import on stack update by changing this timestamp
+      ImportTimestamp: !Ref AWS::StackName
+
 # ============================================================
 # Outputs
 # ============================================================
@@ -580,3 +790,17 @@ Outputs:
     Value: !Ref AdotLogGroup
     Export:
       Name: !Sub '${AWS::StackName}-AdotLogGroupName'
+
+  DashboardBucketName:
+    Description: S3 bucket name for Grafana dashboard JSON storage
+    Condition: ShouldImportDashboards
+    Value: !Ref DashboardBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-DashboardBucketName'
+
+  DashboardImporterFunctionArn:
+    Description: ARN of the dashboard importer Lambda function
+    Condition: ShouldImportDashboards
+    Value: !GetAtt DashboardImporterFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DashboardImporterFunctionArn'

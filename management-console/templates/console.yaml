@@ -40,6 +40,8 @@ Metadata:
           - ToolJetImageTag
           - SessionDurationHours
           - CertificateArn
+          - CustomDomainName
+          - HostedZoneId
     ParameterLabels:
       VpcId:
         default: VPC ID
@@ -73,6 +75,10 @@ Metadata:
         default: Session Duration (Hours)
       CertificateArn:
         default: ACM Certificate ARN
+      CustomDomainName:
+        default: Custom Domain Name
+      HostedZoneId:
+        default: Route 53 Hosted Zone ID
 
 Parameters:
   VpcId:
@@ -171,6 +177,23 @@ Parameters:
     Description: >
       ARN of an existing ACM certificate for HTTPS on the ALB.
     AllowedPattern: '^arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate/[a-f0-9-]+$'
+
+  CustomDomainName:
+    Type: String
+    Default: ''
+    Description: >
+      Custom domain name for the management console (e.g., fsxn-console.example.com).
+      Leave empty to use ALB DNS.
+
+  HostedZoneId:
+    Type: String
+    Default: ''
+    Description: >
+      Route 53 Hosted Zone ID for the custom domain.
+      Required when CustomDomainName is set.
+
+Conditions:
+  HasCustomDomain: !Not [!Equals [!Ref CustomDomainName, '']]
 
 Resources:
   # ============================================================
@@ -329,6 +352,22 @@ Resources:
         - Type: forward
           Order: 2
           TargetGroupArn: !Ref ToolJetTargetGroup
+
+  # ============================================================
+  # Route 53 DNS Record (Custom Domain → ALB Alias)
+  # Only created when CustomDomainName is provided
+  # ============================================================
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasCustomDomain
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref CustomDomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApplicationLoadBalancer.DNSName
+        HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+        EvaluateTargetHealth: true
 
   # ============================================================
   # RDS PostgreSQL (ToolJet state database)
@@ -629,7 +668,10 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: TOOLJET_HOST
-              Value: !Sub 'https://${ApplicationLoadBalancer.DNSName}'
+              Value: !If
+                - HasCustomDomain
+                - !Sub 'https://${CustomDomainName}'
+                - !Sub 'https://${ApplicationLoadBalancer.DNSName}'
             - Name: ONTAP_MGMT_ENDPOINTS
               Value: !Ref OntapManagementEndpoints
             - Name: ONTAP_CREDENTIALS_SECRET_ARNS
@@ -762,3 +804,21 @@ Outputs:
     Value: !GetAtt ToolJetDatabase.MasterUserSecret.SecretArn
     Export:
       Name: !Sub '${AWS::StackName}-RdsSecretArn'
+
+  ConsoleUrl:
+    Description: Management console URL (custom domain or ALB DNS)
+    Value: !If
+      - HasCustomDomain
+      - !Sub 'https://${CustomDomainName}'
+      - !Sub 'https://${ApplicationLoadBalancer.DNSName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-ConsoleUrl'
+
+  CognitoCallbackUrl:
+    Description: Cognito OAuth2 callback URL (must be added to User Pool Client CallbackURLs)
+    Value: !If
+      - HasCustomDomain
+      - !Sub 'https://${CustomDomainName}/oauth2/idpresponse'
+      - !Sub 'https://${ApplicationLoadBalancer.DNSName}/oauth2/idpresponse'
+    Export:
+      Name: !Sub '${AWS::StackName}-CognitoCallbackUrl'
