@@ -146,7 +146,11 @@ def _format_document(log: dict[str, Any], source_key: str) -> dict[str, Any]:
     timestamp = log.get("timestamp", log.get("Timestamp", datetime.now(timezone.utc).isoformat()))
     return {
         "@timestamp": timestamp,
-        "event": {"type": log.get("EventID", log.get("event_type", "unknown"))},
+        "event": {
+            "code": log.get("EventID", log.get("event_type", "unknown")),
+            "type": ["access"],
+            "category": ["file"],
+        },
         "user": {"name": log.get("UserName", log.get("user", ""))},
         "source": {"ip": log.get("ClientIP", log.get("client_ip", ""))},
         "fsxn": {
