@@ -182,6 +182,27 @@ Resources:
         - ScopeDescription: Grafana access scope
           ScopeName: grafana
 
+  # ============================================================
+  # Cognito User Pool Groups (RBAC)
+  # Groups are included in the cognito:groups claim of the OIDC
+  # token when openid scope is requested (already configured above).
+  # ============================================================
+  FsxnAdminsGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: fsxn-admins
+      UserPoolId: !Ref UserPool
+      Description: Administrators with full read/write access to all management operations
+      Precedence: 1
+
+  FsxnViewersGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: fsxn-viewers
+      UserPoolId: !Ref UserPool
+      Description: Viewers with read-only access to dashboards and status
+      Precedence: 10
+
 Outputs:
   UserPoolId:
     Description: Cognito User Pool ID
@@ -218,3 +239,15 @@ Outputs:
     Value: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}'
     Export:
       Name: !Sub '${ProjectName}-CognitoIssuerUrl'
+
+  AdminGroupName:
+    Description: Cognito User Pool group name for administrators
+    Value: !Ref FsxnAdminsGroup
+    Export:
+      Name: !Sub '${ProjectName}-AdminGroupName'
+
+  ViewerGroupName:
+    Description: Cognito User Pool group name for viewers
+    Value: !Ref FsxnViewersGroup
+    Export:
+      Name: !Sub '${ProjectName}-ViewerGroupName'

@@ -69,6 +69,35 @@
       }
     },
     {
+      "id": "q_check_admin_role",
+      "name": "checkAdminRole",
+      "kind": "runJavaScript",
+      "options": {
+        "code": "function checkAdminRole() { try { const oidcHeader = server.headers['x-amzn-oidc-data'] || ''; if (!oidcHeader) { return { isAdmin: false, groups: [], reason: 'no-oidc-header' }; } const parts = oidcHeader.split('.'); if (parts.length !== 3) { return { isAdmin: false, groups: [], reason: 'invalid-jwt-format' }; } const payload = parts[1]; const base64 = payload.replace(/-/g, '+').replace(/_/g, '/'); const padded = base64 + '=='.slice(0, (4 - base64.length % 4) % 4); const decoded = atob(padded); const claims = JSON.parse(decoded); const groups = claims['cognito:groups'] || []; const isAdmin = Array.isArray(groups) && groups.includes('fsxn-admins'); return { isAdmin: isAdmin, groups: groups, reason: 'ok' }; } catch (e) { return { isAdmin: false, groups: [], reason: 'decode-error: ' + e.message }; } } return checkAdminRole();"
+      },
+      "events": {
+        "onSuccess": [
+          {
+            "action": "runConditional",
+            "conditions": [
+              {
+                "condition": "{{queries.checkAdminRole.data.isAdmin === true}}",
+                "actions": [
+                  { "action": "runQuery", "queryName": "restoreSnapshot" }
+                ]
+              },
+              {
+                "condition": "{{queries.checkAdminRole.data.isAdmin === false}}",
+                "actions": [
+                  { "action": "showAlert", "alertType": "error", "message": "Insufficient permissions — Admin role required for this operation" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "id": "q_restore_snapshot",
       "name": "restoreSnapshot",
       "dataSourceId": "ds_ontap_rest",
@@ -298,7 +327,7 @@
           },
           "events": {
             "onClick": [
-              { "action": "runQuery", "queryName": "restoreSnapshot" }
+              { "action": "runQuery", "queryName": "checkAdminRole" }
             ]
           }
         },

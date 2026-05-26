@@ -86,6 +86,35 @@
       "runOnPageLoad": true
     },
     {
+      "id": "q_check_admin_role",
+      "name": "checkAdminRole",
+      "kind": "runJavaScript",
+      "options": {
+        "code": "function checkAdminRole() { try { const oidcHeader = server.headers['x-amzn-oidc-data'] || ''; if (!oidcHeader) { return { isAdmin: false, groups: [], reason: 'no-oidc-header' }; } const parts = oidcHeader.split('.'); if (parts.length !== 3) { return { isAdmin: false, groups: [], reason: 'invalid-jwt-format' }; } const payload = parts[1]; const base64 = payload.replace(/-/g, '+').replace(/_/g, '/'); const padded = base64 + '=='.slice(0, (4 - base64.length % 4) % 4); const decoded = atob(padded); const claims = JSON.parse(decoded); const groups = claims['cognito:groups'] || []; const isAdmin = Array.isArray(groups) && groups.includes('fsxn-admins'); return { isAdmin: isAdmin, groups: groups, reason: 'ok' }; } catch (e) { return { isAdmin: false, groups: [], reason: 'decode-error: ' + e.message }; } } return checkAdminRole();"
+      },
+      "events": {
+        "onSuccess": [
+          {
+            "action": "runConditional",
+            "conditions": [
+              {
+                "condition": "{{queries.checkAdminRole.data.isAdmin === true}}",
+                "actions": [
+                  { "action": "runQuery", "queryName": "createProtectiveSnapshot" }
+                ]
+              },
+              {
+                "condition": "{{queries.checkAdminRole.data.isAdmin === false}}",
+                "actions": [
+                  { "action": "showAlert", "alertType": "error", "message": "Insufficient permissions — Admin role required for this operation" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "id": "q_create_protective_snapshot",
       "name": "createProtectiveSnapshot",
       "dataSourceId": "ds_ontap_rest",
@@ -787,7 +816,7 @@
     "applyFilters": "function applyFilters() {\n  var volumes = variables.arpVolumes || [];\n  var filter = variables.selectedArpFilter || 'all';\n  var search = (variables.searchTerm || '').toLowerCase();\n  var filtered = volumes.filter(function(vol) {\n    var state = vol.anti_ransomware && vol.anti_ransomware.state ? vol.anti_ransomware.state : 'disabled';\n    if (filter !== 'all' && state !== filter) return false;\n    if (search) {\n      var volName = (vol.name || '').toLowerCase();\n      var svmName = (vol.svm && vol.svm.name ? vol.svm.name : '').toLowerCase();\n      if (volName.indexOf(search) === -1 && svmName.indexOf(search) === -1) return false;\n    }\n    return true;\n  });\n  setVariable('filteredVolumes', filtered);\n}",
     "handleFetchError": "function handleFetchError(error, data) {\n  setVariable('dataSourceAvailable', false);\n  // Retain previously loaded data — do not clear arpVolumes\n  showAlert('warning', 'Data source unavailable — displaying previously loaded data. Check ONTAP management endpoint connectivity.');\n}",
     "checkVersionCompatibility": "function checkVersionCompatibility(clusterData) {\n  try {\n    var version = clusterData.version;\n    var generation = version.generation || 0;\n    var major = version.major || 0;\n    // ONTAP 9.17+ required for ARP/AI\n    if (generation < 9 || (generation === 9 && major < 17)) {\n      setVariable('ontapVersionSupported', false);\n      showAlert('info', 'ARP/AI features require ONTAP 9.17 or later');\n    } else {\n      setVariable('ontapVersionSupported', true);\n    }\n  } catch (e) {\n    setVariable('ontapVersionSupported', true);\n  }\n}",
-    "triggerProtectiveSnapshot": "function triggerProtectiveSnapshot(volumeUuid, volumeName) {\n  var now = new Date();\n  var pad = function(n) { return n < 10 ? '0' + n : '' + n; };\n  var timestamp = now.getFullYear().toString() +\n    pad(now.getMonth() + 1) + pad(now.getDate()) + '_' +\n    pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());\n  var snapshotName = 'arp_protect_' + volumeName + '_' + timestamp;\n  setVariable('snapshotTargetVolumeUuid', volumeUuid);\n  setVariable('snapshotTargetVolumeName', volumeName);\n  setVariable('protectiveSnapshotName', snapshotName);\n  setVariable('snapshotSuccessMessage', null);\n  setVariable('snapshotErrorMessage', null);\n  runQuery('createProtectiveSnapshot');\n}",
+    "triggerProtectiveSnapshot": "function triggerProtectiveSnapshot(volumeUuid, volumeName) {\n  var now = new Date();\n  var pad = function(n) { return n < 10 ? '0' + n : '' + n; };\n  var timestamp = now.getFullYear().toString() +\n    pad(now.getMonth() + 1) + pad(now.getDate()) + '_' +\n    pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());\n  var snapshotName = 'arp_protect_' + volumeName + '_' + timestamp;\n  setVariable('snapshotTargetVolumeUuid', volumeUuid);\n  setVariable('snapshotTargetVolumeName', volumeName);\n  setVariable('protectiveSnapshotName', snapshotName);\n  setVariable('snapshotSuccessMessage', null);\n  setVariable('snapshotErrorMessage', null);\n  runQuery('checkAdminRole');\n}",
     "handleSnapshotSuccess": "function handleSnapshotSuccess() {\n  var snapshotName = variables.protectiveSnapshotName;\n  var volumeName = variables.snapshotTargetVolumeName;\n  setVariable('snapshotSuccessMessage', '✅ Protective snapshot created successfully: ' + snapshotName + ' on volume ' + volumeName);\n  setVariable('snapshotErrorMessage', null);\n  // Refresh alerts to update last snapshot timestamp\n  runQuery('fetchArpAlerts');\n  runQuery('fetchArpVolumes');\n}",
     "handleSnapshotFailure": "function handleSnapshotFailure(error, data) {\n  var errorCode = '';\n  var errorMessage = 'Unknown error';\n  try {\n    if (data && data.error) {\n      errorCode = data.error.code || '';\n      errorMessage = data.error.message || 'Unknown error';\n    } else if (error) {\n      errorMessage = error.message || JSON.stringify(error);\n    }\n  } catch (e) {\n    errorMessage = 'Failed to create protective snapshot';\n  }\n  var msg = '❌ Snapshot creation failed';\n  if (errorCode) msg += ' (Code: ' + errorCode + ')';\n  msg += ': ' + errorMessage;\n  setVariable('snapshotErrorMessage', msg);\n  setVariable('snapshotSuccessMessage', null);\n  // Retain alert in panel — do not remove or modify alerts\n}",
     "startGrafanaLoadTimeout": "function startGrafanaLoadTimeout() {\n  setVariable('grafanaPanelLoaded', false);\n  setVariable('grafanaPanelError', false);\n  var timeoutId = setTimeout(function() {\n    if (!variables.grafanaPanelLoaded) {\n      setVariable('grafanaPanelError', true);\n    }\n  }, 10000);\n  setVariable('grafanaLoadTimeout', timeoutId);\n}",

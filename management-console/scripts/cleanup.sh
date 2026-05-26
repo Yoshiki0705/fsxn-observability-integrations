@@ -233,7 +233,103 @@ delete_stack() {
   return 0
 }
 
+# --- Helper: delete Route 53 record before console stack deletion -----------
+
+cleanup_route53_record() {
+  local console_stack="${STACK_PREFIX}-console"
+
+  # Check if console stack exists
+  if ! aws cloudformation describe-stacks \
+    --stack-name "$console_stack" \
+    --region "$AWS_REGION" > /dev/null 2>&1; then
+    return 0
+  fi
+
+  # Get CustomDomainName parameter from the stack
+  local custom_domain
+  custom_domain=$(aws cloudformation describe-stacks \
+    --stack-name "$console_stack" \
+    --region "$AWS_REGION" \
+    --query "Stacks[0].Parameters[?ParameterKey=='CustomDomainName'].ParameterValue" \
+    --output text 2>/dev/null || echo "")
+
+  # Skip if no custom domain was configured
+  if [[ -z "$custom_domain" || "$custom_domain" == "None" || "$custom_domain" == "" ]]; then
+    return 0
+  fi
+
+  # Get HostedZoneId parameter from the stack
+  local hosted_zone_id
+  hosted_zone_id=$(aws cloudformation describe-stacks \
+    --stack-name "$console_stack" \
+    --region "$AWS_REGION" \
+    --query "Stacks[0].Parameters[?ParameterKey=='HostedZoneId'].ParameterValue" \
+    --output text 2>/dev/null || echo "")
+
+  if [[ -z "$hosted_zone_id" || "$hosted_zone_id" == "None" ]]; then
+    return 0
+  fi
+
+  # Get ALB DNS name and hosted zone ID from stack outputs
+  local alb_dns_name
+  alb_dns_name=$(aws cloudformation describe-stacks \
+    --stack-name "$console_stack" \
+    --region "$AWS_REGION" \
+    --query "Stacks[0].Outputs[?OutputKey=='AlbDnsName'].OutputValue" \
+    --output text 2>/dev/null || echo "")
+
+  local alb_hosted_zone_id
+  alb_hosted_zone_id=$(aws cloudformation describe-stacks \
+    --stack-name "$console_stack" \
+    --region "$AWS_REGION" \
+    --query "Stacks[0].Outputs[?OutputKey=='AlbHostedZoneId'].OutputValue" \
+    --output text 2>/dev/null || echo "")
+
+  if [[ -z "$alb_dns_name" || "$alb_dns_name" == "None" || -z "$alb_hosted_zone_id" || "$alb_hosted_zone_id" == "None" ]]; then
+    echo "  ⚠️  Could not retrieve ALB details for Route 53 cleanup, skipping."
+    return 0
+  fi
+
+  # Check if the Route 53 record exists
+  local record_exists
+  record_exists=$(aws route53 list-resource-record-sets \
+    --hosted-zone-id "$hosted_zone_id" \
+    --query "ResourceRecordSets[?Name=='${custom_domain}.' && Type=='A'].Name" \
+    --output text 2>/dev/null || echo "")
+
+  if [[ -z "$record_exists" || "$record_exists" == "None" ]]; then
+    echo "  ⏭️  Route 53 record for ${custom_domain} not found, skipping."
+    return 0
+  fi
+
+  # Delete the Route 53 alias record
+  echo "  Deleting Route 53 record: ${custom_domain} → ${alb_dns_name}..."
+  aws route53 change-resource-record-sets \
+    --hosted-zone-id "$hosted_zone_id" \
+    --change-batch "{
+      \"Changes\": [{
+        \"Action\": \"DELETE\",
+        \"ResourceRecordSet\": {
+          \"Name\": \"${custom_domain}\",
+          \"Type\": \"A\",
+          \"AliasTarget\": {
+            \"DNSName\": \"${alb_dns_name}\",
+            \"HostedZoneId\": \"${alb_hosted_zone_id}\",
+            \"EvaluateTargetHealth\": true
+          }
+        }
+      }]
+    }" > /dev/null 2>&1 && \
+    echo "  ✅ Route 53 record deleted: ${custom_domain}" || \
+    echo "  ⚠️  Failed to delete Route 53 record (may already be removed)."
+}
+
 # --- Execute cleanup --------------------------------------------------------
+
+# Clean up Route 53 record before console stack deletion
+echo "--- Pre-deletion: Route 53 cleanup ---"
+cleanup_route53_record
+echo ""
 
 for i in "${!STACKS[@]}"; do
   step=$((i + 1))
