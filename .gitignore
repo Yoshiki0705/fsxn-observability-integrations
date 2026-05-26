@@ -29,6 +29,9 @@ docs/blog/
 # Kiro Web screenshots (contain account info, not for public repo)
 docs/kiro-web-screenshots/
 
+# Root-level screenshots (working copies, may contain sensitive info)
+/*.png
+
 # Verification results (contain real instance IDs and environment details)
 docs/**/verification-results*.md
 
