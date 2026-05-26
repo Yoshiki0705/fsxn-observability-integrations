@@ -1,0 +1,317 @@
+{
+  "schemaVersion": "2.0",
+  "name": "Replication Management",
+  "description": "FSx ONTAP SnapMirror relationship management with progress polling",
+  "dataSources": [
+    {
+      "id": "ds_ontap_rest",
+      "name": "FSxN ONTAP REST",
+      "kind": "restapi",
+      "options": {
+        "url": "{{globals.ontap_base_url}}",
+        "auth_type": "basic",
+        "headers": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "credentials": {
+          "username": "{{globals.ontap_username}}",
+          "password": "{{globals.ontap_password}}"
+        },
+        "ssl_certificate": "none"
+      }
+    }
+  ],
+  "queries": [
+    {
+      "id": "q_list_relationships",
+      "name": "listRelationships",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/snapmirror/relationships",
+        "url_params": [
+          { "key": "fields", "value": "source.path,destination.path,state,healthy,lag_time,transfer.state,transfer.bytes_transferred,transfer.total_duration,policy.name,group_type" },
+          { "key": "max_records", "value": "50" },
+          { "key": "order_by", "value": "destination.path asc" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "relationships", "value": "{{queries.listRelationships.data.records}}" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to load SnapMirror relationships: {{queries.listRelationships.error}}" }
+        ]
+      },
+      "runOnPageLoad": true
+    },
+    {
+      "id": "q_get_relationship_detail",
+      "name": "getRelationshipDetail",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/snapmirror/relationships/{{variables.selectedRelationshipUuid}}",
+        "url_params": [
+          { "key": "fields", "value": "source.path,destination.path,state,healthy,lag_time,transfer.state,transfer.bytes_transferred,transfer.total_duration,transfer.end_time,policy.name,group_type,last_transfer_type,last_transfer_size,last_transfer_duration,last_transfer_end_time" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "relationshipDetail", "value": "{{queries.getRelationshipDetail.data}}" }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to load relationship details: {{queries.getRelationshipDetail.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_trigger_update",
+      "name": "triggerUpdate",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "POST",
+        "url": "{{globals.ontap_base_url}}/api/snapmirror/relationships/{{variables.selectedRelationshipUuid}}/transfers",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {}
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "showAlert", "alertType": "success", "message": "SnapMirror update initiated" },
+          { "action": "setVariable", "variable": "transferInProgress", "value": true },
+          { "action": "setVariable", "variable": "pollTransferStatus", "value": true }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to trigger SnapMirror update: {{queries.triggerUpdate.data.error.message || queries.triggerUpdate.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_poll_transfer_status",
+      "name": "pollTransferStatus",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/snapmirror/relationships/{{variables.selectedRelationshipUuid}}/transfers",
+        "url_params": [
+          { "key": "state", "value": "transferring|queued" },
+          { "key": "fields", "value": "state,bytes_transferred,total_duration,checkpoint_size" },
+          { "key": "order_by", "value": "end_time desc" },
+          { "key": "max_records", "value": "1" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "transferProgress", "value": "{{queries.pollTransferStatus.data.records[0] || null}}" },
+          { "action": "conditional", "condition": "{{queries.pollTransferStatus.data.num_records === 0}}", "trueActions": [
+            { "action": "setVariable", "variable": "transferInProgress", "value": false },
+            { "action": "setVariable", "variable": "pollTransferStatus", "value": false },
+            { "action": "showAlert", "alertType": "success", "message": "SnapMirror transfer completed" },
+            { "action": "runQuery", "queryName": "listRelationships" }
+          ], "falseActions": [] }
+        ],
+        "onError": [
+          { "action": "setVariable", "variable": "transferInProgress", "value": false },
+          { "action": "showAlert", "alertType": "error", "message": "Failed to poll transfer status: {{queries.pollTransferStatus.error}}" }
+        ]
+      },
+      "pollingInterval": 10000,
+      "pollingEnabled": "{{variables.pollTransferStatus}}"
+    },
+    {
+      "id": "q_resync_relationship",
+      "name": "resyncRelationship",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "POST",
+        "url": "{{globals.ontap_base_url}}/api/snapmirror/relationships/{{variables.selectedRelationshipUuid}}/transfers",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {}
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "showAlert", "alertType": "success", "message": "SnapMirror resync initiated" },
+          { "action": "setVariable", "variable": "transferInProgress", "value": true },
+          { "action": "setVariable", "variable": "pollTransferStatus", "value": true }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to resync: {{queries.resyncRelationship.data.error.message || queries.resyncRelationship.error}}" }
+        ]
+      }
+    },
+    {
+      "id": "q_break_relationship",
+      "name": "breakRelationship",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "PATCH",
+        "url": "{{globals.ontap_base_url}}/api/snapmirror/relationships/{{variables.selectedRelationshipUuid}}",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "state": "broken_off" }
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "showAlert", "alertType": "success", "message": "SnapMirror relationship broken off" },
+          { "action": "runQuery", "queryName": "listRelationships" },
+          { "action": "setVariable", "variable": "showBreakConfirm", "value": false }
+        ],
+        "onError": [
+          { "action": "showAlert", "alertType": "error", "message": "Failed to break relationship: {{queries.breakRelationship.data.error.message || queries.breakRelationship.error}}" }
+        ]
+      }
+    }
+  ],
+  "components": [
+    {
+      "id": "c_relationship_table",
+      "type": "table",
+      "name": "relationshipTable",
+      "properties": {
+        "data": "{{queries.listRelationships.data.records}}",
+        "columns": [
+          { "name": "Source", "key": "source.path", "sortable": true },
+          { "name": "Destination", "key": "destination.path", "sortable": true },
+          { "name": "State", "key": "state", "sortable": true },
+          { "name": "Healthy", "key": "healthy", "cellRenderer": "{{cell ? 'Yes' : 'No'}}" },
+          { "name": "Lag Time", "key": "lag_time" },
+          { "name": "Last Transfer Size", "key": "transfer.bytes_transferred", "cellRenderer": "{{cell ? (cell / 1048576).toFixed(1) + ' MB' : 'N/A'}}" },
+          { "name": "Policy", "key": "policy.name" }
+        ],
+        "pagination": { "enabled": true, "pageSize": 20 },
+        "search": { "enabled": true },
+        "loading": "{{queries.listRelationships.isLoading}}"
+      },
+      "events": {
+        "onRowClick": [
+          { "action": "setVariable", "variable": "selectedRelationshipUuid", "value": "{{relationshipTable.selectedRow.uuid}}" },
+          { "action": "setVariable", "variable": "selectedRelationshipSource", "value": "{{relationshipTable.selectedRow.source.path}}" },
+          { "action": "setVariable", "variable": "selectedRelationshipDest", "value": "{{relationshipTable.selectedRow.destination.path}}" },
+          { "action": "runQuery", "queryName": "getRelationshipDetail" }
+        ]
+      }
+    },
+    {
+      "id": "c_transfer_progress",
+      "type": "container",
+      "name": "transferProgressPanel",
+      "properties": {
+        "visible": "{{variables.transferInProgress}}",
+        "title": "Transfer in Progress"
+      },
+      "children": [
+        {
+          "id": "c_progress_text",
+          "type": "text",
+          "name": "progressText",
+          "properties": {
+            "text": "Transfer State: {{variables.transferProgress?.state || 'Initializing...'}}\nBytes Transferred: {{variables.transferProgress?.bytes_transferred ? (variables.transferProgress.bytes_transferred / 1048576).toFixed(1) + ' MB' : '0 MB'}}\nDuration: {{variables.transferProgress?.total_duration || 'Calculating...'}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_detail_panel",
+      "type": "container",
+      "name": "detailPanel",
+      "properties": {
+        "visible": "{{variables.selectedRelationshipUuid && !variables.transferInProgress}}",
+        "title": "Relationship Details"
+      },
+      "children": [
+        {
+          "id": "c_detail_text",
+          "type": "text",
+          "name": "detailText",
+          "properties": {
+            "text": "Source: {{variables.relationshipDetail?.source?.path}}\nDestination: {{variables.relationshipDetail?.destination?.path}}\nState: {{variables.relationshipDetail?.state}}\nHealthy: {{variables.relationshipDetail?.healthy ? 'Yes' : 'No'}}\nPolicy: {{variables.relationshipDetail?.policy?.name}}\nLast Transfer Type: {{variables.relationshipDetail?.last_transfer_type || 'N/A'}}\nLast Transfer Size: {{variables.relationshipDetail?.last_transfer_size ? (variables.relationshipDetail.last_transfer_size / 1048576).toFixed(1) + ' MB' : 'N/A'}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_update_btn",
+      "type": "button",
+      "name": "updateBtn",
+      "properties": {
+        "text": "Trigger Update",
+        "variant": "primary",
+        "disabled": "{{!variables.selectedRelationshipUuid || variables.transferInProgress}}"
+      },
+      "events": {
+        "onClick": [{ "action": "runQuery", "queryName": "triggerUpdate" }]
+      }
+    },
+    {
+      "id": "c_resync_btn",
+      "type": "button",
+      "name": "resyncBtn",
+      "properties": {
+        "text": "Resync",
+        "variant": "warning",
+        "disabled": "{{!variables.selectedRelationshipUuid || variables.transferInProgress}}",
+        "visible": "{{variables.relationshipDetail?.state === 'broken_off'}}"
+      },
+      "events": {
+        "onClick": [{ "action": "runQuery", "queryName": "resyncRelationship" }]
+      }
+    },
+    {
+      "id": "c_break_confirm_modal",
+      "type": "modal",
+      "name": "breakConfirmModal",
+      "properties": {
+        "visible": "{{variables.showBreakConfirm}}",
+        "title": "Confirm Break SnapMirror Relationship"
+      },
+      "children": [
+        {
+          "id": "c_break_warning",
+          "type": "text",
+          "name": "breakWarningText",
+          "properties": {
+            "text": "Are you sure you want to break the SnapMirror relationship?\n\nSource: {{variables.selectedRelationshipSource}}\nDestination: {{variables.selectedRelationshipDest}}\n\nThe destination volume will become writable and replication will stop."
+          }
+        },
+        {
+          "id": "c_confirm_break_btn",
+          "type": "button",
+          "name": "confirmBreakBtn",
+          "properties": { "text": "Break Relationship", "variant": "danger" },
+          "events": { "onClick": [{ "action": "runQuery", "queryName": "breakRelationship" }] }
+        },
+        {
+          "id": "c_cancel_break_btn",
+          "type": "button",
+          "name": "cancelBreakBtn",
+          "properties": { "text": "Cancel", "variant": "secondary" },
+          "events": { "onClick": [{ "action": "setVariable", "variable": "showBreakConfirm", "value": false }] }
+        }
+      ]
+    },
+    {
+      "id": "c_refresh_btn",
+      "type": "button",
+      "name": "refreshBtn",
+      "properties": { "text": "Refresh", "variant": "outline" },
+      "events": { "onClick": [{ "action": "runQuery", "queryName": "listRelationships" }] }
+    }
+  ],
+  "variables": {
+    "selectedRelationshipUuid": null,
+    "selectedRelationshipSource": null,
+    "selectedRelationshipDest": null,
+    "relationshipDetail": null,
+    "relationships": [],
+    "transferInProgress": false,
+    "pollTransferStatus": false,
+    "transferProgress": null,
+    "showBreakConfirm": false
+  }
+}

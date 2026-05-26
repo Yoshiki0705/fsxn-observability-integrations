@@ -1,0 +1,856 @@
+{
+  "schemaVersion": "2.0",
+  "name": "ARP Dashboard",
+  "description": "Autonomous Ransomware Protection status dashboard with filtering, search, color-coded badges, and error handling for ONTAP unreachable and version incompatibility",
+  "dataSources": [
+    {
+      "id": "ds_ontap_rest",
+      "name": "FSxN ONTAP REST",
+      "kind": "restapi",
+      "options": {
+        "url": "{{globals.ontap_base_url}}",
+        "auth_type": "basic",
+        "headers": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "credentials": {
+          "username": "{{globals.ontap_username}}",
+          "password": "{{globals.ontap_password}}"
+        },
+        "ssl_certificate": "none"
+      }
+    }
+  ],
+  "queries": [
+    {
+      "id": "q_fetch_arp_volumes",
+      "name": "fetchArpVolumes",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes",
+        "url_params": [
+          { "key": "fields", "value": "name,svm.name,svm.uuid,anti_ransomware,uuid" },
+          { "key": "max_records", "value": "200" },
+          { "key": "order_by", "value": "name asc" }
+        ],
+        "headers": [
+          { "key": "Accept", "value": "application/json" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "arpVolumes", "value": "{{queries.fetchArpVolumes.data.records}}" },
+          { "action": "setVariable", "variable": "dataSourceAvailable", "value": true },
+          { "action": "setVariable", "variable": "ontapVersionSupported", "value": true },
+          { "action": "runJsCode", "code": "computeArpSummary()" }
+        ],
+        "onError": [
+          {
+            "action": "runJsCode",
+            "code": "handleFetchError(queries.fetchArpVolumes.error, queries.fetchArpVolumes.data)"
+          }
+        ]
+      },
+      "runOnPageLoad": true
+    },
+    {
+      "id": "q_fetch_arp_alerts",
+      "name": "fetchArpAlerts",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/security/anti-ransomware/volumes",
+        "url_params": [
+          { "key": "fields", "value": "volume.name,volume.uuid,svm.name,attack_probability,timestamp,suspect_files" },
+          { "key": "order_by", "value": "timestamp desc" },
+          { "key": "max_records", "value": "100" }
+        ],
+        "headers": [
+          { "key": "Accept", "value": "application/json" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          { "action": "setVariable", "variable": "arpAlerts", "value": "{{queries.fetchArpAlerts.data.records || []}}" }
+        ],
+        "onError": [
+          {
+            "action": "showAlert",
+            "alertType": "warning",
+            "message": "Unable to fetch ARP alerts — endpoint may be unavailable"
+          }
+        ]
+      },
+      "runOnPageLoad": true
+    },
+    {
+      "id": "q_create_protective_snapshot",
+      "name": "createProtectiveSnapshot",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "POST",
+        "url": "{{globals.ontap_base_url}}/api/storage/volumes/{{variables.snapshotTargetVolumeUuid}}/snapshots",
+        "headers": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": "{{JSON.stringify({ name: variables.protectiveSnapshotName })}}"
+      },
+      "events": {
+        "onSuccess": [
+          {
+            "action": "runJsCode",
+            "code": "handleSnapshotSuccess()"
+          }
+        ],
+        "onError": [
+          {
+            "action": "runJsCode",
+            "code": "handleSnapshotFailure(queries.createProtectiveSnapshot.error, queries.createProtectiveSnapshot.data)"
+          }
+        ]
+      },
+      "runOnPageLoad": false
+    },
+    {
+      "id": "q_check_ontap_version",
+      "name": "checkOntapVersion",
+      "dataSourceId": "ds_ontap_rest",
+      "options": {
+        "method": "GET",
+        "url": "{{globals.ontap_base_url}}/api/cluster",
+        "url_params": [
+          { "key": "fields", "value": "version" }
+        ],
+        "headers": [
+          { "key": "Accept", "value": "application/json" }
+        ]
+      },
+      "events": {
+        "onSuccess": [
+          {
+            "action": "runJsCode",
+            "code": "checkVersionCompatibility(queries.checkOntapVersion.data)"
+          }
+        ],
+        "onError": [
+          { "action": "setVariable", "variable": "dataSourceAvailable", "value": false },
+          { "action": "showAlert", "alertType": "warning", "message": "Data source unavailable — unable to verify ONTAP version" }
+        ]
+      },
+      "runOnPageLoad": true
+    }
+  ],
+  "components": [
+    {
+      "id": "c_error_banner",
+      "type": "container",
+      "name": "errorBanner",
+      "properties": {
+        "visible": "{{!variables.dataSourceAvailable}}",
+        "styles": {
+          "backgroundColor": "#FFF3CD",
+          "border": "1px solid #FFC107",
+          "borderRadius": "4px",
+          "padding": "12px 16px",
+          "marginBottom": "16px"
+        }
+      },
+      "children": [
+        {
+          "id": "c_error_banner_text",
+          "type": "text",
+          "name": "errorBannerText",
+          "properties": {
+            "text": "⚠️ Data source unavailable — displaying previously loaded data. Check ONTAP management endpoint connectivity.",
+            "styles": { "color": "#856404", "fontWeight": "500" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_version_notification",
+      "type": "container",
+      "name": "versionNotification",
+      "properties": {
+        "visible": "{{variables.dataSourceAvailable && !variables.ontapVersionSupported}}",
+        "styles": {
+          "backgroundColor": "#D1ECF1",
+          "border": "1px solid #0DCAF0",
+          "borderRadius": "4px",
+          "padding": "12px 16px",
+          "marginBottom": "16px"
+        }
+      },
+      "children": [
+        {
+          "id": "c_version_notification_text",
+          "type": "text",
+          "name": "versionNotificationText",
+          "properties": {
+            "text": "ℹ️ ARP/AI features require ONTAP 9.17 or later. Some ARP actions are disabled for this file system.",
+            "styles": { "color": "#055160", "fontWeight": "500" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_summary_section",
+      "type": "container",
+      "name": "summarySection",
+      "properties": {
+        "styles": {
+          "display": "flex",
+          "gap": "16px",
+          "marginBottom": "24px"
+        }
+      },
+      "children": [
+        {
+          "id": "c_card_disabled",
+          "type": "container",
+          "name": "cardDisabled",
+          "properties": {
+            "styles": {
+              "flex": "1",
+              "backgroundColor": "#FFFFFF",
+              "border": "2px solid #DC3545",
+              "borderRadius": "8px",
+              "padding": "16px",
+              "textAlign": "center"
+            }
+          },
+          "children": [
+            {
+              "id": "c_card_disabled_count",
+              "type": "text",
+              "name": "cardDisabledCount",
+              "properties": {
+                "text": "{{variables.arpSummary.disabled}}",
+                "styles": { "fontSize": "32px", "fontWeight": "700", "color": "#DC3545" }
+              }
+            },
+            {
+              "id": "c_card_disabled_label",
+              "type": "text",
+              "name": "cardDisabledLabel",
+              "properties": {
+                "text": "Disabled",
+                "styles": { "fontSize": "14px", "color": "#6C757D", "marginTop": "4px" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "c_card_dry_run",
+          "type": "container",
+          "name": "cardDryRun",
+          "properties": {
+            "styles": {
+              "flex": "1",
+              "backgroundColor": "#FFFFFF",
+              "border": "2px solid #FFC107",
+              "borderRadius": "8px",
+              "padding": "16px",
+              "textAlign": "center"
+            }
+          },
+          "children": [
+            {
+              "id": "c_card_dry_run_count",
+              "type": "text",
+              "name": "cardDryRunCount",
+              "properties": {
+                "text": "{{variables.arpSummary.dry_run}}",
+                "styles": { "fontSize": "32px", "fontWeight": "700", "color": "#FFC107" }
+              }
+            },
+            {
+              "id": "c_card_dry_run_label",
+              "type": "text",
+              "name": "cardDryRunLabel",
+              "properties": {
+                "text": "Dry Run (Learning)",
+                "styles": { "fontSize": "14px", "color": "#6C757D", "marginTop": "4px" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "c_card_enabled",
+          "type": "container",
+          "name": "cardEnabled",
+          "properties": {
+            "styles": {
+              "flex": "1",
+              "backgroundColor": "#FFFFFF",
+              "border": "2px solid #28A745",
+              "borderRadius": "8px",
+              "padding": "16px",
+              "textAlign": "center"
+            }
+          },
+          "children": [
+            {
+              "id": "c_card_enabled_count",
+              "type": "text",
+              "name": "cardEnabledCount",
+              "properties": {
+                "text": "{{variables.arpSummary.enabled}}",
+                "styles": { "fontSize": "32px", "fontWeight": "700", "color": "#28A745" }
+              }
+            },
+            {
+              "id": "c_card_enabled_label",
+              "type": "text",
+              "name": "cardEnabledLabel",
+              "properties": {
+                "text": "Enabled",
+                "styles": { "fontSize": "14px", "color": "#6C757D", "marginTop": "4px" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "c_card_paused",
+          "type": "container",
+          "name": "cardPaused",
+          "properties": {
+            "styles": {
+              "flex": "1",
+              "backgroundColor": "#FFFFFF",
+              "border": "2px solid #6C757D",
+              "borderRadius": "8px",
+              "padding": "16px",
+              "textAlign": "center"
+            }
+          },
+          "children": [
+            {
+              "id": "c_card_paused_count",
+              "type": "text",
+              "name": "cardPausedCount",
+              "properties": {
+                "text": "{{variables.arpSummary.paused}}",
+                "styles": { "fontSize": "32px", "fontWeight": "700", "color": "#6C757D" }
+              }
+            },
+            {
+              "id": "c_card_paused_label",
+              "type": "text",
+              "name": "cardPausedLabel",
+              "properties": {
+                "text": "Paused",
+                "styles": { "fontSize": "14px", "color": "#6C757D", "marginTop": "4px" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c_filter_section",
+      "type": "container",
+      "name": "filterSection",
+      "properties": {
+        "styles": {
+          "display": "flex",
+          "gap": "16px",
+          "marginBottom": "16px",
+          "alignItems": "center"
+        }
+      },
+      "children": [
+        {
+          "id": "c_arp_state_filter",
+          "type": "dropdown",
+          "name": "arpStateFilter",
+          "properties": {
+            "label": "ARP State",
+            "options": [
+              { "label": "All", "value": "all" },
+              { "label": "Disabled", "value": "disabled" },
+              { "label": "Dry Run", "value": "dry_run" },
+              { "label": "Enabled", "value": "enabled" },
+              { "label": "Paused", "value": "paused" }
+            ],
+            "defaultValue": "all",
+            "placeholder": "Filter by ARP state"
+          },
+          "events": {
+            "onChange": [
+              { "action": "setVariable", "variable": "selectedArpFilter", "value": "{{components.arpStateFilter.value}}" },
+              { "action": "runJsCode", "code": "applyFilters()" }
+            ]
+          }
+        },
+        {
+          "id": "c_search_input",
+          "type": "textInput",
+          "name": "arpSearchInput",
+          "properties": {
+            "label": "Search",
+            "placeholder": "Search by volume name or SVM name...",
+            "styles": { "minWidth": "300px" }
+          },
+          "events": {
+            "onChange": [
+              { "action": "setVariable", "variable": "searchTerm", "value": "{{components.arpSearchInput.value}}" },
+              { "action": "runJsCode", "code": "applyFilters()" }
+            ]
+          }
+        },
+        {
+          "id": "c_refresh_arp_btn",
+          "type": "button",
+          "name": "refreshArpBtn",
+          "properties": {
+            "text": "Refresh",
+            "variant": "outline"
+          },
+          "events": {
+            "onClick": [
+              { "action": "runQuery", "queryName": "fetchArpVolumes" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "c_arp_volume_table",
+      "type": "table",
+      "name": "arpVolumeTable",
+      "properties": {
+        "data": "{{variables.filteredVolumes}}",
+        "columns": [
+          {
+            "name": "Volume Name",
+            "key": "name",
+            "sortable": true
+          },
+          {
+            "name": "SVM",
+            "key": "svm.name",
+            "sortable": true
+          },
+          {
+            "name": "ARP State",
+            "key": "anti_ransomware.state",
+            "sortable": true,
+            "cellRenderer": "arpStateBadge"
+          },
+          {
+            "name": "Time in State",
+            "key": "anti_ransomware.dry_run_start_time",
+            "cellRenderer": "timeInState"
+          },
+          {
+            "name": "Last Suspicious Activity",
+            "key": "anti_ransomware.attack_probability",
+            "cellRenderer": "lastSuspiciousActivity"
+          }
+        ],
+        "pagination": { "enabled": true, "pageSize": 50 },
+        "search": { "enabled": false },
+        "loading": "{{queries.fetchArpVolumes.isLoading}}"
+      },
+      "events": {
+        "onRowClick": [
+          { "action": "setVariable", "variable": "selectedVolumeUuid", "value": "{{arpVolumeTable.selectedRow.uuid}}" },
+          { "action": "setVariable", "variable": "selectedVolumeName", "value": "{{arpVolumeTable.selectedRow.name}}" }
+        ]
+      }
+    },
+    {
+      "id": "c_alerts_section",
+      "type": "container",
+      "name": "alertsSection",
+      "properties": {
+        "styles": {
+          "marginTop": "32px",
+          "marginBottom": "24px"
+        }
+      },
+      "children": [
+        {
+          "id": "c_alerts_header",
+          "type": "container",
+          "name": "alertsHeader",
+          "properties": {
+            "styles": {
+              "display": "flex",
+              "justifyContent": "space-between",
+              "alignItems": "center",
+              "marginBottom": "12px"
+            }
+          },
+          "children": [
+            {
+              "id": "c_alerts_title",
+              "type": "text",
+              "name": "alertsTitle",
+              "properties": {
+                "text": "🚨 ARP Alerts",
+                "styles": { "fontSize": "20px", "fontWeight": "700", "color": "#212529" }
+              }
+            },
+            {
+              "id": "c_refresh_alerts_btn",
+              "type": "button",
+              "name": "refreshAlertsBtn",
+              "properties": {
+                "text": "Refresh Alerts",
+                "variant": "outline",
+                "size": "sm"
+              },
+              "events": {
+                "onClick": [
+                  { "action": "runQuery", "queryName": "fetchArpAlerts" }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "c_arp_alerts_table",
+          "type": "table",
+          "name": "arpAlertsTable",
+          "properties": {
+            "data": "{{variables.arpAlerts}}",
+            "columns": [
+              {
+                "name": "Volume Name",
+                "key": "volume.name",
+                "sortable": true
+              },
+              {
+                "name": "Alert Type",
+                "key": "attack_probability",
+                "sortable": true,
+                "cellRenderer": "alertSeverityBadge"
+              },
+              {
+                "name": "Timestamp",
+                "key": "timestamp",
+                "sortable": true,
+                "cellRenderer": "alertTimestamp"
+              },
+              {
+                "name": "Severity",
+                "key": "attack_probability",
+                "sortable": true,
+                "cellRenderer": "alertSeverityLevel"
+              },
+              {
+                "name": "Suspect Files",
+                "key": "suspect_files.count",
+                "sortable": true
+              },
+              {
+                "name": "Action",
+                "key": "_action",
+                "cellRenderer": "protectiveSnapshotButton"
+              }
+            ],
+            "pagination": { "enabled": true, "pageSize": 20 },
+            "loading": "{{queries.fetchArpAlerts.isLoading}}",
+            "emptyState": "No active ARP alerts detected"
+          }
+        },
+        {
+          "id": "c_snapshot_success_banner",
+          "type": "container",
+          "name": "snapshotSuccessBanner",
+          "properties": {
+            "visible": "{{variables.snapshotSuccessMessage !== null}}",
+            "styles": {
+              "backgroundColor": "#D4EDDA",
+              "border": "1px solid #28A745",
+              "borderRadius": "4px",
+              "padding": "12px 16px",
+              "marginTop": "12px",
+              "display": "flex",
+              "justifyContent": "space-between",
+              "alignItems": "center"
+            }
+          },
+          "children": [
+            {
+              "id": "c_snapshot_success_text",
+              "type": "text",
+              "name": "snapshotSuccessText",
+              "properties": {
+                "text": "{{variables.snapshotSuccessMessage}}",
+                "styles": { "color": "#155724", "fontWeight": "500" }
+              }
+            },
+            {
+              "id": "c_dismiss_success_btn",
+              "type": "button",
+              "name": "dismissSuccessBtn",
+              "properties": {
+                "text": "✕",
+                "variant": "ghost",
+                "size": "sm"
+              },
+              "events": {
+                "onClick": [
+                  { "action": "setVariable", "variable": "snapshotSuccessMessage", "value": null }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "c_snapshot_error_banner",
+          "type": "container",
+          "name": "snapshotErrorBanner",
+          "properties": {
+            "visible": "{{variables.snapshotErrorMessage !== null}}",
+            "styles": {
+              "backgroundColor": "#F8D7DA",
+              "border": "1px solid #DC3545",
+              "borderRadius": "4px",
+              "padding": "12px 16px",
+              "marginTop": "12px",
+              "display": "flex",
+              "justifyContent": "space-between",
+              "alignItems": "center"
+            }
+          },
+          "children": [
+            {
+              "id": "c_snapshot_error_text",
+              "type": "text",
+              "name": "snapshotErrorText",
+              "properties": {
+                "text": "{{variables.snapshotErrorMessage}}",
+                "styles": { "color": "#721C24", "fontWeight": "500" }
+              }
+            },
+            {
+              "id": "c_dismiss_error_btn",
+              "type": "button",
+              "name": "dismissErrorBtn",
+              "properties": {
+                "text": "✕",
+                "variant": "ghost",
+                "size": "sm"
+              },
+              "events": {
+                "onClick": [
+                  { "action": "setVariable", "variable": "snapshotErrorMessage", "value": null }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c_grafana_section",
+      "type": "container",
+      "name": "grafanaSection",
+      "properties": {
+        "styles": {
+          "marginTop": "32px",
+          "marginBottom": "24px"
+        }
+      },
+      "children": [
+        {
+          "id": "c_grafana_title",
+          "type": "text",
+          "name": "grafanaTitle",
+          "properties": {
+            "text": "📊 ARP Metrics (Grafana)",
+            "styles": { "fontSize": "20px", "fontWeight": "700", "color": "#212529", "marginBottom": "12px" }
+          }
+        },
+        {
+          "id": "c_grafana_iframe",
+          "type": "iframe",
+          "name": "arpGrafanaPanel",
+          "properties": {
+            "url": "{{globals.grafana_url}}/d-solo/fsxn-arp-status/fsxn-arp-status?orgId=1&panelId=1&from=now-1h&to=now&refresh=1m&var-datacenter={{globals.active_datacenter}}",
+            "styles": {
+              "width": "100%",
+              "height": "400px",
+              "border": "1px solid #DEE2E6",
+              "borderRadius": "8px"
+            },
+            "visible": "{{variables.grafanaPanelLoaded}}"
+          },
+          "events": {
+            "onLoad": [
+              { "action": "setVariable", "variable": "grafanaPanelLoaded", "value": true },
+              { "action": "setVariable", "variable": "grafanaPanelError", "value": false }
+            ]
+          }
+        },
+        {
+          "id": "c_grafana_fallback",
+          "type": "container",
+          "name": "grafanaFallback",
+          "properties": {
+            "visible": "{{variables.grafanaPanelError}}",
+            "styles": {
+              "backgroundColor": "#F8F9FA",
+              "border": "1px solid #DEE2E6",
+              "borderRadius": "8px",
+              "padding": "40px",
+              "textAlign": "center",
+              "minHeight": "200px",
+              "display": "flex",
+              "flexDirection": "column",
+              "alignItems": "center",
+              "justifyContent": "center"
+            }
+          },
+          "children": [
+            {
+              "id": "c_grafana_fallback_icon",
+              "type": "text",
+              "name": "grafanaFallbackIcon",
+              "properties": {
+                "text": "⚠️",
+                "styles": { "fontSize": "48px", "marginBottom": "12px" }
+              }
+            },
+            {
+              "id": "c_grafana_fallback_text",
+              "type": "text",
+              "name": "grafanaFallbackText",
+              "properties": {
+                "text": "Grafana panel failed to load within 10 seconds. Verify that the Grafana URL is accessible and the ARP dashboard is provisioned.",
+                "styles": { "color": "#6C757D", "fontSize": "14px", "maxWidth": "400px" }
+              }
+            },
+            {
+              "id": "c_grafana_retry_btn",
+              "type": "button",
+              "name": "grafanaRetryBtn",
+              "properties": {
+                "text": "Retry",
+                "variant": "outline"
+              },
+              "events": {
+                "onClick": [
+                  { "action": "runJsCode", "code": "retryGrafanaPanel()" }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "arpVolumes": [],
+    "filteredVolumes": [],
+    "selectedArpFilter": "all",
+    "searchTerm": "",
+    "dataSourceAvailable": true,
+    "ontapVersionSupported": true,
+    "selectedVolumeUuid": null,
+    "selectedVolumeName": null,
+    "arpSummary": {
+      "disabled": 0,
+      "dry_run": 0,
+      "enabled": 0,
+      "paused": 0
+    },
+    "currentPage": 1,
+    "pageSize": 50,
+    "arpAlerts": [],
+    "snapshotTargetVolumeUuid": null,
+    "snapshotTargetVolumeName": null,
+    "protectiveSnapshotName": null,
+    "snapshotSuccessMessage": null,
+    "snapshotErrorMessage": null,
+    "grafanaPanelLoaded": false,
+    "grafanaPanelError": false,
+    "grafanaLoadTimeout": null
+  },
+  "events": {
+    "onPageLoad": [
+      { "action": "runQuery", "queryName": "checkOntapVersion" },
+      { "action": "runQuery", "queryName": "fetchArpVolumes" },
+      { "action": "runQuery", "queryName": "fetchArpAlerts" },
+      { "action": "runJsCode", "code": "startGrafanaLoadTimeout()" }
+    ]
+  },
+  "jsCode": {
+    "computeArpSummary": "function computeArpSummary() {\n  var volumes = variables.arpVolumes || [];\n  var summary = { disabled: 0, dry_run: 0, enabled: 0, paused: 0 };\n  volumes.forEach(function(vol) {\n    var state = vol.anti_ransomware && vol.anti_ransomware.state ? vol.anti_ransomware.state : 'disabled';\n    if (summary.hasOwnProperty(state)) {\n      summary[state]++;\n    } else {\n      summary.disabled++;\n    }\n  });\n  setVariable('arpSummary', summary);\n  applyFilters();\n}",
+    "applyFilters": "function applyFilters() {\n  var volumes = variables.arpVolumes || [];\n  var filter = variables.selectedArpFilter || 'all';\n  var search = (variables.searchTerm || '').toLowerCase();\n  var filtered = volumes.filter(function(vol) {\n    var state = vol.anti_ransomware && vol.anti_ransomware.state ? vol.anti_ransomware.state : 'disabled';\n    if (filter !== 'all' && state !== filter) return false;\n    if (search) {\n      var volName = (vol.name || '').toLowerCase();\n      var svmName = (vol.svm && vol.svm.name ? vol.svm.name : '').toLowerCase();\n      if (volName.indexOf(search) === -1 && svmName.indexOf(search) === -1) return false;\n    }\n    return true;\n  });\n  setVariable('filteredVolumes', filtered);\n}",
+    "handleFetchError": "function handleFetchError(error, data) {\n  setVariable('dataSourceAvailable', false);\n  // Retain previously loaded data — do not clear arpVolumes\n  showAlert('warning', 'Data source unavailable — displaying previously loaded data. Check ONTAP management endpoint connectivity.');\n}",
+    "checkVersionCompatibility": "function checkVersionCompatibility(clusterData) {\n  try {\n    var version = clusterData.version;\n    var generation = version.generation || 0;\n    var major = version.major || 0;\n    // ONTAP 9.17+ required for ARP/AI\n    if (generation < 9 || (generation === 9 && major < 17)) {\n      setVariable('ontapVersionSupported', false);\n      showAlert('info', 'ARP/AI features require ONTAP 9.17 or later');\n    } else {\n      setVariable('ontapVersionSupported', true);\n    }\n  } catch (e) {\n    setVariable('ontapVersionSupported', true);\n  }\n}",
+    "triggerProtectiveSnapshot": "function triggerProtectiveSnapshot(volumeUuid, volumeName) {\n  var now = new Date();\n  var pad = function(n) { return n < 10 ? '0' + n : '' + n; };\n  var timestamp = now.getFullYear().toString() +\n    pad(now.getMonth() + 1) + pad(now.getDate()) + '_' +\n    pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());\n  var snapshotName = 'arp_protect_' + volumeName + '_' + timestamp;\n  setVariable('snapshotTargetVolumeUuid', volumeUuid);\n  setVariable('snapshotTargetVolumeName', volumeName);\n  setVariable('protectiveSnapshotName', snapshotName);\n  setVariable('snapshotSuccessMessage', null);\n  setVariable('snapshotErrorMessage', null);\n  runQuery('createProtectiveSnapshot');\n}",
+    "handleSnapshotSuccess": "function handleSnapshotSuccess() {\n  var snapshotName = variables.protectiveSnapshotName;\n  var volumeName = variables.snapshotTargetVolumeName;\n  setVariable('snapshotSuccessMessage', '✅ Protective snapshot created successfully: ' + snapshotName + ' on volume ' + volumeName);\n  setVariable('snapshotErrorMessage', null);\n  // Refresh alerts to update last snapshot timestamp\n  runQuery('fetchArpAlerts');\n  runQuery('fetchArpVolumes');\n}",
+    "handleSnapshotFailure": "function handleSnapshotFailure(error, data) {\n  var errorCode = '';\n  var errorMessage = 'Unknown error';\n  try {\n    if (data && data.error) {\n      errorCode = data.error.code || '';\n      errorMessage = data.error.message || 'Unknown error';\n    } else if (error) {\n      errorMessage = error.message || JSON.stringify(error);\n    }\n  } catch (e) {\n    errorMessage = 'Failed to create protective snapshot';\n  }\n  var msg = '❌ Snapshot creation failed';\n  if (errorCode) msg += ' (Code: ' + errorCode + ')';\n  msg += ': ' + errorMessage;\n  setVariable('snapshotErrorMessage', msg);\n  setVariable('snapshotSuccessMessage', null);\n  // Retain alert in panel — do not remove or modify alerts\n}",
+    "startGrafanaLoadTimeout": "function startGrafanaLoadTimeout() {\n  setVariable('grafanaPanelLoaded', false);\n  setVariable('grafanaPanelError', false);\n  var timeoutId = setTimeout(function() {\n    if (!variables.grafanaPanelLoaded) {\n      setVariable('grafanaPanelError', true);\n    }\n  }, 10000);\n  setVariable('grafanaLoadTimeout', timeoutId);\n}",
+    "retryGrafanaPanel": "function retryGrafanaPanel() {\n  setVariable('grafanaPanelLoaded', false);\n  setVariable('grafanaPanelError', false);\n  startGrafanaLoadTimeout();\n}"
+  },
+  "cellRenderers": {
+    "arpStateBadge": {
+      "type": "badge",
+      "config": {
+        "valueMap": {
+          "disabled": { "label": "Disabled", "backgroundColor": "#DC3545", "color": "#FFFFFF" },
+          "dry_run": { "label": "Dry Run", "backgroundColor": "#FFC107", "color": "#212529" },
+          "enabled": { "label": "Enabled", "backgroundColor": "#28A745", "color": "#FFFFFF" },
+          "paused": { "label": "Paused", "backgroundColor": "#6C757D", "color": "#FFFFFF" }
+        },
+        "defaultValue": { "label": "Unknown", "backgroundColor": "#6C757D", "color": "#FFFFFF" }
+      }
+    },
+    "timeInState": {
+      "type": "computed",
+      "config": {
+        "expression": "{{row.anti_ransomware && row.anti_ransomware.dry_run_start_time ? moment(row.anti_ransomware.dry_run_start_time).fromNow(true) : '—'}}"
+      }
+    },
+    "lastSuspiciousActivity": {
+      "type": "computed",
+      "config": {
+        "expression": "{{row.anti_ransomware && row.anti_ransomware.attack_probability && row.anti_ransomware.attack_probability !== 'none' ? row.anti_ransomware.attack_probability : 'None detected'}}"
+      }
+    },
+    "alertSeverityBadge": {
+      "type": "badge",
+      "config": {
+        "valueMap": {
+          "high": { "label": "High", "backgroundColor": "#DC3545", "color": "#FFFFFF" },
+          "moderate": { "label": "Moderate", "backgroundColor": "#FFC107", "color": "#212529" },
+          "low": { "label": "Low", "backgroundColor": "#17A2B8", "color": "#FFFFFF" },
+          "none": { "label": "None", "backgroundColor": "#6C757D", "color": "#FFFFFF" }
+        },
+        "defaultValue": { "label": "Unknown", "backgroundColor": "#6C757D", "color": "#FFFFFF" }
+      }
+    },
+    "alertTimestamp": {
+      "type": "computed",
+      "config": {
+        "expression": "{{row.timestamp ? moment(row.timestamp).format('YYYY-MM-DD HH:mm:ss') : '—'}}"
+      }
+    },
+    "alertSeverityLevel": {
+      "type": "computed",
+      "config": {
+        "expression": "{{row.attack_probability === 'high' ? '🔴 Critical' : row.attack_probability === 'moderate' ? '🟡 Warning' : row.attack_probability === 'low' ? '🔵 Info' : '⚪ None'}}"
+      }
+    },
+    "protectiveSnapshotButton": {
+      "type": "button",
+      "config": {
+        "text": "🛡️ Protect",
+        "variant": "danger",
+        "size": "sm",
+        "disabled": "{{!variables.ontapVersionSupported}}",
+        "onClick": "triggerProtectiveSnapshot(row.volume.uuid, row.volume.name)"
+      }
+    }
+  }
+}

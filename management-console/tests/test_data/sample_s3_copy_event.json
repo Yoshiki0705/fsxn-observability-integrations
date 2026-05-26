@@ -1,0 +1,4 @@
+{
+  "s3_access_point_arn": "arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap",
+  "object_key": "audit/svm-prod-01/2026/01/15/audit_0001.json"
+}
