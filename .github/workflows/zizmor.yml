@@ -1,0 +1,30 @@
+name: zizmor — GitHub Actions Security Lint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+  schedule:
+    - cron: '30 3 * * 1'  # Weekly Monday 03:30 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  zizmor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install zizmor
+        run: pip install zizmor
+
+      - name: Run zizmor on workflow files
+        run: zizmor .github/workflows/
