@@ -5,7 +5,7 @@ let lambdas = Resources.*[ Type == "AWS::Lambda::Function" ]
 let roles = Resources.*[ Type == "AWS::IAM::Role" ]
 let queues = Resources.*[ Type == "AWS::SQS::Queue" ]
 
-# Lambda functions must not use wildcard IAM actions
+# IAM policies must not use wildcard actions
 rule no_wildcard_actions when %roles !empty {
   %roles.Properties.Policies[*].PolicyDocument.Statement[*] {
     Action != "*"
@@ -29,16 +29,14 @@ rule dlq_encrypted when %queues !empty {
     KmsMasterKeyId exists
     OR
     SqsManagedSseEnabled == true
+    <<SQS queues must have encryption enabled (KMS or SSE-SQS).>>
   }
-  <<SQS queues must have encryption enabled (KMS or SSE-SQS).>>
 }
 
 # No plaintext secret parameters without NoEcho
-rule no_plaintext_secret_params {
-  when Parameters exists {
-    Parameters.*[ keys == /.*[Ss]ecret.*/ ] {
-      NoEcho == true
-      <<Parameters containing 'Secret' must have NoEcho: true to prevent console exposure.>>
-    }
+rule no_plaintext_secret_params when Parameters exists {
+  Parameters.*[ keys == /.*[Ss]ecret.*/ ] {
+    NoEcho == true
+    <<Parameters containing 'Secret' must have NoEcho: true to prevent console exposure.>>
   }
 }

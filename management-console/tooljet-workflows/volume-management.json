@@ -31,7 +31,7 @@
         "method": "GET",
         "url": "{{globals.ontap_base_url}}/api/storage/volumes",
         "url_params": [
-          { "key": "fields", "value": "name,size,space.used,space.available,state,svm.name,aggregates.name,nas.path,style,type" },
+          { "key": "fields", "value": "name,size,space.used,space.available,space.logical_space,state,svm.name,aggregates.name,nas.path,style,type,clone" },
           { "key": "max_records", "value": "50" },
           { "key": "order_by", "value": "name asc" }
         ],
@@ -194,10 +194,36 @@
         "data": "{{queries.listVolumes.data.records}}",
         "columns": [
           { "name": "Name", "key": "name", "sortable": true },
+          {
+            "name": "Clone",
+            "key": "clone.is_flexclone",
+            "cellRenderer": "{{row.clone && row.clone.is_flexclone ? '<span style=\"background-color: #17A2B8; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;\">Clone</span>' : ''}}",
+            "sortable": true
+          },
           { "name": "SVM", "key": "svm.name", "sortable": true },
           { "name": "Size (GB)", "key": "size", "cellRenderer": "{{(cell / 1073741824).toFixed(1)}}" },
           { "name": "Used (GB)", "key": "space.used", "cellRenderer": "{{(cell / 1073741824).toFixed(1)}}" },
           { "name": "Used %", "key": "space.used", "cellRenderer": "{{((row.space.used / row.size) * 100).toFixed(1)}}%" },
+          {
+            "name": "Parent Volume",
+            "key": "clone.parent_volume.name",
+            "cellRenderer": "{{row.clone && row.clone.is_flexclone && row.clone.parent_volume ? row.clone.parent_volume.name : '—'}}"
+          },
+          {
+            "name": "Parent Snapshot",
+            "key": "clone.parent_snapshot.name",
+            "cellRenderer": "{{row.clone && row.clone.is_flexclone && row.clone.parent_snapshot ? row.clone.parent_snapshot.name : '—'}}"
+          },
+          {
+            "name": "Split Status",
+            "key": "clone.split_initiated",
+            "cellRenderer": "{{row.clone && row.clone.is_flexclone ? (row.clone.split_initiated ? '<span style=\"background-color: #FFC107; color: #212529; padding: 2px 8px; border-radius: 12px; font-size: 11px;\">Split Initiated (' + (row.clone.split_complete_percent || 0) + '%)</span>' : '<span style=\"background-color: #6C757D; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 11px;\">Not Split</span>') : '—'}}"
+          },
+          {
+            "name": "Space Savings",
+            "key": "space.logical_space.used",
+            "cellRenderer": "{{row.clone && row.clone.is_flexclone && row.space && row.space.logical_space && row.space.logical_space.used ? 'Logical: ' + (row.space.logical_space.used / 1073741824).toFixed(1) + ' GB / Physical: ' + (row.space.used / 1073741824).toFixed(1) + ' GB (Shared: ' + ((1 - row.space.used / row.space.logical_space.used) * 100).toFixed(0) + '%)' : '—'}}"
+          },
           { "name": "State", "key": "state", "sortable": true },
           { "name": "Junction Path", "key": "nas.path" },
           { "name": "Actions", "key": "actions", "cellRenderer": "actionButtons" }

@@ -31,7 +31,8 @@ Metadata:
       - Label:
           default: FSx ONTAP Configuration
         Parameters:
-          - OntapCredentialsSecretArn
+          - OntapManagementEndpoints
+          - OntapCredentialsSecretArns
           - S3AccessPointArn
       - Label:
           default: Application Configuration
@@ -60,8 +61,10 @@ Metadata:
         default: Cognito App Client ID
       CognitoDomain:
         default: Cognito Domain Prefix
-      OntapCredentialsSecretArn:
-        default: ONTAP Credentials Secret ARN
+      OntapManagementEndpoints:
+        default: ONTAP Management Endpoints (comma-separated)
+      OntapCredentialsSecretArns:
+        default: ONTAP Credentials Secret ARNs (comma-separated)
       S3AccessPointArn:
         default: S3 Access Point ARN
       ToolJetImageTag:
@@ -130,11 +133,17 @@ Parameters:
     MinLength: 1
     MaxLength: 63
 
-  OntapCredentialsSecretArn:
+  OntapManagementEndpoints:
     Type: String
     Description: >
-      ARN of the Secrets Manager secret containing ONTAP admin credentials.
-    AllowedPattern: '^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$'
+      Comma-separated list of FSx ONTAP management endpoints (1-10).
+      Each endpoint corresponds positionally to a secret ARN in OntapCredentialsSecretArns.
+
+  OntapCredentialsSecretArns:
+    Type: String
+    Description: >
+      Comma-separated list of Secrets Manager ARNs containing ONTAP admin credentials (1-10).
+      Each ARN corresponds positionally to an endpoint in OntapManagementEndpoints.
 
   S3AccessPointArn:
     Type: String
@@ -585,7 +594,7 @@ Resources:
                 Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
-                Resource: !Ref OntapCredentialsSecretArn
+                Resource: !Split [',', !Ref OntapCredentialsSecretArns]
               - Sid: LambdaInvoke
                 Effect: Allow
                 Action:
@@ -621,8 +630,10 @@ Resources:
           Environment:
             - Name: TOOLJET_HOST
               Value: !Sub 'https://${ApplicationLoadBalancer.DNSName}'
-            - Name: ONTAP_CREDENTIALS_SECRET_ARN
-              Value: !Ref OntapCredentialsSecretArn
+            - Name: ONTAP_MGMT_ENDPOINTS
+              Value: !Ref OntapManagementEndpoints
+            - Name: ONTAP_CREDENTIALS_SECRET_ARNS
+              Value: !Ref OntapCredentialsSecretArns
             - Name: S3_COPY_LAMBDA_ARN
               Value: !GetAtt S3CopyFunction.Arn
             - Name: AWS_REGION

@@ -217,5 +217,14 @@
       "minHeight": "200px",
       "maxHeight": "400px"
     }
+  },
+  "multiPoller": {
+    "description": "Phase 2A: Multi-poller support. All Grafana dashboards should include a $datacenter variable for filtering by file system.",
+    "variableName": "datacenter",
+    "variableQuery": "label_values(ontap_volume_read_ops, datacenter)",
+    "includeAll": true,
+    "multiSelect": true,
+    "defaultValue": "$__all",
+    "embedUrlPattern": "{{grafanaBaseUrl}}/d-solo/{{dashboardUid}}/{{dashboardSlug}}?orgId=1&panelId={{panelId}}&var-datacenter={{activeDatcenter}}&from={{from}}&to={{to}}&refresh={{refresh}}"
   }
 }

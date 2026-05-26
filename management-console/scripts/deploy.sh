@@ -30,11 +30,15 @@ Usage: $(basename "$0") [OPTIONS]
 Deploy the FSxN Management Console (5 CloudFormation stacks).
 
 Required environment variables:
-  VPC_ID                      Target VPC ID (e.g., vpc-0123456789abcdef0)
-  PRIVATE_SUBNET_IDS          Comma-separated private subnet IDs (min 2 AZs)
-  PUBLIC_SUBNET_IDS           Comma-separated public subnet IDs (min 2 AZs)
-  ONTAP_MGMT_ENDPOINT        FSx ONTAP management endpoint (IP or DNS)
-  ONTAP_CREDENTIALS_SECRET_ARN  Secrets Manager ARN for ONTAP credentials
+  VPC_ID                        Target VPC ID (e.g., vpc-0123456789abcdef0)
+  PRIVATE_SUBNET_IDS            Comma-separated private subnet IDs (min 2 AZs)
+  PUBLIC_SUBNET_IDS             Comma-separated public subnet IDs (min 2 AZs)
+  ONTAP_MGMT_ENDPOINTS          Comma-separated FSx ONTAP management endpoints (1-10)
+  ONTAP_CREDENTIALS_SECRET_ARNS Comma-separated Secrets Manager ARNs (positional match to endpoints)
+
+Backward-compatible aliases (auto-converted to plural form):
+  ONTAP_MGMT_ENDPOINT           Single FSx ONTAP management endpoint (legacy)
+  ONTAP_CREDENTIALS_SECRET_ARN  Single Secrets Manager ARN (legacy)
 
 Optional environment variables:
   COGNITO_DOMAIN_PREFIX       Cognito hosted UI domain prefix (default: fsxn-mgmt)
@@ -53,13 +57,23 @@ Options:
   --help, -h    Show this help message
 
 Examples:
-  # Minimal deployment
+  # Single file system deployment (backward compatible)
   export VPC_ID=vpc-0123456789abcdef0
   export PRIVATE_SUBNET_IDS=subnet-aaaa1111,subnet-bbbb2222
   export PUBLIC_SUBNET_IDS=subnet-cccc3333,subnet-dddd4444
+  export ONTAP_MGMT_ENDPOINTS=10.0.x.x
+  export ONTAP_CREDENTIALS_SECRET_ARNS=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:ontap-creds-XXXXXX
+  export CERTIFICATE_ARN=arn:aws:acm:ap-northeast-1:123456789012:certificate/abc-123
+  ./deploy.sh
+
+  # Multi file system deployment (up to 10)
+  export ONTAP_MGMT_ENDPOINTS=10.0.1.x,10.0.2.x,10.0.3.x
+  export ONTAP_CREDENTIALS_SECRET_ARNS=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:ontap-fs1-XXXXXX,arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:ontap-fs2-XXXXXX,arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:ontap-fs3-XXXXXX
+  ./deploy.sh
+
+  # Legacy single-endpoint variables (auto-converted to plural form)
   export ONTAP_MGMT_ENDPOINT=10.0.x.x
   export ONTAP_CREDENTIALS_SECRET_ARN=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:ontap-creds-XXXXXX
-  export CERTIFICATE_ARN=arn:aws:acm:ap-northeast-1:123456789012:certificate/abc-123
   ./deploy.sh
 
   # Production deployment with MFA required
@@ -97,13 +111,26 @@ done
 # ---------------------------------------------------------------------------
 
 validate_env() {
+  # -------------------------------------------------------------------------
+  # Backward compatibility: auto-convert singular vars to plural form
+  # -------------------------------------------------------------------------
+  if [[ -z "${ONTAP_MGMT_ENDPOINTS:-}" && -n "${ONTAP_MGMT_ENDPOINT:-}" ]]; then
+    ONTAP_MGMT_ENDPOINTS="${ONTAP_MGMT_ENDPOINT}"
+  fi
+  if [[ -z "${ONTAP_CREDENTIALS_SECRET_ARNS:-}" && -n "${ONTAP_CREDENTIALS_SECRET_ARN:-}" ]]; then
+    ONTAP_CREDENTIALS_SECRET_ARNS="${ONTAP_CREDENTIALS_SECRET_ARN}"
+  fi
+
+  # -------------------------------------------------------------------------
+  # Check required variables are set
+  # -------------------------------------------------------------------------
   local missing=()
 
   [[ -z "${VPC_ID:-}" ]] && missing+=("VPC_ID")
   [[ -z "${PRIVATE_SUBNET_IDS:-}" ]] && missing+=("PRIVATE_SUBNET_IDS")
   [[ -z "${PUBLIC_SUBNET_IDS:-}" ]] && missing+=("PUBLIC_SUBNET_IDS")
-  [[ -z "${ONTAP_MGMT_ENDPOINT:-}" ]] && missing+=("ONTAP_MGMT_ENDPOINT")
-  [[ -z "${ONTAP_CREDENTIALS_SECRET_ARN:-}" ]] && missing+=("ONTAP_CREDENTIALS_SECRET_ARN")
+  [[ -z "${ONTAP_MGMT_ENDPOINTS:-}" ]] && missing+=("ONTAP_MGMT_ENDPOINTS (or ONTAP_MGMT_ENDPOINT)")
+  [[ -z "${ONTAP_CREDENTIALS_SECRET_ARNS:-}" ]] && missing+=("ONTAP_CREDENTIALS_SECRET_ARNS (or ONTAP_CREDENTIALS_SECRET_ARN)")
 
   if [[ ${#missing[@]} -gt 0 ]]; then
     echo "Error: Missing required environment variables:"
@@ -114,6 +141,25 @@ validate_env() {
     echo "Run '$(basename "$0") --help' for usage."
     exit 1
   fi
+
+  # -------------------------------------------------------------------------
+  # Multi-endpoint validation: count match and range check
+  # -------------------------------------------------------------------------
+  IFS=',' read -ra EP_ARRAY <<< "${ONTAP_MGMT_ENDPOINTS}"
+  IFS=',' read -ra ARN_ARRAY <<< "${ONTAP_CREDENTIALS_SECRET_ARNS}"
+
+  if [[ ${#EP_ARRAY[@]} -ne ${#ARN_ARRAY[@]} ]]; then
+    log_error "Endpoint count (${#EP_ARRAY[@]}) does not match secret ARN count (${#ARN_ARRAY[@]})"
+    log_error "Each management endpoint must have a corresponding Secrets Manager ARN (positional match)."
+    exit 1
+  fi
+
+  if [[ ${#EP_ARRAY[@]} -lt 1 || ${#EP_ARRAY[@]} -gt 10 ]]; then
+    log_error "Endpoint count must be between 1 and 10 (got ${#EP_ARRAY[@]})"
+    exit 1
+  fi
+
+  log_info "Validated ${#EP_ARRAY[@]} FSx ONTAP endpoint(s) with matching credentials"
 }
 
 # ---------------------------------------------------------------------------
@@ -229,7 +275,7 @@ main() {
   echo "   Region: ${AWS_REGION}"
   echo "   Stack prefix: ${STACK_PREFIX}"
   echo "   VPC: ${VPC_ID}"
-  echo "   ONTAP endpoint: ${ONTAP_MGMT_ENDPOINT}"
+  echo "   ONTAP endpoints: ${ONTAP_MGMT_ENDPOINTS}"
   echo ""
 
   # =========================================================================
@@ -241,7 +287,7 @@ main() {
     "VpcId=${VPC_ID}" \
     "PrivateSubnetIds=${PRIVATE_SUBNET_IDS}" \
     "PublicSubnetIds=${PUBLIC_SUBNET_IDS}" \
-    "OntapManagementEndpoint=${ONTAP_MGMT_ENDPOINT}"
+    "OntapManagementEndpoints=${ONTAP_MGMT_ENDPOINTS}"
 
   # Retrieve network stack outputs for downstream stacks
   HARVEST_TASK_SG=$(get_stack_output "${STACK_PREFIX}-network" "HarvestTaskSgId")
@@ -296,8 +342,8 @@ main() {
   deploy_stack "${STACK_PREFIX}-observability" "${TEMPLATE_DIR}/observability.yaml" \
     "PrivateSubnetIds=${PRIVATE_SUBNET_IDS}" \
     "HarvestTaskSgId=${HARVEST_TASK_SG}" \
-    "OntapManagementEndpoint=${ONTAP_MGMT_ENDPOINT}" \
-    "OntapCredentialsSecretArn=${ONTAP_CREDENTIALS_SECRET_ARN}" \
+    "OntapManagementEndpoints=${ONTAP_MGMT_ENDPOINTS}" \
+    "OntapCredentialsSecretArns=${ONTAP_CREDENTIALS_SECRET_ARNS}" \
     "CognitoUserPoolArn=${COGNITO_USER_POOL_ARN}" \
     "HarvestImageTag=${HARVEST_IMAGE_TAG}"
 
@@ -330,7 +376,8 @@ main() {
     "CognitoUserPoolArn=${COGNITO_USER_POOL_ARN}"
     "CognitoAppClientId=${COGNITO_APP_CLIENT_ID}"
     "CognitoDomain=${COGNITO_DOMAIN}"
-    "OntapCredentialsSecretArn=${ONTAP_CREDENTIALS_SECRET_ARN}"
+    "OntapCredentialsSecretArns=${ONTAP_CREDENTIALS_SECRET_ARNS}"
+    "OntapManagementEndpoints=${ONTAP_MGMT_ENDPOINTS}"
     "ToolJetImageTag=${TOOLJET_IMAGE_TAG}"
     "SessionDurationHours=${SESSION_DURATION_HOURS}"
   )

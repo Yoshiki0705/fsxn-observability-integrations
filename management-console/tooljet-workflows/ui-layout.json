@@ -97,6 +97,39 @@
     "urlSync": true,
     "urlPattern": "/app/{tab}/{accordion}",
     "historyMode": "pushState",
+    "fileSystemSelector": {
+      "enabled": true,
+      "position": "header-right",
+      "type": "dropdown",
+      "dataSource": "env:ONTAP_MGMT_ENDPOINTS",
+      "labelFormat": "FSx ONTAP: {{endpoint}}",
+      "onSelect": {
+        "updateGlobals": ["ontap_base_url", "ontap_username", "ontap_password"],
+        "refreshCurrentView": true,
+        "maxRefreshTime": 3000
+      },
+      "credentialMapping": {
+        "source": "env:ONTAP_CREDENTIALS_SECRET_ARNS",
+        "positionalMatch": true
+      },
+      "visualIndicator": {
+        "showOnAllPages": true,
+        "style": {
+          "backgroundColor": "#E3F2FD",
+          "borderRadius": "4px",
+          "padding": "4px 12px",
+          "fontSize": "12px",
+          "fontWeight": "600"
+        }
+      },
+      "errorHandling": {
+        "unreachableEndpoint": {
+          "showError": true,
+          "allowSwitch": true,
+          "message": "File system unreachable. You can switch to another file system."
+        }
+      }
+    },
     "tabs": [
       {
         "id": "dashboard",

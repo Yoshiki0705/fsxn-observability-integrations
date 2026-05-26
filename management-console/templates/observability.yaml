@@ -4,6 +4,7 @@ Description: >
   Creates AMP workspace, AMG workspace, ECS Cluster, Harvest + ADOT sidecar
   ECS service, IAM roles, and CloudWatch Log Groups.
   Depends on: fsxn-mgmt-network (Stack 1), fsxn-mgmt-auth (Stack 2).
+  Phase 2A: Multi-poller support for monitoring multiple FSx ONTAP file systems.
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -16,8 +17,8 @@ Metadata:
       - Label:
           default: FSx ONTAP Configuration
         Parameters:
-          - OntapManagementEndpoint
-          - OntapCredentialsSecretArn
+          - OntapManagementEndpoints
+          - OntapCredentialsSecretArns
       - Label:
           default: Authentication (from Stack 2)
         Parameters:
@@ -31,10 +32,10 @@ Metadata:
         default: Private Subnet IDs (2+ AZs)
       HarvestTaskSgId:
         default: Harvest Task Security Group ID
-      OntapManagementEndpoint:
-        default: FSx ONTAP Management Endpoint
-      OntapCredentialsSecretArn:
-        default: ONTAP Credentials Secret ARN
+      OntapManagementEndpoints:
+        default: FSx ONTAP Management Endpoints (comma-separated)
+      OntapCredentialsSecretArns:
+        default: ONTAP Credentials Secret ARNs (comma-separated)
       CognitoUserPoolArn:
         default: Cognito User Pool ARN
       HarvestImageTag:
@@ -52,17 +53,20 @@ Parameters:
     Description: >
       Security Group ID for Harvest ECS tasks (from network stack).
 
-  OntapManagementEndpoint:
+  OntapManagementEndpoints:
     Type: String
     Description: >
-      FSx ONTAP management endpoint IP address or DNS name.
-    AllowedPattern: '^[a-zA-Z0-9._-]+$'
+      Comma-separated list of FSx ONTAP management endpoint IP addresses or DNS names (1-10).
+      Single endpoint is treated as a list of one for backward compatibility.
+    AllowedPattern: '^[a-zA-Z0-9._,-]+$'
 
-  OntapCredentialsSecretArn:
+  OntapCredentialsSecretArns:
     Type: String
     Description: >
-      ARN of the Secrets Manager secret containing ONTAP admin credentials.
-    AllowedPattern: '^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$'
+      Comma-separated list of Secrets Manager secret ARNs containing ONTAP admin credentials.
+      Each ARN corresponds positionally to the endpoint in OntapManagementEndpoints.
+      For shared credentials across all endpoints, provide the same ARN repeated.
+    AllowedPattern: '^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+(,arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+)*$'
 
   CognitoUserPoolArn:
     Type: String
@@ -237,7 +241,7 @@ Resources:
                 Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
-                Resource: !Ref OntapCredentialsSecretArn
+                Resource: !Split [',', !Ref OntapCredentialsSecretArns]
       Tags:
         - Key: Project
           Value: fsxn-management-console
@@ -264,7 +268,7 @@ Resources:
                 Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
-                Resource: !Ref OntapCredentialsSecretArn
+                Resource: !Split [',', !Ref OntapCredentialsSecretArns]
               - Sid: AmpRemoteWrite
                 Effect: Allow
                 Action:
@@ -279,7 +283,9 @@ Resources:
   # ============================================================
   # Uses /busybox/sh (available in the Harvest image) to generate
   # harvest.yml at startup, then exec's bin/poller.
-  # This eliminates the need for an init container or shared volume.
+  # Phase 2A: Generates one poller entry per comma-separated endpoint.
+  # Each poller gets datacenter=fsxn-{i+1} and sequential port from 12990.
+  # Single shared credential (ONTAP_USERNAME + ONTAP_PASSWORD) applied to all endpoints.
   HarvestTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -297,6 +303,7 @@ Resources:
         # ---------------------------------------------------------
         # The Harvest image (ghcr.io/netapp/harvest) includes /busybox/sh.
         # We use it to write harvest.yml from env vars, then exec bin/poller.
+        # Phase 2A: Generates N poller entries from comma-separated endpoints.
         - Name: harvest
           Image: !Sub 'ghcr.io/netapp/harvest:${HarvestImageTag}'
           Cpu: 512
@@ -307,14 +314,36 @@ Resources:
             - -c
           Command:
             - |
-              cat > /opt/harvest/harvest.yml << EOF
+              # Phase 2A: Multi-poller harvest.yml generation
+              # Parse comma-separated endpoints into individual entries
+              IFS=',' read -ra ENDPOINTS <<< "$ONTAP_MGMT_ENDPOINTS"
+              NUM_ENDPOINTS=${#ENDPOINTS[@]}
+
+              # Generate harvest.yml header
+              cat > /opt/harvest/harvest.yml << 'HEADER'
               Pollers:
-                fsxn-cluster:
-                  datacenter: aws
-                  addr: $ONTAP_MGMT_ENDPOINT
+              HEADER
+
+              # Generate one poller entry per endpoint
+              POLLER_NAMES=""
+              i=0
+              for EP in "${ENDPOINTS[@]}"; do
+                EP=$(echo "$EP" | xargs)  # trim whitespace
+                IDX=$((i + 1))
+                PORT=$((12990 + i))
+                POLLER_NAME="fsxn-cluster-${IDX}"
+                if [ -n "$POLLER_NAMES" ]; then
+                  POLLER_NAMES="${POLLER_NAMES},${POLLER_NAME}"
+                else
+                  POLLER_NAMES="${POLLER_NAME}"
+                fi
+                cat >> /opt/harvest/harvest.yml << EOF
+                ${POLLER_NAME}:
+                  datacenter: fsxn-${IDX}
+                  addr: ${EP}
                   auth_style: basic_auth
-                  username: $ONTAP_USERNAME
-                  password: $ONTAP_PASSWORD
+                  username: ${ONTAP_USERNAME}
+                  password: ${ONTAP_PASSWORD}
                   collectors:
                     - Rest
                     - RestPerf
@@ -322,25 +351,55 @@ Resources:
                     - prometheus
                   schedule:
                     - data: 60s
+              EOF
+                i=$((i + 1))
+              done
+
+              # Generate exporters and defaults sections
+              cat >> /opt/harvest/harvest.yml << 'FOOTER'
               Exporters:
                 prometheus:
                   exporter: Prometheus
                   port_range: 12990-12999
               Defaults:
                 use_insecure_tls: true
-              EOF
-              exec bin/poller --config harvest.yml -p fsxn-cluster
+              FOOTER
+
+              # Start all pollers
+              exec bin/poller --config harvest.yml --pollers "$POLLER_NAMES"
           PortMappings:
             - ContainerPort: 12990
               Protocol: tcp
+            - ContainerPort: 12991
+              Protocol: tcp
+            - ContainerPort: 12992
+              Protocol: tcp
+            - ContainerPort: 12993
+              Protocol: tcp
+            - ContainerPort: 12994
+              Protocol: tcp
+            - ContainerPort: 12995
+              Protocol: tcp
+            - ContainerPort: 12996
+              Protocol: tcp
+            - ContainerPort: 12997
+              Protocol: tcp
+            - ContainerPort: 12998
+              Protocol: tcp
+            - ContainerPort: 12999
+              Protocol: tcp
           Environment:
-            - Name: ONTAP_MGMT_ENDPOINT
-              Value: !Ref OntapManagementEndpoint
+            - Name: ONTAP_MGMT_ENDPOINTS
+              Value: !Ref OntapManagementEndpoints
           Secrets:
             - Name: ONTAP_USERNAME
-              ValueFrom: !Sub '${OntapCredentialsSecretArn}:username::'
+              ValueFrom: !Sub
+                - '${FirstSecretArn}:username::'
+                - FirstSecretArn: !Select [0, !Split [',', !Ref OntapCredentialsSecretArns]]
             - Name: ONTAP_PASSWORD
-              ValueFrom: !Sub '${OntapCredentialsSecretArn}:password::'
+              ValueFrom: !Sub
+                - '${FirstSecretArn}:password::'
+                - FirstSecretArn: !Select [0, !Split [',', !Ref OntapCredentialsSecretArns]]
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -361,6 +420,7 @@ Resources:
         # ---------------------------------------------------------
         # Uses AOT_CONFIG_CONTENT env var for inline config (no config file needed).
         # ADOT natively supports this env var to pass collector configuration.
+        # Phase 2A: Scrapes all ports in range 12990-12999 to cover up to 10 pollers.
         - Name: adot-collector
           Image: public.ecr.aws/aws-observability/aws-otel-collector:latest
           Cpu: 256
@@ -378,6 +438,15 @@ Resources:
                           static_configs:
                             - targets:
                                 - "localhost:12990"
+                                - "localhost:12991"
+                                - "localhost:12992"
+                                - "localhost:12993"
+                                - "localhost:12994"
+                                - "localhost:12995"
+                                - "localhost:12996"
+                                - "localhost:12997"
+                                - "localhost:12998"
+                                - "localhost:12999"
                           metrics_path: /metrics
                 processors:
                   batch:
