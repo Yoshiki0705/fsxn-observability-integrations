@@ -20,8 +20,8 @@ FSx for ONTAP audit logs may contain the following data categories:
 | Vendor | Available Regions | Self-Hosted Option | Data Sovereignty Notes |
 |--------|------------------|-------------------|----------------------|
 | **Datadog** | US1 (Virginia), US3, US5, EU1 (Frankfurt), AP1 (Tokyo), AP2, US1-FED (GovCloud) | ❌ | AP1 (Tokyo) available for Japan residency |
-| **New Relic** | US (Oregon), EU (Frankfurt) | ❌ | No AP region; US or EU only |
-| **Grafana Cloud** | US (multiple), EU (multiple), AP (Sydney, Singapore) | ✅ (Grafana OSS + Loki) | Self-hosted keeps data in your VPC |
+| **New Relic** | US (Oregon), EU (Frankfurt), JP (Tokyo — July 2026) | ❌ | JP region launching July 2026; US or EU only until then |
+| **Grafana Cloud** | US (multiple), EU (multiple), AP (Sydney, Singapore); Tokyo on Dedicated tier only | ✅ (Grafana OSS + Loki) | Self-hosted keeps data in your VPC; Free/Pro tiers limited to US/EU |
 | **Splunk** | Splunk Cloud: US, EU, AU, custom | ✅ (Splunk Enterprise) | Self-managed keeps data in your infra |
 | **Elastic** | Elastic Cloud: US, EU, AP (Tokyo, Sydney, Singapore) | ✅ (Self-hosted) | Self-hosted = full data sovereignty |
 | **Dynatrace** | SaaS: US, EU, AP (Sydney, Singapore) | ✅ (Managed / ActiveGate) | Managed deployment = your infra |

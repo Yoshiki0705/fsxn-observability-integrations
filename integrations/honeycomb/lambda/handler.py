@@ -16,7 +16,8 @@ LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 HONEYCOMB_DATASET = os.environ.get("HONEYCOMB_DATASET", "fsxn-audit")
 HONEYCOMB_API_URL = os.environ.get("HONEYCOMB_API_URL", "https://api.honeycomb.io")
 
-# Honeycomb limit: 5MB per batch, max 100 events per batch request
+# Honeycomb limit: 5MB per batch request body
+# Implementation choice: batch in chunks of 100 events for reliability
 MAX_BATCH_EVENTS = 100
 MAX_RETRIES = 3
 
