@@ -344,59 +344,60 @@ Resources:
             - -c
           Command:
             - |
-              # Phase 2A: Multi-poller harvest.yml generation
-              # Parse comma-separated endpoints into individual entries
-              IFS=',' read -ra ENDPOINTS <<< "$ONTAP_MGMT_ENDPOINTS"
-              NUM_ENDPOINTS=${#ENDPOINTS[@]}
+              # Phase 2A: Multi-poller harvest.yml generation (POSIX sh compatible)
+              # Uses printf instead of heredoc to avoid YAML indentation issues in CFn
 
-              # Generate harvest.yml header
-              cat > /opt/harvest/harvest.yml << 'HEADER'
-              Pollers:
-              HEADER
+              # Start harvest.yml
+              printf 'Pollers:\n' > /opt/harvest/harvest.yml
 
               # Generate one poller entry per endpoint
               POLLER_NAMES=""
               i=0
-              for EP in "${ENDPOINTS[@]}"; do
-                EP=$(echo "$EP" | xargs)  # trim whitespace
-                IDX=$((i + 1))
-                PORT=$((12990 + i))
-                POLLER_NAME="fsxn-cluster-${IDX}"
+              OLDIFS="$IFS"
+              IFS=','
+              for EP in $ONTAP_MGMT_ENDPOINTS; do
+                IFS="$OLDIFS"
+                EP=$(echo "$EP" | tr -d ' ')
+                i=$((i + 1))
+                POLLER_NAME="fsxn-cluster-${i}"
                 if [ -n "$POLLER_NAMES" ]; then
                   POLLER_NAMES="${POLLER_NAMES},${POLLER_NAME}"
                 else
                   POLLER_NAMES="${POLLER_NAME}"
                 fi
-                cat >> /opt/harvest/harvest.yml << EOF
-                ${POLLER_NAME}:
-                  datacenter: fsxn-${IDX}
-                  addr: ${EP}
-                  auth_style: basic_auth
-                  username: ${ONTAP_USERNAME}
-                  password: ${ONTAP_PASSWORD}
-                  collectors:
-                    - Rest
-                    - RestPerf
-                  exporters:
-                    - prometheus
-                  schedule:
-                    - data: 60s
-              EOF
-                i=$((i + 1))
+                printf '  %s:\n' "$POLLER_NAME" >> /opt/harvest/harvest.yml
+                printf '    datacenter: fsxn-%s\n' "$i" >> /opt/harvest/harvest.yml
+                printf '    addr: %s\n' "$EP" >> /opt/harvest/harvest.yml
+                printf '    auth_style: basic_auth\n' >> /opt/harvest/harvest.yml
+                printf '    username: %s\n' "$ONTAP_USERNAME" >> /opt/harvest/harvest.yml
+                printf '    password: %s\n' "$ONTAP_PASSWORD" >> /opt/harvest/harvest.yml
+                printf '    use_insecure_tls: true\n' >> /opt/harvest/harvest.yml
+                printf '    collectors:\n' >> /opt/harvest/harvest.yml
+                printf '      - Rest\n' >> /opt/harvest/harvest.yml
+                printf '      - RestPerf\n' >> /opt/harvest/harvest.yml
+                printf '    exporters:\n' >> /opt/harvest/harvest.yml
+                printf '      - prometheus\n' >> /opt/harvest/harvest.yml
+                IFS=','
               done
+              IFS="$OLDIFS"
 
-              # Generate exporters and defaults sections
-              cat >> /opt/harvest/harvest.yml << 'FOOTER'
-              Exporters:
-                prometheus:
-                  exporter: Prometheus
-                  port_range: 12990-12999
-              Defaults:
-                use_insecure_tls: true
-              FOOTER
+              # Exporters section
+              printf 'Exporters:\n' >> /opt/harvest/harvest.yml
+              printf '  prometheus:\n' >> /opt/harvest/harvest.yml
+              printf '    exporter: Prometheus\n' >> /opt/harvest/harvest.yml
+              printf '    port_range: 12990-12999\n' >> /opt/harvest/harvest.yml
+
+              # Defaults section
+              printf 'Defaults:\n' >> /opt/harvest/harvest.yml
+              printf '  use_insecure_tls: true\n' >> /opt/harvest/harvest.yml
+
+              # Debug: show generated config
+              echo "=== Generated harvest.yml ==="
+              cat /opt/harvest/harvest.yml
+              echo "=== Starting pollers: $POLLER_NAMES ==="
 
               # Start all pollers
-              exec bin/poller --config harvest.yml --pollers "$POLLER_NAMES"
+              exec bin/poller --config /opt/harvest/harvest.yml --pollers "$POLLER_NAMES"
           PortMappings:
             - ContainerPort: 12990
               Protocol: tcp

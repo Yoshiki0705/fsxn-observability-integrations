@@ -315,7 +315,7 @@ main() {
     "VpcId=${VPC_ID}" \
     "PrivateSubnetIds=${PRIVATE_SUBNET_IDS}" \
     "PublicSubnetIds=${PUBLIC_SUBNET_IDS}" \
-    "OntapManagementEndpoints=${ONTAP_MGMT_ENDPOINTS}"
+    "OntapManagementEndpoint=${ONTAP_MGMT_ENDPOINTS}"
 
   # Retrieve network stack outputs for downstream stacks
   HARVEST_TASK_SG=$(get_stack_output "${STACK_PREFIX}-network" "HarvestTaskSgId")
