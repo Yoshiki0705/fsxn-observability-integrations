@@ -403,9 +403,12 @@ Resources:
               cat harvest.yml
               echo "=== Starting poller(s): $POLLER_NAMES ==="
 
-              # Start poller(s) — uses --poller flag (official CLI)
-              # Using 'exec' to replace shell process with poller
-              exec bin/poller --poller $POLLER_NAMES
+              # Start poller(s) using bin/harvest start (daemon mode)
+              # bin/harvest start reads harvest.yml and starts all defined pollers
+              # It runs as a foreground process (no daemonize in container)
+              bin/harvest start
+              # Keep container alive (harvest start may background pollers)
+              tail -f /dev/null
           PortMappings:
             - ContainerPort: 12990
               Protocol: tcp
