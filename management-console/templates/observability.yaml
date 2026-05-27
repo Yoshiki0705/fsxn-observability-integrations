@@ -404,9 +404,8 @@ Resources:
               echo "=== Starting poller(s): $POLLER_NAMES ==="
 
               # Start poller(s) — uses --poller flag (official CLI)
-              # For single poller: bin/poller --poller fsxn-cluster-1
-              # For multiple: bin/poller --poller fsxn-cluster-1,fsxn-cluster-2,...
-              exec bin/poller --poller "$POLLER_NAMES"
+              # Using 'exec' to replace shell process with poller
+              exec bin/poller --poller $POLLER_NAMES
           PortMappings:
             - ContainerPort: 12990
               Protocol: tcp
