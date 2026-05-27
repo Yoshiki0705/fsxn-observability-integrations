@@ -449,7 +449,7 @@ Resources:
           HealthCheck:
             Command:
               - CMD-SHELL
-              - 'wget --no-verbose --tries=1 --spider http://localhost:12990/ || exit 1'
+              - 'wget --no-verbose --tries=1 --spider http://localhost:12990/metrics || exit 1'
             Interval: 30
             Timeout: 10
             Retries: 5
