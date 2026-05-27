@@ -403,12 +403,9 @@ Resources:
               cat harvest.yml
               echo "=== Starting poller(s): $POLLER_NAMES ==="
 
-              # Start poller(s) using bin/harvest start (daemon mode)
-              # bin/harvest start reads harvest.yml and starts all defined pollers
-              # It runs as a foreground process (no daemonize in container)
-              bin/harvest start
-              # Keep container alive (harvest start may background pollers)
-              tail -f /dev/null
+              # Start poller — exec replaces shell with poller (foreground process)
+              # bin/poller --poller runs as PID 1 and stays alive collecting metrics
+              exec bin/poller --poller $POLLER_NAMES
           PortMappings:
             - ContainerPort: 12990
               Protocol: tcp
@@ -545,10 +542,10 @@ Resources:
             - !Ref HarvestTaskSgId
       DeploymentConfiguration:
         DeploymentCircuitBreaker:
-          Enable: true
-          Rollback: true
+          Enable: false
+          Rollback: false
         MaximumPercent: 200
-        MinimumHealthyPercent: 100
+        MinimumHealthyPercent: 0
       EnableExecuteCommand: true
       Tags:
         - Key: Project
