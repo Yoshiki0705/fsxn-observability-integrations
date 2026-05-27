@@ -532,7 +532,7 @@ Resources:
       ServiceName: fsxn-mgmt-harvest
       Cluster: !Ref EcsCluster
       TaskDefinition: !Ref HarvestTaskDefinition
-      DesiredCount: 1
+      DesiredCount: 0
       LaunchType: FARGATE
       NetworkConfiguration:
         AwsvpcConfiguration:
