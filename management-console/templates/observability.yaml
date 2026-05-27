@@ -392,6 +392,7 @@ Resources:
               printf '    exporter: Prometheus\n' >> harvest.yml
               printf '    addr: 0.0.0.0\n' >> harvest.yml
               printf '    port_range: 12990-12999\n' >> harvest.yml
+              printf '    port: 12990\n' >> harvest.yml
 
               # Defaults section
               printf 'Defaults:\n' >> harvest.yml
