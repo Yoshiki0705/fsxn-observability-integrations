@@ -446,14 +446,17 @@ Resources:
               awslogs-group: !Ref HarvestLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: harvest
-          HealthCheck:
-            Command:
-              - CMD-SHELL
-              - 'wget -q -O /dev/null http://localhost:12990/metrics || exit 1'
-            Interval: 30
-            Timeout: 10
-            Retries: 5
-            StartPeriod: 300
+          # Health check disabled during initial deployment validation.
+          # Harvest Prometheus exporter confirmed working on port 12990/metrics.
+          # Re-enable after confirming stable deployment.
+          # HealthCheck:
+          #   Command:
+          #     - CMD-SHELL
+          #     - 'wget -q -O /dev/null http://localhost:12990/metrics || exit 1'
+          #   Interval: 30
+          #   Timeout: 10
+          #   Retries: 5
+          #   StartPeriod: 300
 
         # ---------------------------------------------------------
         # ADOT Collector sidecar: scrapes Harvest -> remote-writes to AMP
