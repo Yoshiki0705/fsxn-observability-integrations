@@ -61,6 +61,12 @@ EventBridge Scheduler → Lambda → Vendor API
 - ベンダー API に1時間超のメンテナンスウィンドウがある
 - 監査コンプライアンスで配信証明またはリトライ記録が必要
 
+**実装ノート**:
+- Lambda failure destination を追加し、非同期呼び出し失敗をキャプチャ
+- DynamoDB または SSM タグでオブジェクト単位のリトライ回数を追跡
+- N回失敗後の poison-pill 隔離を実装
+- Scheduler DLQ 深度、Lambda エラー、チェックポイント経過時間に CloudWatch アラームを設定
+
 ## Tier 3: Higher Reliability（SQS バッファリング）
 
 ```
@@ -83,6 +89,14 @@ EventBridge Scheduler → Lambda (reader) → SQS バッファ
 - ベンダー API に厳格なレート制限がありバックプレッシャーが必要
 - 重複排除付き並行処理が必要
 - ベンダー長時間障害時のバッファリングが必要
+
+**実装ノート**:
+- Reader Lambda がファイルを一覧し、S3 キーを SQS にエンキュー
+- Shipper Lambda がメッセージごとに1キーを処理（SQS event source mapping）
+- DynamoDB でオブジェクト単位の状態を追跡: PENDING → IN_PROGRESS → COMPLETE
+- Conditional writes で重複処理を防止
+- SQS visibility timeout > Lambda timeout
+- Batch size = 1（オブジェクト単位のエラー分離）
 
 ## Tier 4: Multi-Backend / エンリッチメント / リダクション
 
@@ -115,6 +129,47 @@ EventBridge Scheduler → Lambda (reader) → OTel Collector / Grafana Alloy
 | SSM ハイウォーターマーク | SSM Parameter Store | 単一（reserved=1） | 辞書順 | 低 |
 | DynamoDB オブジェクト台帳 | DynamoDB | 複数ワーカー | Conditional writes | 中 |
 | SQS メッセージ重複排除 | SQS FIFO | 複数ワーカー | Message dedup ID | 中 |
+
+### SSM ハイウォーターマーク（Quickstart）
+
+最後に正常処理された S3 キーを保存します。次回実行時はその値以降のキーを一覧取得します。シンプルで無料（SSM 制限内）ですが、単調増加するキーと単一同時実行が必要です。
+
+### DynamoDB オブジェクト台帳（Production）
+
+Conditional writes によるオブジェクト単位の処理状態を保存します:
+
+```python
+table.put_item(
+    Item={"object_key": key, "etag": etag, "status": "IN_PROGRESS", "ttl": ...},
+    ConditionExpression="attribute_not_exists(object_key)"
+)
+```
+
+並行ワーカー、重複排除、リトライ追跡、poison-pill 検出をサポートします。
+
+## 一般的な障害シナリオ
+
+| シナリオ | Quickstart の動作 | 本番推奨 |
+|---------|------------------|----------|
+| ベンダー API 5xx | Lambda が3回リトライ → 失敗 → 次回実行でチェックポイントからリトライ | 長時間障害に備え SQS バッファを追加 |
+| ベンダー API 429 | Lambda がバックオフ付きリトライ → タイムアウトの可能性 | MAX_KEYS_PER_RUN を削減; バックプレッシャー用に SQS を追加 |
+| 不正な監査ファイル | パースエラー → チェックポイント停滞 | N回リトライ後の poison-pill 隔離 |
+| Lambda タイムアウト | 最後に成功したキーでチェックポイント | MAX_KEYS_PER_RUN を削減またはタイムアウトを延長 |
+| 認証情報ローテーション | コールドスタートまで 401/403 | reload-on-401/403 付き auth_cache を使用 |
+| Scheduler スロットル | DLQ がイベントをキャプチャ | 次回スケジュール実行でギャップをカバー |
+
+## 障害オーナーシップマトリクス
+
+異なる障害タイプは異なるレイヤーが所有します。この分離を理解することで運用責任の割り当てが明確になります:
+
+| 障害 | オーナーレイヤー | Quickstart の動作 | 本番オプション |
+|------|----------------|------------------|---------------|
+| Scheduler が Lambda を起動できない | EventBridge Scheduler | リトライ + Scheduler DLQ | DLQ アラーム + リプレイ手順書 |
+| Lambda が処理中にクラッシュ | Lambda ランタイム | チェックポイント未更新; 次回実行でリトライ | Lambda failure destination → SQS |
+| ベンダー API が 429/5xx を返す | Shipper リトライロジック | 3回リトライ後に raise | SQS バッファリングまたは Collector パス |
+| 1ファイルが繰り返しパース失敗 | アプリケーションロジック | チェックポイント進行停止 | DynamoDB poison-pill 台帳 |
+| 認証情報の期限切れ/ローテーション | Auth cache レイヤー | キャッシュ更新まで 401/403 | reload-on-401/403 付き auth_cache.py |
+| Lambda 同時実行数の枯渇 | Lambda サービス | スロットル; Scheduler DLQ | ReservedConcurrency=1 では想定内 |
 
 ## パイプラインヘルス監視
 

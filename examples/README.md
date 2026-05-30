@@ -16,7 +16,7 @@ These payloads can be used to:
 
 ```
 examples/
-├── audit/              # FSx ONTAP audit log samples
+├── audit/              # FSx for ONTAP audit log samples
 │   └── sample-audit-log.json
 ├── ems/                # EMS webhook event samples
 │   ├── sample-ransomware-event.json

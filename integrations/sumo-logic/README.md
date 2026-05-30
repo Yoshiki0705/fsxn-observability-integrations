@@ -13,7 +13,7 @@ Ships Amazon FSx for NetApp ONTAP audit logs to Sumo Logic via HTTP Source. Sumo
 ## Architecture
 
 ```
-FSx ONTAP → S3 Access Point → EventBridge → Lambda → Sumo Logic HTTP Source
+FSx for ONTAP → S3 Access Point → EventBridge → Lambda → Sumo Logic HTTP Source
 ```
 
 ## Prerequisites

@@ -72,7 +72,7 @@
 
 | ユースケース | クエリ |
 |----------|-------|
-| 全 FSx ONTAP 監査ログ | `source:fsxn` |
+| 全 FSx for ONTAP 監査ログ | `source:fsxn` |
 | 失敗したアクセス試行 | `source:fsxn @attributes.result:Failure` |
 | ARP ランサムウェアアラート | `source:fsxn-ems @attributes.event_name:arw.volume.state` |
 | FPolicy ファイル操作 | `source:fsxn-fpolicy` |
@@ -85,7 +85,7 @@
 
 ```json
 {
-  "name": "FSx ONTAP: Ransomware Detected (ARP)",
+  "name": "FSx for ONTAP: Ransomware Detected (ARP)",
   "type": "log alert",
   "query": "source:fsxn-ems @attributes.event_name:arw.volume.state @attributes.parameters.state:attack-detected",
   "message": "🚨 ONTAP Autonomous Ransomware Protection detected encryption activity.\n\nVolume: {{attributes.parameters.volume_name}}\nSVM: {{attributes.svm}}\nNode: {{host}}\n\nImmediate actions:\n1. Create snapshot of affected volume\n2. Disable client access\n3. Investigate with FPolicy logs",
@@ -100,7 +100,7 @@
 
 ```json
 {
-  "name": "FSx ONTAP: Bulk Failed Access Attempts",
+  "name": "FSx for ONTAP: Bulk Failed Access Attempts",
   "type": "log alert",
   "query": "source:fsxn @attributes.result:Failure",
   "message": "⚠️ Multiple failed file access attempts detected.\n\nUser: {{attributes.user}}\nClient IP: {{attributes.client_ip}}\n\nThis may indicate unauthorized access attempts.",

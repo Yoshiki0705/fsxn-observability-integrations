@@ -4,7 +4,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                        FSx for NetApp ONTAP                             │
+│                        FSx for ONTAP                                    │
 ├─────────────────┬──────────────────┬────────────────────────────────────┤
 │  監査ログ        │  EMS イベント     │  FPolicy ファイル操作通知            │
 │  (EVTX/XML)     │  (ARP, Quota等)  │  (create/write/rename/delete)      │
@@ -75,7 +75,7 @@ ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Vendor API
 
 ## コンポーネント詳細
 
-### 1. FSx for NetApp ONTAP 監査ログ
+### 1. FSx for ONTAP 監査ログ
 
 FSx for ONTAP の監査ログ機能を有効化し、SVM 内の audit volume に出力します。
 
@@ -151,8 +151,8 @@ FSx S3 AP → Lambda (変換) → Kinesis Data Firehose → ベンダー API
 
 ```yaml
 # Lambda 実行ロール
-- s3:GetObject (FSx ONTAP S3 Access Point ARN のみ)
-- s3:ListBucket (FSx ONTAP S3 Access Point ARN のみ)
+- s3:GetObject (FSx for ONTAP S3 Access Point ARN のみ)
+- s3:ListBucket (FSx for ONTAP S3 Access Point ARN のみ)
 - secretsmanager:GetSecretValue (API Key Secret のみ)
 - dynamodb:GetItem, dynamodb:PutItem (チェックポイントテーブルのみ)
 - logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents

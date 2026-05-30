@@ -15,7 +15,7 @@ Use this when:
 - OTel Collector deployed (see the [OTel Collector README](../../README.md))
 - Collector version 0.90+ (for `transform` processor support)
 
-## PII Fields in FSx ONTAP Audit Logs
+## PII Fields in FSx for ONTAP Audit Logs
 
 | Field | Risk Level | Example | Redaction Strategy |
 |-------|-----------|---------|-------------------|

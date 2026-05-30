@@ -7,7 +7,7 @@
 
 ## Overview
 
-Amazon S3 Access Points for FSx for ONTAP attaches an S3-compatible access point to an FSx ONTAP volume. This enables S3 API access to data that is also accessible via NFS/SMB (no data copy required).
+Amazon S3 Access Points for FSx for ONTAP attaches an S3-compatible access point to an FSx for ONTAP volume. This enables S3 API access to data that is also accessible via NFS/SMB (no data copy required).
 
 ## User Mapping Mechanism
 
@@ -39,7 +39,7 @@ The "file system user ID" specified when creating the Access Point is used for a
 
 ### Prerequisites
 
-- FSx ONTAP volume exists and is mounted (junction path is configured)
+- FSx for ONTAP volume exists and is mounted (junction path is configured)
 - Volume is in AVAILABLE state
 
 ### CLI Creation

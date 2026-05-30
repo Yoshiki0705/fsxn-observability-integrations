@@ -15,7 +15,7 @@ Amazon FSx for NetApp ONTAP の監査ログを Splunk HEC (HTTP Event Collector)
 - **AWS アカウント**: FSx for ONTAP が稼働中であること
 - **Splunk アカウント**: Splunk Enterprise または Splunk Cloud（HEC 機能が有効）
 - **AWS CLI v2**: 設定済み（`aws configure` 完了）
-- **FSx ONTAP 監査ログ**: S3 バケットに出力されていること
+- **FSx for ONTAP 監査ログ**: S3 バケットに出力されていること
 - **前提リソーススタック**: [前提リソース](../../../../docs/ja/prerequisites.md)がデプロイ済み
 
 ## Step 1: Splunk HEC トークンの作成
@@ -104,7 +104,7 @@ aws cloudformation describe-stacks \
 
 | パラメータ | 説明 |
 |-----------|------|
-| `S3AccessPointArn` | FSx ONTAP 監査ログ用 S3 Access Point の ARN |
+| `S3AccessPointArn` | FSx for ONTAP 監査ログ用 S3 Access Point の ARN |
 | `SplunkHecTokenSecretArn` | Secrets Manager に保存した HEC トークンの ARN |
 | `SplunkHecEndpoint` | Splunk HEC エンドポイント URL（ポート 8088） |
 | `S3BucketName` | 監査ログが出力される S3 バケット名 |

@@ -1,0 +1,4 @@
+index=fsxn sourcetype=fsxn:audit
+| stats count max(_time) as last_access by user, volume, path
+| convert ctime(last_access)
+| sort - count

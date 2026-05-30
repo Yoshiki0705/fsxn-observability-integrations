@@ -8,12 +8,12 @@ Validate the FPolicy file activity pipeline end-to-end: ONTAP file operation →
 
 - [ ] FSx for ONTAP file system deployed (Single-AZ or Multi-AZ)
 - [ ] CIFS-enabled SVM with at least one SMB share
-- [ ] VPC with private subnets (same as FSx ONTAP)
+- [ ] VPC with private subnets (same as FSx for ONTAP)
 - [ ] Private subnet egress: NAT Gateway or VPC endpoints (ECR, CloudWatch Logs, SQS)
 - [ ] ECR repository with FPolicy server image (`docker buildx build --platform linux/amd64`)
 - [ ] Datadog account with API key in Secrets Manager
 - [ ] ONTAP fsxadmin credentials accessible (Secrets Manager or direct)
-- [ ] Network path from Fargate subnet to FSx ONTAP data LIFs (TCP:9898)
+- [ ] Network path from Fargate subnet to FSx for ONTAP data LIFs (TCP:9898)
 
 ## PoC Scope
 

@@ -15,7 +15,7 @@ Ships Amazon FSx for NetApp ONTAP audit logs to Honeycomb via the Events Batch A
 ## Architecture
 
 ```
-FSx ONTAP → S3 Access Point → EventBridge → Lambda → Honeycomb Events Batch API
+FSx for ONTAP → S3 Access Point → EventBridge → Lambda → Honeycomb Events Batch API
 ```
 
 ## Prerequisites

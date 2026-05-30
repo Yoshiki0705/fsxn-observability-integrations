@@ -25,7 +25,7 @@
 
 ## 2つのデプロイパターン
 
-### パターン A: 既存 FSx ONTAP 環境に追加する（推奨）
+### パターン A: 既存 FSx for ONTAP 環境に追加する（推奨）
 
 既に FSx for ONTAP が稼働している環境に、監査ログ配信パイプラインを追加します。
 
@@ -36,7 +36,7 @@
 
 **手順**:
 1. [Step 1: 前提リソーススタックのデプロイ](#step-1-前提リソーススタックのデプロイ)
-2. [Step 2: FSx ONTAP 監査ログの有効化](#step-2-fsx-ontap-監査ログの有効化)
+2. [Step 2: FSx for ONTAP 監査ログの有効化](#step-2-fsx-ontap-監査ログの有効化)
 3. [Step 3: ログ配信の確認](#step-3-ログ配信の確認)
 4. [Step 4: ベンダー統合のデプロイ](#step-4-ベンダー統合のデプロイ)
 
@@ -152,11 +152,11 @@ aws cloudformation describe-stacks \
 
 重要な出力値:
 - `AccessPointArn` — ベンダー統合スタックの `S3AccessPointArn` パラメータに使用
-- `AuditLogBucketName` — FSx ONTAP 監査ログの出力先として設定
+- `AuditLogBucketName` — FSx for ONTAP 監査ログの出力先として設定
 
 ---
 
-## Step 2: FSx ONTAP 監査ログの有効化
+## Step 2: FSx for ONTAP 監査ログの有効化
 
 ### 方法 A: スクリプトを使用（推奨）
 
@@ -188,7 +188,7 @@ bash shared/scripts/ontap-audit-setup.sh \
 ### 方法 C: SSH で手動実行
 
 ```bash
-# FSx ONTAP 管理エンドポイントに SSH 接続
+# FSx for ONTAP 管理エンドポイントに SSH 接続
 ssh admin@<management-endpoint-ip>
 
 # ONTAP CLI で実行
@@ -205,7 +205,7 @@ vserver audit show -vserver svm-prod-01
 
 ### 監査ログの S3 配信設定
 
-FSx ONTAP の監査ログを S3 バケットに配信する方法は複数あります:
+FSx for ONTAP の監査ログを S3 バケットに配信する方法は複数あります:
 
 #### オプション 1: FSx 自動バックアップ + S3 エクスポート
 
@@ -223,12 +223,12 @@ aws datasync create-task \
   --name fsxn-audit-sync
 ```
 
-#### オプション 3: FSx ONTAP S3 Access Point 経由（推奨・最新）
+#### オプション 3: FSx for ONTAP S3 Access Point 経由（推奨・最新）
 
-FSx ONTAP の S3 Access Point 機能（2025年リリース）を使用すると、ボリュームデータに直接 S3 API でアクセスできます。監査ログボリュームに S3 Access Point をアタッチすることで、Lambda から直接読み取り可能です。
+FSx for ONTAP の S3 Access Point 機能（2025年リリース）を使用すると、ボリュームデータに直接 S3 API でアクセスできます。監査ログボリュームに S3 Access Point をアタッチすることで、Lambda から直接読み取り可能です。
 
 ```bash
-# FSx ONTAP ボリュームに S3 Access Point を作成
+# FSx for ONTAP ボリュームに S3 Access Point を作成
 # （FSx コンソールまたは API 経由）
 aws fsx create-data-repository-association \
   --file-system-id fs-0123456789abcdef0 \
@@ -242,7 +242,7 @@ aws fsx create-data-repository-association \
   --region ap-northeast-1
 ```
 
-> 📝 FSx ONTAP S3 Access Point は通常の S3 Access Point とは異なります。FSx ボリュームに直接アタッチされ、NFS/SMB データに S3 API でアクセスできる機能です。
+> 📝 FSx for ONTAP S3 Access Point は通常の S3 Access Point とは異なります。FSx ボリュームに直接アタッチされ、NFS/SMB データに S3 API でアクセスできる機能です。
 
 ---
 
@@ -357,7 +357,7 @@ aws cloudformation deploy \
 
 ### 監査ログが S3 に届かない
 
-1. **FSx ONTAP 側の確認**:
+1. **FSx for ONTAP 側の確認**:
    ```
    ssh admin@<endpoint>
    vserver audit show -vserver <svm-name> -fields state
@@ -395,7 +395,7 @@ aws cloudformation deploy \
 
 ## 参考リンク
 
-- [FSx ONTAP ファイルアクセス監査](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html)
+- [FSx for ONTAP ファイルアクセス監査](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html)
 - [S3 Access Points for FSx](https://aws.amazon.com/blogs/storage/bridge-legacy-and-modern-applications-with-amazon-s3-access-points-for-amazon-fsx/)
 - [Lambda で FSx ファイルをサーバーレス処理](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/tutorial-process-files-with-lambda.html)
 - [EventBridge で S3 イベントを使用](https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventBridge.html)

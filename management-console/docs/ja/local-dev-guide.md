@@ -199,7 +199,7 @@ http://localhost:3001/d-solo/<dashboard-uid>/<dashboard-slug>?orgId=1&panelId=<p
 
 ## ONTAP REST API モックの構築
 
-実際の FSx ONTAP がなくても、モック API サーバーで UI 操作を検証できます。
+実際の FSx for ONTAP がなくても、モック API サーバーで UI 操作を検証できます。
 
 ### json-server を使用する場合
 

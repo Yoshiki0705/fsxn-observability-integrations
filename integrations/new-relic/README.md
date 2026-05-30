@@ -13,7 +13,7 @@ Ships Amazon FSx for NetApp ONTAP audit logs to New Relic via the Log API. New R
 ## Architecture
 
 ```
-FSx ONTAP → S3 Bucket → S3 Access Point → EventBridge → Lambda → New Relic Log API v1
+FSx for ONTAP → S3 Bucket → S3 Access Point → EventBridge → Lambda → New Relic Log API v1
 ```
 
 ## Prerequisites

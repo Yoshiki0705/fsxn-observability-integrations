@@ -5,7 +5,7 @@
 Enterprise customers running Amazon FSx for NetApp ONTAP need to ship file access audit logs to their existing SIEM/Observability platform. The current approach requires EC2 instances running syslog-ng and vendor-specific forwarders — adding operational overhead, patching burden, and fixed monthly costs.
 
 **Common customer questions**:
-- "How do I get FSx ONTAP audit logs into Splunk/Datadog/Grafana without managing EC2?"
+- "How do I get FSx for ONTAP audit logs into Splunk/Datadog/Grafana without managing EC2?"
 - "Can I detect ransomware activity on my file shares in real-time?"
 - "How do I meet compliance requirements for file access auditing?"
 
@@ -14,7 +14,7 @@ Enterprise customers running Amazon FSx for NetApp ONTAP need to ship file acces
 Serverless log shipping pipeline using Lambda + EventBridge + S3 Access Points. No EC2 instances to manage.
 
 ```
-FSx ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Vendor API
+FSx for ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Vendor API
                                                                 (Datadog/Splunk/Grafana/etc.)
 ```
 
@@ -36,13 +36,13 @@ FSx ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Vendor AP
 ## Target Customer Profiles
 
 ### Profile A: Splunk Modernization
-- **Current state**: EC2 Universal Forwarder shipping FSx ONTAP logs to Splunk
+- **Current state**: EC2 Universal Forwarder shipping FSx for ONTAP logs to Splunk
 - **Pain point**: EC2 patching, agent updates, fixed cost
 - **Recommended path**: Splunk Serverless integration + EC2 migration guide
 - **PoC scope**: Deploy serverless stack in parallel, compare event parity for 48h
 
 ### Profile B: New Observability Platform
-- **Current state**: FSx ONTAP audit logs not shipped anywhere
+- **Current state**: FSx for ONTAP audit logs not shipped anywhere
 - **Pain point**: No visibility into file access patterns, compliance gaps
 - **Recommended path**: Start with free-tier vendor (New Relic 100GB/month or Grafana 50GB/month)
 - **PoC scope**: Deploy audit poller, confirm logs queryable, build first dashboard

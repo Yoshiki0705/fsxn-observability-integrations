@@ -103,14 +103,14 @@ The EMS webhook path exposes an API Gateway endpoint. Secure it:
 
 1. **API Key**: Require `x-api-key` header on all requests
 2. **WAF**: Attach AWS WAF with rate limiting (100 req/min recommended)
-3. **IP Allowlist**: Restrict to FSx ONTAP management IP range
+3. **IP Allowlist**: Restrict to FSx for ONTAP management IP range
 4. **Request Validation**: Validate EMS event schema before processing
 
 See [Webhook Security Guide](webhook-security.md) for detailed configuration.
 
 ## Audit Log Data Classification
 
-FSx ONTAP audit logs may contain:
+FSx for ONTAP audit logs may contain:
 
 | Data Type | Example | Sensitivity |
 |-----------|---------|-------------|

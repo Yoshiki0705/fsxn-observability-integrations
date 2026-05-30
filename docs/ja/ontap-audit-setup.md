@@ -283,7 +283,7 @@ vol autosize -vserver svm-prod-01 -volume audit_logs \
 監査を有効化し、最初のローテーション間隔を待った後、ローテーション済みログファイルが作成されていることを確認します：
 
 ```bash
-# SSH to FSx ONTAP CLI and list audit files
+# SSH to FSx for ONTAP CLI and list audit files
 vserver audit show -vserver svm-prod-01 -instance
 
 # List files in the audit volume

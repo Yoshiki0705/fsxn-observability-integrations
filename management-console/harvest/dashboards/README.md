@@ -1,10 +1,10 @@
-# Harvest Grafana Dashboards for FSx ONTAP
+# Harvest Grafana Dashboards for FSx for ONTAP
 
 This directory contains Grafana dashboard JSON files from the [NetApp Harvest](https://github.com/NetApp/harvest) project, customized for Amazon FSx for NetApp ONTAP monitoring via Amazon Managed Grafana (AMG).
 
-## Supported Harvest Dashboards for FSx ONTAP
+## Supported Harvest Dashboards for FSx for ONTAP
 
-NetApp Harvest provides 60+ pre-built Grafana dashboards for ONTAP. However, FSx for ONTAP is a managed service with limited access to certain subsystems. The following dashboards are **supported and recommended** for FSx ONTAP deployments.
+NetApp Harvest provides 60+ pre-built Grafana dashboards for ONTAP. However, FSx for ONTAP is a managed service with limited access to certain subsystems. The following dashboards are **supported and recommended** for FSx for ONTAP deployments.
 
 ### Dashboard Categories (Minimum 20 Required)
 
@@ -32,7 +32,7 @@ NetApp Harvest provides 60+ pre-built Grafana dashboards for ONTAP. However, FSx
 | | Disk Errors | `disk_errors.json` | Disk error counts and types |
 | | Disk Spare Count | `disk_spare_count.json` | Available spare disk inventory |
 
-### Dashboards NOT Supported on FSx ONTAP
+### Dashboards NOT Supported on FSx for ONTAP
 
 The following Harvest dashboards rely on features not available in FSx for ONTAP:
 
@@ -40,7 +40,7 @@ The following Harvest dashboards rely on features not available in FSx for ONTAP
 |-----------|--------|
 | Cluster Hardware | FSx manages hardware — no user access |
 | Shelf/Bay Status | Physical shelf management not exposed |
-| MetroCluster | Not available on FSx ONTAP |
+| MetroCluster | Not available on FSx for ONTAP |
 | FabricPool Tiering | FSx manages tiering internally |
 | Node-level CPU/Memory | Node metrics not exposed to users |
 | Cluster Peer | Cross-cluster peering managed by AWS |
@@ -102,13 +102,13 @@ If you have Harvest installed locally:
 harvest grafana export --directory ./dashboards/
 ```
 
-## Customizing Dashboards for FSx ONTAP
+## Customizing Dashboards for FSx for ONTAP
 
-After downloading, dashboards need customization to work with FSx ONTAP and AMP:
+After downloading, dashboards need customization to work with FSx for ONTAP and AMP:
 
 ### Step 1: Remove Unsupported Panels
 
-Some panels reference metrics not available on FSx ONTAP. Remove or hide them:
+Some panels reference metrics not available on FSx for ONTAP. Remove or hide them:
 
 ```bash
 # Use jq to remove panels referencing unsupported metrics
@@ -122,7 +122,7 @@ jq '
 ' input_dashboard.json > output_dashboard.json
 ```
 
-**Metrics to remove** (not available on FSx ONTAP):
+**Metrics to remove** (not available on FSx for ONTAP):
 - `node_cpu_*` — Node CPU metrics (managed by AWS)
 - `node_memory_*` — Node memory metrics (managed by AWS)
 - `shelf_*` — Physical shelf metrics
@@ -154,7 +154,7 @@ jq '
 
 ### Step 3: Adjust Variable Templates
 
-Harvest dashboards use template variables that may need adjustment for FSx ONTAP:
+Harvest dashboards use template variables that may need adjustment for FSx for ONTAP:
 
 ```bash
 # Update cluster variable to use FSx file system identifier
@@ -298,7 +298,7 @@ After running `import-dashboards.sh`, the script generates `panel-embed-urls.jso
 1. Verify Harvest is collecting metrics: check ECS task logs
 2. Verify AMP data source is configured correctly in AMG
 3. Check that the Prometheus query uses correct metric names
-4. Verify template variables match your FSx ONTAP cluster/SVM names
+4. Verify template variables match your FSx for ONTAP cluster/SVM names
 
 ### Panel embed returns 403
 
@@ -316,6 +316,6 @@ After running `import-dashboards.sh`, the script generates `panel-embed-urls.jso
 
 - [NetApp Harvest GitHub — Grafana Dashboards](https://github.com/NetApp/harvest/tree/main/grafana/dashboards)
 - [AWS Docs — Amazon Managed Grafana](https://docs.aws.amazon.com/grafana/latest/userguide/what-is-Amazon-Managed-Service-Grafana.html)
-- [AWS Docs — FSx ONTAP Monitoring](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring-overview.html)
+- [AWS Docs — FSx for ONTAP Monitoring](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring-overview.html)
 - [Grafana HTTP API — Dashboard](https://grafana.com/docs/grafana/latest/developers/http_api/dashboard/)
 - [Grafana Embedding — Solo Panel](https://grafana.com/docs/grafana/latest/dashboards/share-dashboards-panels/#embed-a-panel)

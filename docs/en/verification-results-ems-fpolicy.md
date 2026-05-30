@@ -12,7 +12,7 @@
 | Item | Value |
 |------|-------|
 | **AWS Region** | `ap-northeast-1` |
-| **FSx ONTAP File System ID** | `fs-0123456789abcdef0` (SINGLE_AZ_1) |
+| **FSx for ONTAP File System ID** | `fs-0123456789abcdef0` (SINGLE_AZ_1) |
 | **SVM Name** | `FPolicySMB` (svm-0123456789abcdef0), `FSxN_OnPre` (svm-0abcdef123456789a) |
 | **ONTAP Version** | `9.17.1P6` |
 

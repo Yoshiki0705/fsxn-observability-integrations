@@ -15,7 +15,7 @@ EC2-free integration that ships Amazon FSx for NetApp ONTAP audit logs to Datado
 ## Architecture
 
 ```
-FSx ONTAP audit volume → FSx ONTAP S3 Access Point → EventBridge Scheduler → Lambda → Datadog Logs API v2
+FSx for ONTAP audit volume → FSx for ONTAP S3 Access Point → EventBridge Scheduler → Lambda → Datadog Logs API v2
 ```
 
 ## Quick Deploy
@@ -72,6 +72,6 @@ aws cloudformation deploy \
 
 ## Important Notes
 
-- **FSx ONTAP S3 APs do NOT support S3 Event Notifications.** Lambda is invoked on a schedule (EventBridge Scheduler) and uses checkpointing to process only newly rotated files.
+- **FSx for ONTAP S3 APs do NOT support S3 Event Notifications.** Lambda is invoked on a schedule (EventBridge Scheduler) and uses checkpointing to process only newly rotated files.
 - **Internet-origin S3 APs** timed out with only a Gateway Endpoint in our environment. If Lambda is in a VPC, use NAT Gateway or create a VPC-origin AP.
 - Audit log format: EVTX or XML (configured via `vserver audit create -format {evtx|xml}`)

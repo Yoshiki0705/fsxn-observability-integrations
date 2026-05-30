@@ -1,6 +1,6 @@
 # Shared Python Utilities
 
-Common modules for all FSx ONTAP observability Lambda handlers.
+Common modules for all FSx for ONTAP observability Lambda handlers.
 
 ## Modules
 

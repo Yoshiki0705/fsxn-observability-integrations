@@ -10,7 +10,7 @@
 - **Lambda 関数名**: fsxn-splunk-log-shipper
 - **Splunk HEC エンドポイント**: <HEC エンドポイント URL>
 - **Splunk インデックス**: fsxn_audit
-- **FSx ONTAP ファイルシステム**: <ファイルシステム ID>
+- **FSx for ONTAP ファイルシステム**: <ファイルシステム ID>
 - **S3 Access Point**: <S3 Access Point ARN>
 - **HEC Token Secret ARN**: <Secrets Manager ARN>
 

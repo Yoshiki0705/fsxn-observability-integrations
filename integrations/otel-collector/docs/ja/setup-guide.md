@@ -137,7 +137,7 @@ Lambda 関数と関連リソースを AWS にデプロイします。
 
 | パラメータ | 説明 | 例 |
 |-----------|------|-----|
-| `S3AccessPointArn` | FSx ONTAP S3 AP の ARN | `arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit` |
+| `S3AccessPointArn` | FSx for ONTAP S3 AP の ARN | `arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit` |
 | `OtlpEndpoint` | OTel Collector エンドポイント | `http://collector:4318` |
 | `ApiKeySecretArn` | 認証トークンの Secret ARN（任意） | `arn:aws:secretsmanager:...` |
 | `ServiceName` | OTLP service.name 属性 | `fsxn-audit` |
@@ -199,7 +199,7 @@ Grafana Cloud Explore で以下のクエリを実行します：
 - データソース: Loki
 - クエリ: `{job="fsxn-audit"}`
 
-5分以内に FSx ONTAP 監査ログが表示されることを確認します。`event.type`、`user.name`、`fsxn.operation` 属性が含まれていることを確認してください。
+5分以内に FSx for ONTAP 監査ログが表示されることを確認します。`event.type`、`user.name`、`fsxn.operation` 属性が含まれていることを確認してください。
 
 ![Grafana Cloud ログ到着](../../../../docs/screenshots/02-grafana-logs-arrival.png)
 
@@ -210,7 +210,7 @@ Honeycomb の `fsxn-audit` データセットでクエリを実行します：
 - データセット: `fsxn-audit`
 - 時間範囲: 過去5分
 
-5分以内に FSx ONTAP 監査ログが表示されることを確認します。
+5分以内に FSx for ONTAP 監査ログが表示されることを確認します。
 
 ### 4. マルチバックエンド一貫性確認
 
@@ -343,7 +343,7 @@ curl -f http://localhost:13133/
 
 1. Datadog Logs UI にログインします
 2. 検索フィルタに `source:fsxn-audit` または `service:fsxn-ontap`（FPolicy の場合）を入力します
-3. FSx ONTAP ログが到着していることを確認します（5分以内）
+3. FSx for ONTAP ログが到着していることを確認します（5分以内）
 4. 構造化属性が含まれることを確認します：
    - **S3 監査ログ**: `event.type`、`user.name`、`fsxn.operation`、`client.address`、`fsxn.result`、`fsxn.path`
    - **FPolicy**: `client_ip`、`file_path`、`operation_type`、`volume_name`、`event_id`、`timestamp`、`file_size`、`svm`/`vserver`

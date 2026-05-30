@@ -1,6 +1,6 @@
 # ToolJet Workflow Exports
 
-Pre-built ToolJet workflow JSON files for FSx ONTAP management operations. These workflows provide a complete storage management UI when imported into ToolJet.
+Pre-built ToolJet workflow JSON files for FSx for ONTAP management operations. These workflows provide a complete storage management UI when imported into ToolJet.
 
 ## Workflows
 
@@ -26,11 +26,11 @@ Configure these in ToolJet Settings → Global Variables:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `ontap_base_url` | FSx ONTAP management endpoint (HTTPS) | `https://<management-ip>` |
+| `ontap_base_url` | FSx for ONTAP management endpoint (HTTPS) | `https://<management-ip>` |
 | `ontap_username` | ONTAP admin username | `fsxadmin` |
 | `ontap_password` | ONTAP admin password | (from Secrets Manager) |
 | `lambda_invoke_url` | S3 Copy Lambda invoke URL | (from CloudFormation stack output) |
-| `s3_access_point_arn` | FSx ONTAP S3 Access Point ARN | `arn:aws:s3:<region>:123456789012:accesspoint/<name>` |
+| `s3_access_point_arn` | FSx for ONTAP S3 Access Point ARN | `arn:aws:s3:<region>:123456789012:accesspoint/<name>` |
 
 ## Import Instructions
 
@@ -76,7 +76,7 @@ done
 After importing, configure the ONTAP REST API data source:
 
 1. Go to **Data Sources** → **FSxN ONTAP REST**
-2. Set the base URL to your FSx ONTAP management endpoint
+2. Set the base URL to your FSx for ONTAP management endpoint
 3. Configure Basic Auth with credentials from Secrets Manager
 4. Test the connection
 

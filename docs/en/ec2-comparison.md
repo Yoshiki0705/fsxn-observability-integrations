@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document compares two architecture patterns for delivering FSx for NetApp ONTAP audit logs to Splunk.
+This document compares two architecture patterns for delivering FSx for ONTAP audit logs to Splunk.
 
 - **EC2-Based Pattern**: syslog-ng + Splunk Universal Forwarder on an EC2 instance
 - **Serverless Pattern**: S3 Access Point + EventBridge + Lambda + Secrets Manager
@@ -31,14 +31,14 @@ https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on
 
 **Components:**
 - EC2 Instance (t3.medium): Hosts syslog-ng and Universal Forwarder
-- syslog-ng: Receives and parses syslog messages from FSx ONTAP
+- syslog-ng: Receives and parses syslog messages from FSx for ONTAP
 - Splunk Universal Forwarder: Forwards parsed logs to Splunk Cloud/Enterprise
 
 ### Serverless Pattern
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  FSx for ONTAP  │────▶│  FSx ONTAP       │────▶│  EventBridge    │
+│  FSx for ONTAP  │────▶│  FSx for ONTAP       │────▶│  EventBridge    │
 │  (Audit Logs)   │     │  S3 Access Point │     │  Scheduler      │
 └─────────────────┘     └──────────────────┘     └────────┬────────┘
                                                            │
@@ -50,7 +50,7 @@ https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on
 ```
 
 **Components:**
-- S3 Access Point: S3 API access layer for FSx ONTAP audit logs
+- S3 Access Point: S3 API access layer for FSx for ONTAP audit logs
 - EventBridge Scheduler: Invokes Lambda periodically (every 5 minutes)
 - Lambda: Retrieves, parses, and ships logs to Splunk HEC
 - Secrets Manager: Secure management of HEC token

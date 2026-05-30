@@ -25,7 +25,7 @@ Before deploying any vendor integration from this project, the following prerequ
 
 ## Two Deployment Patterns
 
-### Pattern A: Add to Existing FSx ONTAP Environment (Recommended)
+### Pattern A: Add to Existing FSx for ONTAP Environment (Recommended)
 
 Add the audit log delivery pipeline to an environment where FSx for ONTAP is already running.
 
@@ -36,7 +36,7 @@ Add the audit log delivery pipeline to an environment where FSx for ONTAP is alr
 
 **Steps**:
 1. [Step 1: Deploy Prerequisites Stack](#step-1-deploy-prerequisites-stack)
-2. [Step 2: Enable FSx ONTAP Audit Logging](#step-2-enable-fsx-ontap-audit-logging)
+2. [Step 2: Enable FSx for ONTAP Audit Logging](#step-2-enable-fsx-ontap-audit-logging)
 3. [Step 3: Verify Log Delivery](#step-3-verify-log-delivery)
 4. [Step 4: Deploy Vendor Integration](#step-4-deploy-vendor-integration)
 
@@ -152,11 +152,11 @@ aws cloudformation describe-stacks \
 
 Key outputs:
 - `AccessPointArn` — Use as `S3AccessPointArn` parameter in vendor stacks
-- `AuditLogBucketName` — Configure as FSx ONTAP audit log destination
+- `AuditLogBucketName` — Configure as FSx for ONTAP audit log destination
 
 ---
 
-## Step 2: Enable FSx ONTAP Audit Logging
+## Step 2: Enable FSx for ONTAP Audit Logging
 
 ### Method A: Use the Setup Script (Recommended)
 
@@ -188,7 +188,7 @@ bash shared/scripts/ontap-audit-setup.sh \
 ### Method C: Manual SSH
 
 ```bash
-# SSH to FSx ONTAP management endpoint
+# SSH to FSx for ONTAP management endpoint
 ssh admin@<management-endpoint-ip>
 
 # Execute in ONTAP CLI
@@ -205,7 +205,7 @@ vserver audit show -vserver svm-prod-01
 
 ### Audit Log S3 Delivery Options
 
-There are multiple ways to deliver FSx ONTAP audit logs to an S3 bucket:
+There are multiple ways to deliver FSx for ONTAP audit logs to an S3 bucket:
 
 #### Option 1: FSx Automatic Backups + S3 Export
 
@@ -222,12 +222,12 @@ aws datasync create-task \
   --name fsxn-audit-sync
 ```
 
-#### Option 3: FSx ONTAP S3 Access Point (Recommended, Latest)
+#### Option 3: FSx for ONTAP S3 Access Point (Recommended, Latest)
 
-FSx ONTAP S3 Access Points (released 2025) allow direct S3 API access to volume data. Attach an S3 Access Point to the audit log volume for direct Lambda read access.
+FSx for ONTAP S3 Access Points (released 2025) allow direct S3 API access to volume data. Attach an S3 Access Point to the audit log volume for direct Lambda read access.
 
 ```bash
-# Create S3 Access Point on FSx ONTAP volume
+# Create S3 Access Point on FSx for ONTAP volume
 # (via FSx Console or API)
 aws fsx create-data-repository-association \
   --file-system-id fs-0123456789abcdef0 \
@@ -241,7 +241,7 @@ aws fsx create-data-repository-association \
   --region ap-northeast-1
 ```
 
-> 📝 FSx ONTAP S3 Access Points differ from regular S3 Access Points. They attach directly to FSx volumes, providing S3 API access to NFS/SMB data.
+> 📝 FSx for ONTAP S3 Access Points differ from regular S3 Access Points. They attach directly to FSx volumes, providing S3 API access to NFS/SMB data.
 
 ---
 
@@ -356,7 +356,7 @@ aws cloudformation deploy \
 
 ### Audit logs not arriving in S3
 
-1. **Check FSx ONTAP side**:
+1. **Check FSx for ONTAP side**:
    ```
    ssh admin@<endpoint>
    vserver audit show -vserver <svm-name> -fields state
@@ -394,7 +394,7 @@ aws cloudformation deploy \
 
 ## References
 
-- [FSx ONTAP File Access Auditing](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html)
+- [FSx for ONTAP File Access Auditing](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html)
 - [S3 Access Points for FSx](https://aws.amazon.com/blogs/storage/bridge-legacy-and-modern-applications-with-amazon-s3-access-points-for-amazon-fsx/)
 - [Process Files Serverlessly with Lambda](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/tutorial-process-files-with-lambda.html)
 - [Using EventBridge with S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventBridge.html)

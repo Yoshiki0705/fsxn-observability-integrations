@@ -6,10 +6,10 @@ Setup guide for the serverless integration that ships Amazon FSx for NetApp ONTA
 
 ## Prerequisites
 
-- AWS Account (FSx ONTAP running)
+- AWS Account (FSx for ONTAP running)
 - Datadog Account (Logs feature enabled)
 - AWS CLI v2 configured
-- FSx ONTAP audit logs outputting to an S3 bucket
+- FSx for ONTAP audit logs outputting to an S3 bucket
 
 ## Step 1: Prepare Datadog API Key
 
@@ -33,7 +33,7 @@ aws secretsmanager create-secret \
 
 ## Step 2: Configure S3 Access Point
 
-Create an S3 Access Point for the FSx ONTAP audit log bucket (if not already created).
+Create an S3 Access Point for the FSx for ONTAP audit log bucket (if not already created).
 
 ```bash
 aws s3control create-access-point \
@@ -93,13 +93,13 @@ aws cloudformation deploy \
 2. Click **New Pipeline**
 3. Configuration:
    - **Filter**: `source:fsxn`
-   - **Name**: `FSx ONTAP Audit Logs`
+   - **Name**: `FSx for ONTAP Audit Logs`
 
 ### 4.2 Add Processors to Pipeline
 
 #### Grok Parser
 ```
-# Parse rule for FSx ONTAP audit logs
+# Parse rule for FSx for ONTAP audit logs
 fsxn_audit %{data:attributes}
 ```
 
@@ -124,7 +124,7 @@ Register the following fields as Facets for easier searching:
 
 ### 4.4 Create Dashboard (Recommended)
 
-Create a Datadog dashboard for FSx ONTAP audit logs:
+Create a Datadog dashboard for FSx for ONTAP audit logs:
 
 - **Log Volume Trend**: Time series of `source:fsxn` log count
 - **Operations Breakdown**: Top list by `@attributes.operation`
@@ -135,10 +135,10 @@ Create a Datadog dashboard for FSx ONTAP audit logs:
 
 ### 5.1 Generate Test Events
 
-Perform file operations on FSx ONTAP:
+Perform file operations on FSx for ONTAP:
 
 ```bash
-# File operations on FSx ONTAP mount point
+# File operations on FSx for ONTAP mount point
 echo "test" > /mnt/fsxn/test-audit.txt
 cat /mnt/fsxn/test-audit.txt
 rm /mnt/fsxn/test-audit.txt

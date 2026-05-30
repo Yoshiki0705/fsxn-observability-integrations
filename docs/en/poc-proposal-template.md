@@ -87,7 +87,7 @@
 | Activity | Customer | Partner/SA | Vendor |
 |----------|----------|-----------|--------|
 | Provide AWS account access | **R/A** | C | — |
-| FSx ONTAP audit logging config | C | **R** | — |
+| FSx for ONTAP audit logging config | C | **R** | — |
 | Vendor account + API key | **R/A** | C | I |
 | CloudFormation deployment | I | **R/A** | — |
 | Delivery validation | C | **R** | I |

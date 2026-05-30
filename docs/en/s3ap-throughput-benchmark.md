@@ -24,7 +24,7 @@ This document provides a benchmark methodology and reference results for reading
 ### Test Script
 
 ```python
-"""S3 AP throughput benchmark for FSx ONTAP audit logs.
+"""S3 AP throughput benchmark for FSx for ONTAP audit logs.
 
 Run from Lambda or EC2 in the same region as the S3 Access Point.
 """

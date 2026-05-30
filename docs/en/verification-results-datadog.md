@@ -9,7 +9,7 @@
 - **CloudFormation Stack Name**: fsxn-datadog-integration
 - **Lambda Function Name**: fsxn-datadog-integration-shipper
 - **Datadog Site**: ap1.datadoghq.com (AP1 Tokyo)
-- **FSx ONTAP File System**: fs-0123456789abcdef0
+- **FSx for ONTAP File System**: fs-0123456789abcdef0
 - **S3 Access Point**: arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-observability
 
 ---
@@ -107,7 +107,7 @@ aws lambda invoke \
 
 - **Result**: ✅ Success
 
-- **Pipeline Name**: FSx ONTAP Audit Logs
+- **Pipeline Name**: FSx for ONTAP Audit Logs
 - **Filter**: `source:fsxn`
 - **Method**: Datadog UI (Logs → Configuration → Pipelines → New Pipeline)
 
@@ -119,7 +119,7 @@ aws lambda invoke \
 
 - **Result**: ✅ Success
 
-- **Dashboard Name**: FSx ONTAP Audit Log Overview
+- **Dashboard Name**: FSx for ONTAP Audit Log Overview
 - **Dashboard ID**: ggx-7ad-6e4
 - **Method**: Datadog Dashboard API (`POST /api/v1/dashboard`)
 - **Widgets**:
@@ -326,7 +326,7 @@ aws lambda invoke \
 | Fargate Task IP | 10.0.x.x |
 | SQS Queue | fsxn-fpolicy-server-fpolicy-queue |
 | Lambda Function | fsxn-datadog-ems-fpolicy-fpolicy |
-| FSx ONTAP SVM | FPolicySMB (svm-0123456789abcdef0) |
+| FSx for ONTAP SVM | FPolicySMB (svm-0123456789abcdef0) |
 | FPolicy Engine | fpolicy_aws_engine |
 | FPolicy Policy | fpolicy_aws (async, cifs) |
 | Monitored Volume | smb_test_vol |
