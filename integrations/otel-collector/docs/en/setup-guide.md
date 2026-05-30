@@ -137,7 +137,7 @@ Deploy the Lambda function and supporting resources to AWS.
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
-| `S3AccessPointArn` | FSx ONTAP S3 AP ARN | `arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit` |
+| `S3AccessPointArn` | FSx for ONTAP S3 AP ARN | `arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit` |
 | `OtlpEndpoint` | OTel Collector endpoint | `http://collector:4318` |
 | `ApiKeySecretArn` | Auth token Secret ARN (optional) | `arn:aws:secretsmanager:...` |
 | `ServiceName` | OTLP service.name attribute | `fsxn-audit` |
@@ -199,7 +199,7 @@ In Grafana Cloud Explore, run the following query:
 - Data source: Loki
 - Query: `{job="fsxn-audit"}`
 
-Confirm that FSx ONTAP audit logs appear within 5 minutes. Verify that `event.type`, `user.name`, and `fsxn.operation` attributes are present.
+Confirm that FSx for ONTAP audit logs appear within 5 minutes. Verify that `event.type`, `user.name`, and `fsxn.operation` attributes are present.
 
 ![Grafana Cloud log arrival](../../../../docs/screenshots/02-grafana-logs-arrival.png)
 
@@ -210,7 +210,7 @@ Query the `fsxn-audit` dataset in Honeycomb:
 - Dataset: `fsxn-audit`
 - Time range: Last 5 minutes
 
-Confirm that FSx ONTAP audit logs appear within 5 minutes.
+Confirm that FSx for ONTAP audit logs appear within 5 minutes.
 
 ### 4. Multi-Backend Consistency Check
 
@@ -343,7 +343,7 @@ curl -f http://localhost:13133/
 
 1. Log in to the Datadog Logs UI
 2. Enter `source:fsxn-audit` or `service:fsxn-ontap` (for FPolicy) in the search filter
-3. Confirm FSx ONTAP logs arrive within 5 minutes
+3. Confirm FSx for ONTAP logs arrive within 5 minutes
 4. Verify structured attributes are present:
    - **S3 Audit Logs**: `event.type`, `user.name`, `fsxn.operation`, `client.address`, `fsxn.result`, `fsxn.path`
    - **FPolicy**: `client_ip`, `file_path`, `operation_type`, `volume_name`, `event_id`, `timestamp`, `file_size`, `svm`/`vserver`

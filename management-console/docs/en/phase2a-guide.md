@@ -1,6 +1,6 @@
 # FSxN Management Console — Phase 2A Guide
 
-This guide covers the Phase 2A features added to the FSxN Management Console: ARP (Anti-Ransomware Protection) dashboard, snapshot restore workflow, FlexClone management, and multi-poller support for monitoring multiple FSx ONTAP file systems.
+This guide covers the Phase 2A features added to the FSxN Management Console: ARP (Anti-Ransomware Protection) dashboard, snapshot restore workflow, FlexClone management, and multi-poller support for monitoring multiple FSx for ONTAP file systems.
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@ Phase 2A extends the existing Phase 1 Management Console with four key capabilit
 | ARP Dashboard | Ransomware protection status visibility with alerts and one-click protective snapshots | 9.17+ |
 | Snapshot Restore | Full restore-from-snapshot workflow with confirmation and progress tracking | 9.8+ |
 | FlexClone Management | Create writable clones from volumes/snapshots with parent relationship visibility | 9.8+ |
-| Multi-Poller Support | Monitor up to 10 FSx ONTAP file systems from a single deployment | 9.8+ |
+| Multi-Poller Support | Monitor up to 10 FSx for ONTAP file systems from a single deployment | 9.8+ |
 
 All Phase 2A features are delivered as updates to existing CloudFormation stacks and new ToolJet workflow files. Existing Phase 1 functionality (volume management, SVM management, snapshot CRUD, replication management, S3 file browser) is fully preserved.
 
@@ -55,11 +55,11 @@ fsxn-mgmt-monitoring
 | FlexClone | 9.8+ | Standard ONTAP REST API |
 | Multi-Poller | 9.8+ | No version dependency (Harvest-side configuration) |
 
-> **Note**: If your FSx ONTAP file system runs a version earlier than 9.17, the ARP dashboard will display a notification indicating that ARP/AI features require ONTAP 9.17 or later. All other Phase 2A features will function normally.
+> **Note**: If your FSx for ONTAP file system runs a version earlier than 9.17, the ARP dashboard will display a notification indicating that ARP/AI features require ONTAP 9.17 or later. All other Phase 2A features will function normally.
 
 ### Multi-Poller Prerequisites (if monitoring multiple file systems)
 
-For each additional FSx ONTAP file system, prepare:
+For each additional FSx for ONTAP file system, prepare:
 
 1. **Management endpoint** — IP address or DNS name (port 443 accessible from private subnets)
 2. **Secrets Manager secret** — ONTAP admin credentials in JSON format:
@@ -153,7 +153,7 @@ Import the ARP dashboard into your AMG workspace:
 
 ## Multi-Poller Configuration
 
-Multi-poller support allows a single Harvest deployment to collect metrics from up to 10 FSx ONTAP file systems simultaneously.
+Multi-poller support allows a single Harvest deployment to collect metrics from up to 10 FSx for ONTAP file systems simultaneously.
 
 ### How It Works
 
@@ -382,7 +382,7 @@ The volume list displays additional metadata for FlexClone volumes:
 
 ## File System Selector
 
-When multiple FSx ONTAP file systems are configured, a file system selector appears in the navigation header.
+When multiple FSx for ONTAP file systems are configured, a file system selector appears in the navigation header.
 
 ### Behavior
 
@@ -494,9 +494,9 @@ aws logs tail /ecs/fsxn-mgmt-harvest --since 30m
 
 **Symptom**: ARP dashboard shows version requirement notification.
 
-**Cause**: The connected FSx ONTAP file system runs an ONTAP version earlier than 9.17.
+**Cause**: The connected FSx for ONTAP file system runs an ONTAP version earlier than 9.17.
 
-**Resolution**: Upgrade the FSx ONTAP file system to ONTAP 9.17 or later. ARP/AI features are not available on earlier versions.
+**Resolution**: Upgrade the FSx for ONTAP file system to ONTAP 9.17 or later. ARP/AI features are not available on earlier versions.
 
 #### "Data source unavailable"
 

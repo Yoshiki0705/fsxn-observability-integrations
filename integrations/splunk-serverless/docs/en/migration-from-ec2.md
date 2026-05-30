@@ -8,13 +8,13 @@ This guide helps you migrate from the [EC2-based Splunk integration](https://aws
 
 ```
 [Before: EC2-based]
-FSx ONTAP → syslog-ng (EC2) → Splunk Universal Forwarder (EC2) → Splunk Enterprise/Cloud
+FSx for ONTAP → syslog-ng (EC2) → Splunk Universal Forwarder (EC2) → Splunk Enterprise/Cloud
   - 2 EC2 instances to manage
   - OS patching, agent updates required
   - Fixed cost regardless of log volume
 
 [After: Serverless]
-FSx ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Splunk HEC
+FSx for ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Splunk HEC
   - Zero EC2 instances
   - No patching, no agent management
   - Pay-per-use (scales to zero)
@@ -28,7 +28,7 @@ FSx ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Splunk HE
 - [ ] Document current syslog-ng filter rules (what events are forwarded)
 - [ ] Confirm Splunk HEC is enabled and accessible
 - [ ] Create a new HEC token for the serverless integration
-- [ ] Verify FSx ONTAP audit logging is writing to S3 (via S3 Access Point)
+- [ ] Verify FSx for ONTAP audit logging is writing to S3 (via S3 Access Point)
 - [ ] Identify any custom field extractions or transforms in the UF
 
 ### Phase 2: Parallel Deployment (Day 2-3)
@@ -95,14 +95,14 @@ FSx ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Splunk HE
 If issues are discovered after cutover:
 
 1. Start the stopped EC2 instances (syslog-ng + UF)
-2. Verify syslog-ng is receiving events from FSx ONTAP
+2. Verify syslog-ng is receiving events from FSx for ONTAP
 3. Delete the serverless CloudFormation stack
 4. Investigate and resolve issues before re-attempting migration
 
 ## FAQ
 
 **Q: Can I run both pipelines simultaneously?**
-A: Yes. Use separate Splunk indexes during validation. Both can read from the same FSx ONTAP audit logs without conflict.
+A: Yes. Use separate Splunk indexes during validation. Both can read from the same FSx for ONTAP audit logs without conflict.
 
 **Q: Will I lose events during cutover?**
 A: No. The serverless Lambda uses checkpointing — it will process all audit log files from the last checkpoint forward. There may be brief duplicate events during the overlap period.

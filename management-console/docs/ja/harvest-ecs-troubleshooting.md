@@ -86,7 +86,7 @@ Pollers:
 | 単一コンテナ、複数ポーラー | ECS Fargate（コスト最適化） | カスタム（本プロジェクト） |
 | Kubernetes | K8s 環境 | [K8 install](https://netapp.github.io/harvest/nightly/install/k8/) |
 
-### FSx ONTAP 用 harvest.yml リファレンス
+### FSx for ONTAP 用 harvest.yml リファレンス
 
 ```yaml
 Pollers:
@@ -96,7 +96,7 @@ Pollers:
     auth_style: basic_auth
     username: fsxadmin
     password: <password>
-    use_insecure_tls: true    # FSx ONTAP に必須
+    use_insecure_tls: true    # FSx for ONTAP に必須
     collectors:
       - Rest
       - RestPerf
@@ -110,20 +110,20 @@ Exporters:
     port_range: 12990-12999
 
 Defaults:
-  use_insecure_tls: true      # FSx ONTAP に必須
+  use_insecure_tls: true      # FSx for ONTAP に必須
 ```
 
 重要ポイント:
-- `use_insecure_tls: true` は FSx ONTAP に**必須**（自己署名証明書のため）
+- `use_insecure_tls: true` は FSx for ONTAP に**必須**（自己署名証明書のため）
 - exporter の `addr: 0.0.0.0` はサイドカースクレイピングに必須
-- `collectors: [Rest, RestPerf]` — ZAPI は FSx ONTAP では非推奨
+- `collectors: [Rest, RestPerf]` — ZAPI は FSx for ONTAP では非推奨
 - `auth_style: basic_auth` で fsxadmin 認証情報を使用
 
 参考: [Amazon FSx for ONTAP — Harvest 準備](https://netapp.github.io/harvest/nightly/prepare-fsx-clusters/)
 
-### FSx ONTAP 対応ダッシュボード
+### FSx for ONTAP 対応ダッシュボード
 
-すべての Harvest ダッシュボードが FSx ONTAP で動作するわけではありません。以下が互換性確認済み:
+すべての Harvest ダッシュボードが FSx for ONTAP で動作するわけではありません。以下が互換性確認済み:
 
 - ONTAP: cDOT
 - ONTAP: Cluster
@@ -141,7 +141,7 @@ Defaults:
 - ONTAP: Volume by SVM
 - ONTAP: Volume Deep Dive
 
-参考: [FSx ONTAP — 対応 Harvest ダッシュボード](https://netapp.github.io/harvest/nightly/prepare-fsx-clusters/#supported-harvest-dashboards)
+参考: [FSx for ONTAP — 対応 Harvest ダッシュボード](https://netapp.github.io/harvest/nightly/prepare-fsx-clusters/#supported-harvest-dashboards)
 
 ### ECS 固有の考慮事項
 
@@ -169,6 +169,6 @@ Stack 3（observability）デプロイ前:
 
 - [ ] Stack 1 の VPC Endpoints が `available` 状態であること
 - [ ] Secrets Manager シークレットが存在し、有効な JSON を含むこと（`{"username": "fsxadmin", "password": "..."}`）
-- [ ] FSx ONTAP セキュリティグループが Harvest タスク SG からの TCP/443 インバウンドを許可していること
+- [ ] FSx for ONTAP セキュリティグループが Harvest タスク SG からの TCP/443 インバウンドを許可していること
 - [ ] Harvest イメージタグが存在すること（初回デプロイには `latest` 推奨）
 - [ ] プライベートサブネットに GHCR イメージプル用の NAT Gateway ルートがあること

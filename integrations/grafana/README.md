@@ -7,7 +7,7 @@
 ## Architecture
 
 ```
-FSx ONTAP → S3 Access Point → EventBridge → Lambda → Grafana Cloud OTLP Gateway
+FSx for ONTAP → S3 Access Point → EventBridge → Lambda → Grafana Cloud OTLP Gateway
                                                       (fallback: Loki Push API)
 ```
 

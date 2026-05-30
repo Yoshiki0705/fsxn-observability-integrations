@@ -9,7 +9,7 @@
 - AWS CLI v2 が設定済み（`ap-northeast-1` リージョン）
 - VPC、サブネット、セキュリティグループが存在すること
 - ECR に FPolicy サーバーイメージ（`v2-timeout-fix` タグ）がプッシュ済み
-- FSx ONTAP SVM のセキュリティグループが TCP:9898 のアウトバウンドを許可していること
+- FSx for ONTAP SVM のセキュリティグループが TCP:9898 のアウトバウンドを許可していること
 - `CAPABILITY_NAMED_IAM` を使用可能であること
 
 ## アーキテクチャ概要
@@ -170,7 +170,7 @@ aws ec2 describe-security-groups \
 ```
 
 **確認ポイント:**
-- TCP:9898 のインバウンドが FSx ONTAP SVM のセキュリティグループから許可されていること
+- TCP:9898 のインバウンドが FSx for ONTAP SVM のセキュリティグループから許可されていること
 
 ## 検証チェックリスト
 
@@ -199,7 +199,7 @@ aws ec2 describe-security-groups \
 ### セキュリティグループで接続が拒否される
 
 - **原因**: TCP:9898 のインバウンドルールが不足
-- **解決**: Fargate タスクの SG に FSx ONTAP SVM SG からの TCP:9898 を許可
+- **解決**: Fargate タスクの SG に FSx for ONTAP SVM SG からの TCP:9898 を許可
 
 ### EventBridge カスタムバスが作成されない
 

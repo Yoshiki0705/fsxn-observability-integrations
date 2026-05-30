@@ -21,7 +21,7 @@ CloudFormation StackSets を使用して、複数の AWS アカウントに FSx 
           Lambda + EventBridge + DLQ + Secrets Manager
 
 一元管理: StackSet 管理、クロスアカウントダッシュボード
-アカウント別: FSx ONTAP、S3 AP、ベンダー認証情報、監査データ
+アカウント別: FSx for ONTAP、S3 AP、ベンダー認証情報、監査データ
 ```
 
 ## 主要な設計判断

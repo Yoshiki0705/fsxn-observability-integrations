@@ -11,7 +11,7 @@
 │  │  S3 Bucket: Raw EVTX/XML audit logs                     │    │
 │  │  - Immutable (versioning + Object Lock)                  │    │
 │  │  - Complete (no filtering applied)                       │    │
-│  │  - Timestamped by FSx ONTAP                             │    │
+│  │  - Timestamped by FSx for ONTAP                             │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -150,7 +150,7 @@ git log --format="%H %ai %an %s" -- \
 ### Data Flow Documentation
 
 ```
-1. FSx ONTAP generates audit event
+1. FSx for ONTAP generates audit event
    → Timestamp: ONTAP system clock (NTP synced)
    → Format: EVTX or XML
 

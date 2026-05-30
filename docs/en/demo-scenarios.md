@@ -14,7 +14,7 @@ Detect unauthorized access attempts to confidential files and trigger real-time 
 ### Steps
 
 1. **Setup**: Datadog integration deployed
-2. **Action**: Access a restricted file on the FSx ONTAP mount point without permission
+2. **Action**: Access a restricted file on the FSx for ONTAP mount point without permission
    ```bash
    # Attempt to access a confidential file as an unauthorized user
    sudo -u testuser cat /mnt/fsxn/confidential/secret-report.pdf
@@ -108,7 +108,7 @@ Ship same audit logs to Grafana Cloud and Honeycomb simultaneously via OTel Coll
        logs:
          exporters: [otlp_http/grafana, otlp_http/honeycomb]
    ```
-2. **Action**: Perform file operations on FSx ONTAP
+2. **Action**: Perform file operations on FSx for ONTAP
 3. **Verify**:
    - Grafana: Explore → Loki → `{job="fsxn-audit"}`
    - Honeycomb: Dataset `fsxn-audit` → Query
@@ -172,7 +172,7 @@ Alert immediately when files with specific extensions (.exe, .bat, .ps1) are cre
 
 ## Demo Environment Checklist
 
-- [ ] FSx ONTAP file system running
+- [ ] FSx for ONTAP file system running
 - [ ] Audit logging enabled
 - [ ] S3 bucket + Access Point deployed
 - [ ] Target vendor integration stack deployed

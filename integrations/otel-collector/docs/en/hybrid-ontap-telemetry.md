@@ -53,17 +53,17 @@ ONTAP runs in multiple deployment models. This guide covers how to collect and n
 │  AWS Account                                                     │
 │                                                                  │
 │  ┌──────────────┐     ┌──────────────┐     ┌────────────────┐  │
-│  │ FSx ONTAP    │────▶│ S3 Bucket    │────▶│ Lambda         │  │
+│  │ FSx for ONTAP    │────▶│ S3 Bucket    │────▶│ Lambda         │  │
 │  │ (Audit logs) │     │ (Raw logs)   │     │ (Parse + OTLP) │  │
 │  └──────────────┘     └──────────────┘     └───────┬────────┘  │
 │                                                     │            │
 │  ┌──────────────┐     ┌──────────────┐             │            │
-│  │ FSx ONTAP    │────▶│ API Gateway  │────▶ Lambda ─┤            │
+│  │ FSx for ONTAP    │────▶│ API Gateway  │────▶ Lambda ─┤            │
 │  │ (EMS webhook)│     │              │             │            │
 │  └──────────────┘     └──────────────┘             │            │
 │                                                     │ OTLP/HTTP  │
 │  ┌──────────────┐     ┌──────────────┐             │            │
-│  │ FSx ONTAP    │────▶│ ECS Fargate  │────▶ SQS ──▶│ Lambda    │
+│  │ FSx for ONTAP    │────▶│ ECS Fargate  │────▶ SQS ──▶│ Lambda    │
 │  │ (FPolicy TCP)│     │ (FP Server)  │             │            │
 │  └──────────────┘     └──────────────┘             │            │
 │                                                     ▼            │
@@ -239,7 +239,7 @@ Option C: Dual Collector (recommended for hybrid)
                    │
      ┌─────────────┼─────────────┐
      │             │             │
-   FSx ONTAP    CVO ONTAP    On-Prem
+   FSx for ONTAP    CVO ONTAP    On-Prem
      │             │             │
      ▼             ▼             ▼
 ┌──────────┐ ┌──────────┐ ┌──────────────────────┐
@@ -297,7 +297,7 @@ Option C: Dual Collector (recommended for hybrid)
 | Enhancement | Status | Impact |
 |-------------|--------|--------|
 | ONTAP native OTLP export | Under discussion | Eliminates Lambda parsing layer |
-| FSx ONTAP S3 Event Notifications | Not available | Would replace polling with push |
+| FSx for ONTAP S3 Event Notifications | Not available | Would replace polling with push |
 | OTel Collector Kubernetes operator | Available | Simplifies on-prem/EKS deployment |
 | Collector config hot-reload | Available (0.100+) | Zero-downtime config changes |
 
@@ -317,7 +317,7 @@ For organizations running ONTAP across multiple clouds:
 
 ```
 ┌──────────┐  ┌──────────┐  ┌──────────┐
-│ FSx ONTAP│  │ CVO (AWS)│  │CVO(Azure)│
+│ FSx for ONTAP│  │ CVO (AWS)│  │CVO(Azure)│
 │ (AWS)    │  │          │  │          │
 └────┬─────┘  └────┬─────┘  └────┬─────┘
      │              │              │

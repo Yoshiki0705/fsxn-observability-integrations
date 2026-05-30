@@ -27,7 +27,7 @@ Phase 2A で追加される機能:
 | ARP ダッシュボード | Autonomous Ransomware Protection の状態可視化、アラート表示、保護スナップショット作成 |
 | スナップショットリストア | 確認ダイアログ付きのフルリストアワークフロー（ジョブポーリング対応） |
 | FlexClone 管理 | ボリューム/スナップショットからの書き込み可能クローン作成・一覧表示 |
-| マルチポーラー | 単一デプロイで複数の FSx ONTAP ファイルシステムを監視・管理 |
+| マルチポーラー | 単一デプロイで複数の FSx for ONTAP ファイルシステムを監視・管理 |
 
 ### 追加されるファイル
 
@@ -65,23 +65,23 @@ management-console/
 | リソース | 要件 | 備考 |
 |---------|------|------|
 | Secrets Manager シークレット | 各ファイルシステムに 1 つ | JSON 形式: `{"username": "fsxadmin", "password": "..."}` |
-| FSx ONTAP ファイルシステム | 1〜10 台 | 管理エンドポイント (port 443) にアクセス可能 |
+| FSx for ONTAP ファイルシステム | 1〜10 台 | 管理エンドポイント (port 443) にアクセス可能 |
 
 ### マルチファイルシステム用の Secrets Manager シークレット作成
 
-各 FSx ONTAP ファイルシステムに対応するシークレットを作成します:
+各 FSx for ONTAP ファイルシステムに対応するシークレットを作成します:
 
 ```bash
 # ファイルシステム 1
 aws secretsmanager create-secret \
   --name fsxn-mgmt-ontap-credentials-fs1 \
-  --description "FSx ONTAP credentials for file system 1" \
+  --description "FSx for ONTAP credentials for file system 1" \
   --secret-string '{"username": "fsxadmin", "password": "<password-1>"}'
 
 # ファイルシステム 2
 aws secretsmanager create-secret \
   --name fsxn-mgmt-ontap-credentials-fs2 \
-  --description "FSx ONTAP credentials for file system 2" \
+  --description "FSx for ONTAP credentials for file system 2" \
   --secret-string '{"username": "fsxadmin", "password": "<password-2>"}'
 ```
 
@@ -155,7 +155,7 @@ Phase 2A は以下の後方互換性を保証します:
 
 ## 新規デプロイ（マルチファイルシステム）
 
-複数の FSx ONTAP ファイルシステムを一括で監視・管理する場合の手順です。
+複数の FSx for ONTAP ファイルシステムを一括で監視・管理する場合の手順です。
 
 ### Step 1: 環境変数の設定
 
@@ -341,7 +341,7 @@ GET /api/cluster/jobs/{job_uuid}  (5秒ごとにポーリング)
 
 ### マルチポーラー / ファイルシステム切替
 
-単一デプロイで複数の FSx ONTAP ファイルシステムを監視・管理します。
+単一デプロイで複数の FSx for ONTAP ファイルシステムを監視・管理します。
 
 #### ファイルシステムセレクター
 
@@ -417,10 +417,10 @@ aws logs tail /ecs/fsxn-mgmt-tooljet --since 10m
 
 #### 「ARP/AI features require ONTAP 9.17 or later」と表示される
 
-**原因**: 接続先の FSx ONTAP ファイルシステムが ONTAP 9.17 未満
+**原因**: 接続先の FSx for ONTAP ファイルシステムが ONTAP 9.17 未満
 
 **解決策**:
-- FSx ONTAP のバージョンを確認: `GET /api/cluster` → `version.full`
+- FSx for ONTAP のバージョンを確認: `GET /api/cluster` → `version.full`
 - ARP/AI 機能を使用するには ONTAP 9.17 以降にアップグレードが必要
 - スナップショットリストアと FlexClone は 9.17 未満でも利用可能
 

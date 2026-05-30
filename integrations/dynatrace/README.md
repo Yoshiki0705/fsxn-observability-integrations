@@ -13,7 +13,7 @@ Ships Amazon FSx for NetApp ONTAP audit logs to Dynatrace via the Log Ingest API
 ## Architecture
 
 ```
-FSx ONTAP → S3 Access Point → EventBridge → Lambda → Dynatrace Log Ingest API v2
+FSx for ONTAP → S3 Access Point → EventBridge → Lambda → Dynatrace Log Ingest API v2
 ```
 
 ## Prerequisites

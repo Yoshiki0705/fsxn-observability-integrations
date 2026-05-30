@@ -4,7 +4,7 @@
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  FSx for ONTAP  │────▶│  FSx ONTAP       │────▶│  EventBridge    │
+│  FSx for ONTAP  │────▶│  FSx for ONTAP       │────▶│  EventBridge    │
 │  (Audit Logs)   │     │  S3 Access Point │     │  Scheduler      │
 └─────────────────┘     └──────────────────┘     └────────┬────────┘
                                                            │
@@ -16,6 +16,35 @@
 ```
 
 > **What "serverless" means in this series**: Minimizing server management and undifferentiated collector operations — not forcing every component into Lambda. FPolicy requires a persistent TCP listener, so we use ECS Fargate (serverless containers). Event decoupling uses SQS. Short-lived processing uses Lambda. Each AWS service is chosen for its operational characteristics, not to satisfy a "Lambda-only" constraint.
+
+## Three Telemetry Paths
+
+This project supports three ONTAP telemetry sources:
+
+### Path 1: Audit Logs (S3 AP + EventBridge Scheduler)
+```
+ONTAP Audit Logs → S3 Access Point → EventBridge Scheduler → Lambda → Vendor API
+```
+- **Use case**: Compliance file access history
+- **Latency**: Near-real-time (depends on Scheduler interval, typically 5 minutes)
+- **Format**: EVTX / XML
+
+### Path 2: EMS Events (Webhook)
+```
+ONTAP EMS → Webhook (HTTPS) → API Gateway → Lambda → Vendor API
+```
+- **Use case**: ARP ransomware detection, quota exceeded, HA failover, etc.
+- **Latency**: Real-time (~30 seconds)
+- **Format**: JSON
+
+### Path 3: FPolicy File Operations (ECS Fargate)
+```
+ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Vendor API
+```
+- **Use case**: Real-time file operation monitoring (create, write, rename, delete)
+- **Latency**: Real-time (~6-8 seconds)
+- **Format**: FPolicy binary protocol → JSON normalization
+- **Note**: FPolicy uses a proprietary binary protocol, so Lambda is not viable — ECS Fargate is required
 
 ## ONTAP Telemetry Source Selection Guide
 
@@ -29,7 +58,7 @@
 
 ## Component Details
 
-### 1. FSx for NetApp ONTAP Audit Logs
+### 1. FSx for ONTAP Audit Logs
 
 Enable audit logging on FSx for ONTAP to output logs to an audit volume inside the SVM.
 
@@ -105,8 +134,8 @@ This project uses Lambda → Vendor API direct because:
 
 ```yaml
 # Lambda execution role
-- s3:GetObject (FSx ONTAP S3 Access Point ARN only)
-- s3:ListBucket (FSx ONTAP S3 Access Point ARN only)
+- s3:GetObject (FSx for ONTAP S3 Access Point ARN only)
+- s3:ListBucket (FSx for ONTAP S3 Access Point ARN only)
 - secretsmanager:GetSecretValue (API Key Secret only)
 - dynamodb:GetItem, dynamodb:PutItem (checkpoint table only)
 - logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents
@@ -122,7 +151,7 @@ This project uses Lambda → Vendor API direct because:
 
 - Access FSx for ONTAP S3 Access Point via NAT Gateway (when Lambda is in VPC)
 - **Note**: Internet-origin S3 APs require NAT Gateway or VPC-external Lambda for VPC-internal access
-- Lambda placed outside VPC can access FSx ONTAP S3 AP without issues (recommended for read-only)
+- Lambda placed outside VPC can access FSx for ONTAP S3 AP without issues (recommended for read-only)
 - Security groups allow minimal outbound only
 
 ## Monitoring & Alerting

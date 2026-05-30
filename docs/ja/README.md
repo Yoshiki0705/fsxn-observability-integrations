@@ -11,7 +11,7 @@ Amazon FSx for NetApp ONTAP の監査ログ・メトリクスを、**FSx for ONT
 ## アーキテクチャパターン
 
 ```
-FSx ONTAP → 監査ログ有効化 → audit volume に出力
+FSx for ONTAP → 監査ログ有効化 → audit volume に出力
 audit volume → FSx for ONTAP S3 Access Point で S3 API アクセス
 EventBridge Scheduler → Lambda → ベンダー固有 API エンドポイントへ配信
 
@@ -49,6 +49,16 @@ FPolicy: ONTAP → TCP:9898 → ECS Fargate → SQS → Lambda → ベンダー 
 - ファイルアクセス行動の可視性向上
 - ONTAP ネイティブテレメトリを活用した迅速なセキュリティ対応
 
+## パートナーポジショニング
+
+本プロジェクトは、EC2 ベースの FSx for ONTAP 監査ログコレクターを EC2 不要のベンダーニュートラルな Observability パイプラインへモダナイズするパートナーを支援します。
+
+一般的な顧客シナリオ:
+- EC2 上の Splunk Universal Forwarder の置き換え
+- エンタープライズファイル共有の監査可視性モダナイゼーション（部門ファイルサーバー、SAP/Oracle/SQL Server 隣接共有などのアプリケーションインターフェースディレクトリ、VDI/EUC ホームディレクトリ、エンジニアリング・設計リポジトリ）
+- FSx for ONTAP と既存 SIEM / Observability プラットフォームの統合
+- ONTAP テレメトリを活用したランサムウェア検知ワークフローの準備
+
 ## クイックスタート
 
 ```bash
@@ -67,7 +77,7 @@ aws cloudformation deploy \
     FsxS3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
   --capabilities CAPABILITY_IAM
 
-# 4. FSx ONTAP 監査ログ有効化（ドライラン）
+# 4. FSx for ONTAP 監査ログ有効化（ドライラン）
 bash shared/scripts/ontap-audit-setup.sh \
   --endpoint <management-ip> --svm <svm-name> --dry-run
 
@@ -83,6 +93,48 @@ aws cloudformation deploy \
 ```
 
 > 📝 詳細な手順は [前提条件ガイド](prerequisites.md) を参照してください。
+
+## クイックバリデーション
+
+ベンダー統合スタックのデプロイ後:
+
+```bash
+# 1. Scheduler が Lambda を起動していることを確認
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/fsxn-datadog-integration-shipper \
+  --start-time $(python3 -c "import time; print(int((time.time()-300)*1000))") \
+  --region ap-northeast-1
+
+# 2. DLQ が空であることを確認（失敗イベントなし）
+aws sqs get-queue-attributes \
+  --queue-url <dlq-url> \
+  --attribute-names All \
+  --query 'Attributes.ApproximateNumberOfMessages'
+
+# 3. Observability プラットフォームで検索
+#    Datadog: source:fsxn
+#    Splunk:  index=fsxn_audit
+#    Grafana: {source="fsxn"}
+```
+
+## テアダウン
+
+```bash
+# ベンダー統合スタックの削除
+aws cloudformation delete-stack \
+  --stack-name fsxn-datadog-integration \
+  --region ap-northeast-1
+
+# 前提条件スタックの削除（他のベンダースタックが依存していない場合）
+aws cloudformation delete-stack \
+  --stack-name fsxn-observability-prerequisites \
+  --region ap-northeast-1
+
+# ONTAP 監査ログは有効なまま残ります — 必要に応じて個別に無効化:
+# vserver audit disable -vserver <svm-name>
+```
+
+> **注意**: スタックを削除しても、ONTAP 監査ログや FSx ボリューム上の既存データには影響しません。
 
 ## ドキュメント
 

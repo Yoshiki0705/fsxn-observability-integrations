@@ -86,7 +86,7 @@ When the container exits before the logging driver can establish a connection, n
 | Single container, multiple pollers | ECS Fargate (cost optimization) | Custom (this project) |
 | Kubernetes | K8s environments | [K8 install](https://netapp.github.io/harvest/nightly/install/k8/) |
 
-### harvest.yml Reference for FSx ONTAP
+### harvest.yml Reference for FSx for ONTAP
 
 ```yaml
 Pollers:
@@ -96,7 +96,7 @@ Pollers:
     auth_style: basic_auth
     username: fsxadmin
     password: <password>
-    use_insecure_tls: true    # Required for FSx ONTAP
+    use_insecure_tls: true    # Required for FSx for ONTAP
     collectors:
       - Rest
       - RestPerf
@@ -110,20 +110,20 @@ Exporters:
     port_range: 12990-12999
 
 Defaults:
-  use_insecure_tls: true      # Required for FSx ONTAP
+  use_insecure_tls: true      # Required for FSx for ONTAP
 ```
 
 Key points:
-- `use_insecure_tls: true` is **required** for FSx ONTAP (self-signed certificates)
+- `use_insecure_tls: true` is **required** for FSx for ONTAP (self-signed certificates)
 - `addr: 0.0.0.0` in the exporter is required for sidecar scraping
-- `collectors: [Rest, RestPerf]` — ZAPI is deprecated for FSx ONTAP
+- `collectors: [Rest, RestPerf]` — ZAPI is deprecated for FSx for ONTAP
 - `auth_style: basic_auth` with fsxadmin credentials
 
 Reference: [Amazon FSx for ONTAP — Harvest Preparation](https://netapp.github.io/harvest/nightly/prepare-fsx-clusters/)
 
-### Supported Dashboards for FSx ONTAP
+### Supported Dashboards for FSx for ONTAP
 
-Not all Harvest dashboards work with FSx ONTAP. The following are confirmed compatible:
+Not all Harvest dashboards work with FSx for ONTAP. The following are confirmed compatible:
 
 - ONTAP: cDOT
 - ONTAP: Cluster
@@ -141,7 +141,7 @@ Not all Harvest dashboards work with FSx ONTAP. The following are confirmed comp
 - ONTAP: Volume by SVM
 - ONTAP: Volume Deep Dive
 
-Reference: [FSx ONTAP — Supported Harvest Dashboards](https://netapp.github.io/harvest/nightly/prepare-fsx-clusters/#supported-harvest-dashboards)
+Reference: [FSx for ONTAP — Supported Harvest Dashboards](https://netapp.github.io/harvest/nightly/prepare-fsx-clusters/#supported-harvest-dashboards)
 
 ### ECS-Specific Considerations
 
@@ -169,6 +169,6 @@ Before deploying Stack 3 (observability):
 
 - [ ] Stack 1 VPC Endpoints are in `available` state
 - [ ] Secrets Manager secret exists and contains valid JSON (`{"username": "fsxadmin", "password": "..."}`)
-- [ ] FSx ONTAP security group allows inbound TCP/443 from Harvest task security group
+- [ ] FSx for ONTAP security group allows inbound TCP/443 from Harvest task security group
 - [ ] Harvest image tag exists (`latest` recommended for initial deployment)
 - [ ] Private subnets have NAT Gateway route for GHCR image pull (or ECR VPC Endpoint for cached images)

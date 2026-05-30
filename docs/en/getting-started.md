@@ -10,7 +10,7 @@
 
 ## Setup Steps
 
-### 1. Enable FSx ONTAP Audit Logging
+### 1. Enable FSx for ONTAP Audit Logging
 
 Enable audit logging on the FSx for ONTAP console or CLI, and configure output to an S3 bucket.
 
@@ -50,7 +50,7 @@ aws cloudformation deploy \
 
 ### 4. Verify Operation
 
-Perform file operations on FSx ONTAP and verify logs are received on the vendor side.
+Perform file operations on FSx for ONTAP and verify logs are received on the vendor side.
 
 ## Next Steps
 

@@ -78,7 +78,7 @@ aws logs filter-log-events \
 **ファイル名**: `ontap-arp-status.png`
 
 **手順**:
-1. FSx ONTAP 管理エンドポイントに SSH 接続:
+1. FSx for ONTAP 管理エンドポイントに SSH 接続:
    ```bash
    ssh admin@management.fs-0123456789abcdef0.fsx.ap-northeast-1.amazonaws.com
    ```
@@ -95,7 +95,7 @@ aws logs filter-log-events \
 **ファイル名**: `ontap-arp-snapshot.png`
 
 **手順**:
-1. FSx ONTAP 管理エンドポイントに SSH 接続（上記と同じ）
+1. FSx for ONTAP 管理エンドポイントに SSH 接続（上記と同じ）
 2. 以下のコマンドを実行:
    ```
    volume snapshot show -snapshot Anti_ransomware*

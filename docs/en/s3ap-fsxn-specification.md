@@ -1,4 +1,4 @@
-# FSx ONTAP S3 Access Points Specification
+# FSx for ONTAP S3 Access Points Specification
 
 ## Overview
 
@@ -10,7 +10,7 @@ Specification, constraints, and troubleshooting knowledge for FSx for ONTAP S3 A
 
 ### Root Cause
 
-**Internet-origin FSx ONTAP S3 Access Points timed out when accessed from VPC Lambda with only a Gateway Endpoint (observed in our environment).**
+**Internet-origin FSx for ONTAP S3 Access Points timed out when accessed from VPC Lambda with only a Gateway Endpoint (observed in our environment).**
 
 AWS [documents](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html) that VPC-origin access points work with Gateway Endpoints for traffic originating within the bound VPC. For Internet-origin APs, NAT Gateway or VPC-external Lambda is required.
 
@@ -169,7 +169,7 @@ aws s3control get-access-point-policy --account-id <account> --name <ap-name>
 ### Symptom: ListObjectsV2 returns empty results
 
 **Possible causes**:
-- Incorrect prefix (FSx ONTAP path structure does not start with `/`)
+- Incorrect prefix (FSx for ONTAP path structure does not start with `/`)
 - S3 AP network origin is `VPC` and Lambda is in a different VPC
 
 ---
@@ -192,8 +192,31 @@ aws s3control get-access-point-policy --account-id <account> --name <ap-name>
 
 ## References
 
-- [AWS Docs — FSx ONTAP S3 AP API Support](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)
+- [AWS Docs — FSx for ONTAP S3 AP API Support](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)
 - [AWS Docs — Managing S3 AP Access](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html)
 - [AWS Blog — S3 Access Points for FSx](https://aws.amazon.com/blogs/storage/bridge-legacy-and-modern-applications-with-amazon-s3-access-points-for-amazon-fsx/)
 - [AWS Docs — Process files with Lambda](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/tutorial-process-files-with-lambda.html)
 - [AWS Blog — AI-powered analytics with S3 AP + AD](https://aws.amazon.com/blogs/storage/enabling-ai-powered-analytics-on-enterprise-file-data-configuring-s3-access-points-for-amazon-fsx-for-netapp-ontap-with-active-directory/)
+
+---
+
+## 8. FSx for ONTAP S3 Access Points — Constraints & Validated Patterns
+
+For the comprehensive compatibility matrix, validated patterns, and known constraints (confirmed with AWS Support, May 2026), refer to:
+
+📋 **[FSx for ONTAP S3 AP Compatibility Matrix](https://github.com/Yoshiki0705/fsxn-lakehouse-integrations/blob/main/docs/en/compatibility-matrix.md)**
+
+Key constraints relevant to this project:
+
+| Constraint | Impact | Workaround |
+|-----------|--------|-----------|
+| No conditional writes (If-None-Match) | Delta Lake/Iceberg/Hudi transactional writes blocked | Read-only analytics or DataSync → S3 for write workloads |
+| No S3 Event Notifications | Snowpipe auto-ingest, Auto Loader file notification mode unavailable | FPolicy → Lambda, scheduled polling, or Snowpipe REST API |
+| No SnapMirror S3 | Cannot replicate ONTAP S3 bucket to AWS S3 | Use DataSync (NFS → S3) as validated sync mechanism |
+| ListObjectsV2 higher latency | 30-80x slower than native S3 for small directories | Pre-generate file lists, use larger file sizes, or cache results |
+| SSE-FSX encryption only | SSE-S3, SSE-KMS, SSE-C not supported | Use default SSE-FSX (transparent, AWS KMS managed) |
+| No Object Versioning | S3 versioning not available | Use ONTAP Snapshot for point-in-time recovery |
+| Presigned URLs: Not officially supported | Works in practice but not guaranteed | Use for non-critical paths only; prefer IAM-based access |
+| ONTAP 9.17.1+ required | Minimum version for S3 Access Points | Verify FSx file system ONTAP version before deployment |
+
+For the full matrix including platform-specific compatibility (Athena, Glue, EMR, Databricks, Snowflake, Bedrock), see the [complete document](https://github.com/Yoshiki0705/fsxn-lakehouse-integrations/blob/main/docs/en/compatibility-matrix.md).

@@ -22,7 +22,7 @@
 ## Architecture
 
 ```
-FSx ONTAP audit volume → S3 Access Point → EventBridge Scheduler → Lambda → Grafana Cloud OTLP Gateway
+FSx for ONTAP audit volume → S3 Access Point → EventBridge Scheduler → Lambda → Grafana Cloud OTLP Gateway
 ONTAP EMS → Webhook → API Gateway → Lambda → Grafana Cloud
 ONTAP FPolicy → ECS Fargate → SQS → Lambda → Grafana Cloud
 ```

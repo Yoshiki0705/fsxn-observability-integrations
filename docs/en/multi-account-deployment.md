@@ -21,7 +21,7 @@ Management Account
           Lambda + EventBridge + DLQ + Secrets Manager
 
 Centralized: StackSet management, cross-account dashboard
-Per-account: FSx ONTAP, S3 AP, vendor credentials, audit data
+Per-account: FSx for ONTAP, S3 AP, vendor credentials, audit data
 ```
 
 ## Key Design Decisions

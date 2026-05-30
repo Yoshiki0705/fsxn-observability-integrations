@@ -56,3 +56,7 @@ cdk.out/
 # Build artifacts
 *.zip
 *.tar.gz
+
+# NetApp Console screenshots (contain real resource IDs, require masking before commit)
+integrations/netapp-console/system-manager/screenshots/
+.playwright-mcp/

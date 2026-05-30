@@ -34,7 +34,7 @@ This project supports **three event sources** from FSx for ONTAP.
 
 ### Delivery Path
 ```
-FSx ONTAP (vserver audit) → S3 Bucket → EventBridge → Lambda → Vendor API
+FSx for ONTAP (vserver audit) → S3 Bucket → EventBridge → Lambda → Vendor API
 ```
 
 ### Configuration
@@ -90,10 +90,10 @@ event notification create -filter-name arp-and-quota \
 
 #### Pattern B: CloudWatch → EventBridge → Lambda
 
-FSx ONTAP publishes EMS events as CloudWatch Events.
+FSx for ONTAP publishes EMS events as CloudWatch Events.
 
 ```
-FSx ONTAP EMS → CloudWatch Events → EventBridge Rule → Lambda → Vendor API
+FSx for ONTAP EMS → CloudWatch Events → EventBridge Rule → Lambda → Vendor API
 ```
 
 **EventBridge Rule Example:**
@@ -107,7 +107,7 @@ FSx ONTAP EMS → CloudWatch Events → EventBridge Rule → Lambda → Vendor A
 }
 ```
 
-References: [AWS Docs - Monitoring FSx ONTAP](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring_overview.html) | [EMS alerts for ARP](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/EMS-ARP.html)
+References: [AWS Docs - Monitoring FSx for ONTAP](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring_overview.html) | [EMS alerts for ARP](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/EMS-ARP.html)
 
 ---
 
@@ -130,7 +130,7 @@ A custom FPolicy server container handles the TCP protocol translation and deliv
 
 ```
 ┌──────────────┐     TCP:9898      ┌──────────────────┐
-│ FSx ONTAP    │ ─────────────────→ │ ECS Fargate      │
+│ FSx for ONTAP    │ ─────────────────→ │ ECS Fargate      │
 │ FPolicy      │  (direct connect) │ FPolicy Server   │
 └──────────────┘                    └────────┬─────────┘
                                              │ SQS SendMessage

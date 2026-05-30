@@ -8,7 +8,7 @@
 
 Serverless alternative to the [EC2-based Splunk integration](https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on-amazon-fsx-for-netapp-ontap-using-splunk/) that uses syslog-ng + Universal Forwarder on EC2 instances.
 
-This integration ships FSx ONTAP audit logs directly to Splunk via HTTP Event Collector (HEC), eliminating the need for EC2 instances.
+This integration ships FSx for ONTAP audit logs directly to Splunk via HTTP Event Collector (HEC), eliminating the need for EC2 instances.
 
 **PoC time estimate**: ~30 minutes from deploy to first queryable event in Splunk (assumes HEC is already configured).
 
@@ -20,10 +20,10 @@ See [Prerequisites Guide](../../docs/en/prerequisites.md) for ONTAP audit loggin
 
 ```
 [Existing: EC2-based]
-FSx ONTAP → syslog-ng (EC2) → Splunk UF (EC2) → Splunk Enterprise
+FSx for ONTAP → syslog-ng (EC2) → Splunk UF (EC2) → Splunk Enterprise
 
 [This project: Serverless]
-FSx ONTAP → S3 Access Point → EventBridge → Lambda → Splunk HEC
+FSx for ONTAP → S3 Access Point → EventBridge → Lambda → Splunk HEC
 ```
 
 ### Alternative: Firehose Path (High Volume)
@@ -31,7 +31,7 @@ FSx ONTAP → S3 Access Point → EventBridge → Lambda → Splunk HEC
 For sustained high-volume logs (>1000 events/sec), use Kinesis Data Firehose with its built-in Splunk destination:
 
 ```
-FSx ONTAP → S3 AP → Lambda (transform) → Kinesis Data Firehose → Splunk HEC
+FSx for ONTAP → S3 AP → Lambda (transform) → Kinesis Data Firehose → Splunk HEC
 ```
 
 ## Quick Deploy

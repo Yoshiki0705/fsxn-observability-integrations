@@ -1,4 +1,4 @@
-# FSx ONTAP S3 Access Points 仕様書
+# FSx for ONTAP S3 Access Points 仕様書
 
 ## 概要
 
@@ -10,7 +10,7 @@
 
 ### 根本原因
 
-**Internet-origin の FSx ONTAP S3 Access Points は、VPC 内から Gateway Endpoint のみではアクセスできませんでした（本環境での観察結果）。**
+**Internet-origin の FSx for ONTAP S3 Access Points は、VPC 内から Gateway Endpoint のみではアクセスできませんでした（本環境での観察結果）。**
 
 AWS [ドキュメント](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)によると、VPC-origin の S3 AP は Gateway Endpoint で動作します。Internet-origin AP の場合は NAT Gateway または VPC 外 Lambda が必要です。
 
@@ -172,7 +172,7 @@ aws s3control get-access-point-policy --account-id <account> --name <ap-name>
 ### 症状: ListObjectsV2 が空の結果を返す
 
 **原因候補**:
-- Prefix が間違っている（FSx ONTAP のパス構造は `/` 始まりではない）
+- Prefix が間違っている（FSx for ONTAP のパス構造は `/` 始まりではない）
 - S3 AP の network origin が `VPC` で、Lambda が別 VPC にいる
 
 ---
@@ -195,8 +195,55 @@ aws s3control get-access-point-policy --account-id <account> --name <ap-name>
 
 ## 参考リンク
 
-- [AWS Docs — FSx ONTAP S3 AP API Support](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)
+- [AWS Docs — FSx for ONTAP S3 AP API Support](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html)
 - [AWS Docs — Managing S3 AP Access](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/s3-ap-manage-access-fsxn.html)
 - [AWS Blog — S3 Access Points for FSx](https://aws.amazon.com/blogs/storage/bridge-legacy-and-modern-applications-with-amazon-s3-access-points-for-amazon-fsx/)
 - [AWS Docs — Process files with Lambda](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/tutorial-process-files-with-lambda.html)
 - [AWS Blog — AI-powered analytics with S3 AP + AD](https://aws.amazon.com/blogs/storage/enabling-ai-powered-analytics-on-enterprise-file-data-configuring-s3-access-points-for-amazon-fsx-for-netapp-ontap-with-active-directory/)
+
+---
+
+## 8. FSx for ONTAP S3 Access Points — 制約と検証済みパターン
+
+包括的な互換性マトリクス、検証済みパターン、既知の制約（2026年5月 AWS サポート確認済み）については以下を参照:
+
+📋 **[FSx for ONTAP S3 AP 互換性マトリクス](https://github.com/Yoshiki0705/fsxn-lakehouse-integrations/blob/main/docs/en/compatibility-matrix.md)**
+
+本プロジェクトに関連する主要な制約:
+
+| 制約 | 影響 | 回避策 |
+|------|------|--------|
+| 条件付き書き込み非対応 (If-None-Match) | Delta Lake/Iceberg/Hudi のトランザクション書き込み不可 | 読み取り専用分析、または DataSync → S3 で書き込みワークロード |
+| S3 Event Notifications 非対応 | Snowpipe 自動取り込み、Auto Loader ファイル通知モード不可 | FPolicy → Lambda、スケジュールポーリング、Snowpipe REST API |
+| SnapMirror S3 非対応 | ONTAP S3 バケットを AWS S3 にレプリケート不可 | DataSync (NFS → S3) を検証済み同期メカニズムとして使用 |
+| ListObjectsV2 高レイテンシー | 小ディレクトリでネイティブ S3 の 30-80 倍遅い | ファイルリスト事前生成、大ファイルサイズ使用、結果キャッシュ |
+| SSE-FSX 暗号化のみ | SSE-S3, SSE-KMS, SSE-C 非対応 | デフォルト SSE-FSX を使用（透過的、AWS KMS 管理） |
+| Object Versioning 非対応 | S3 バージョニング不可 | ONTAP Snapshot でポイントインタイムリカバリ |
+| Presigned URL: 公式非対応 | 実際には動作するが保証なし | 非クリティカルパスのみ使用、IAM ベースアクセスを推奨 |
+| ONTAP 9.17.1+ 必須 | S3 Access Points の最小バージョン | デプロイ前に FSx ファイルシステムの ONTAP バージョンを確認 |
+
+プラットフォーム固有の互換性（Athena, Glue, EMR, Databricks, Snowflake, Bedrock）を含む完全なマトリクスは[完全版ドキュメント](https://github.com/Yoshiki0705/fsxn-lakehouse-integrations/blob/main/docs/en/compatibility-matrix.md)を参照。
+
+
+---
+
+## 8. FSx for ONTAP S3 Access Points — 制約と検証済みパターン
+
+包括的な互換性マトリクス、検証済みパターン、既知の制約（2026年5月 AWS サポート確認済み）については、以下を参照してください:
+
+📋 **[FSx for ONTAP S3 AP 互換性マトリクス](https://github.com/Yoshiki0705/fsxn-lakehouse-integrations/blob/main/docs/en/compatibility-matrix.md)**
+
+本プロジェクトに関連する主要な制約:
+
+| 制約 | 影響 | 回避策 |
+|------|------|--------|
+| 条件付き書き込み非対応 (If-None-Match) | Delta Lake/Iceberg/Hudi のトランザクショナル書き込みがブロックされる | 読み取り専用分析、または DataSync → S3 で書き込みワークロード対応 |
+| S3 Event Notifications 非対応 | Snowpipe 自動取り込み、Auto Loader ファイル通知モード利用不可 | FPolicy → Lambda、スケジュールポーリング、または Snowpipe REST API |
+| SnapMirror S3 非対応 | ONTAP S3 バケットを AWS S3 にレプリケーション不可 | DataSync (NFS → S3) を検証済み同期メカニズムとして使用 |
+| ListObjectsV2 高レイテンシ | 小規模ディレクトリでネイティブ S3 比 30-80 倍遅い | ファイルリスト事前生成、大きなファイルサイズ使用、またはキャッシュ |
+| SSE-FSX 暗号化のみ | SSE-S3、SSE-KMS、SSE-C 非対応 | デフォルト SSE-FSX を使用（透過的、AWS KMS マネージド） |
+| Object Versioning 非対応 | S3 バージョニング利用不可 | ONTAP Snapshot でポイントインタイムリカバリ |
+| Presigned URL: 公式非対応 | 実際には動作するが保証なし | 非クリティカルパスのみで使用、IAM ベースアクセスを推奨 |
+| ONTAP 9.17.1+ 必須 | S3 Access Points の最小バージョン | デプロイ前に FSx ファイルシステムの ONTAP バージョンを確認 |
+
+プラットフォーム別互換性（Athena、Glue、EMR、Databricks、Snowflake、Bedrock）を含む完全なマトリクスは、[完全版ドキュメント](https://github.com/Yoshiki0705/fsxn-lakehouse-integrations/blob/main/docs/en/compatibility-matrix.md)を参照してください。

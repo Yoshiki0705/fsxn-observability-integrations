@@ -199,7 +199,7 @@ http://localhost:3001/d-solo/<dashboard-uid>/<dashboard-slug>?orgId=1&panelId=<p
 
 ## ONTAP REST API Mock Setup
 
-You can verify UI interactions without a real FSx ONTAP instance by using a mock API server.
+You can verify UI interactions without a real FSx for ONTAP instance by using a mock API server.
 
 ### Using json-server
 

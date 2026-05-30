@@ -17,10 +17,10 @@ This guide walks you through the following workflow:
 
 ## Prerequisites
 
-- AWS account (FSx ONTAP running)
+- AWS account (FSx for ONTAP running)
 - Grafana Cloud account (Free tier available: 50GB/month log ingestion)
 - AWS CLI v2 configured
-- FSx ONTAP audit logs outputting to an S3 bucket
+- FSx for ONTAP audit logs outputting to an S3 bucket
 - S3 Access Point created (see [Prerequisites](../../../../docs/en/prerequisites.md))
 
 ## Step 1: Prepare Grafana Cloud Credentials
@@ -130,7 +130,7 @@ aws cloudformation deploy \
 
 | Parameter | Required | Description | Example |
 |-----------|----------|-------------|---------|
-| `S3AccessPointArn` | ✅ | ARN of the S3 Access Point for FSx ONTAP audit logs | `arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap` |
+| `S3AccessPointArn` | ✅ | ARN of the S3 Access Point for FSx for ONTAP audit logs | `arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap` |
 | `GrafanaCredentialsSecretArn` | ✅ | ARN of the Secrets Manager secret containing Grafana Cloud credentials | `arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:grafana/fsxn-loki-credentials-AbCdEf` |
 | `LokiEndpoint` | ✅ | Grafana Cloud Loki endpoint URL | `https://logs-prod-us-central1.grafana.net` |
 | `S3BucketName` | ✅ | S3 bucket name where audit logs are stored | `your-fsxn-audit-log-bucket` |
@@ -177,7 +177,7 @@ Save the following JSON as `test-event.json`. It uses the S3 object creation not
 }
 ```
 
-> **Note**: Replace `bucket.name` and `object.key` with the actual audit log path. The `object.key` is the path to the audit log file output by FSx ONTAP.
+> **Note**: Replace `bucket.name` and `object.key` with the actual audit log path. The `object.key` is the path to the audit log file output by FSx for ONTAP.
 
 ### 3.2 Invoking the Lambda Function
 
@@ -465,7 +465,7 @@ rate({job="fsxn-audit"}[5m])
 
 ## Step 6: Dashboard Creation
 
-Leverage LogQL queries to create a visualization dashboard for FSx ONTAP audit logs. A dashboard composed of the following 4 panels provides an at-a-glance view of log volume trends, operation breakdown, user activity, and failure events.
+Leverage LogQL queries to create a visualization dashboard for FSx for ONTAP audit logs. A dashboard composed of the following 4 panels provides an at-a-glance view of log volume trends, operation breakdown, user activity, and failure events.
 
 ### Dashboard Creation Steps
 

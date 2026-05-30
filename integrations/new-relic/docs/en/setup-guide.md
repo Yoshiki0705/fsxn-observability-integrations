@@ -8,7 +8,7 @@ Setup guide for shipping FSx for ONTAP audit logs to New Relic Logs.
 
 ## Prerequisites
 
-- AWS Account (FSx ONTAP running)
+- AWS Account (FSx for ONTAP running)
 - New Relic Account (Logs enabled)
 - [Prerequisites stack](../../../docs/en/prerequisites.md) deployed
 
