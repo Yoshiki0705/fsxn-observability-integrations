@@ -91,3 +91,12 @@ For operations teams unfamiliar with CLI, these browser-based GUI operations ena
 - [ONTAP System Manager Guide](system-manager/)
 - [AWS Docs — FSx for ONTAP Management](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-resources-ontap-apps.html)
 - [NetApp Docs — System Manager](https://docs.netapp.com/us-en/ontap/concept_administration_overview.html)
+
+## Start Here
+
+1. Read [Part 14: System Manager Reality Check](https://dev.to/yoshikifujiwara/series/39759) (dev.to article)
+2. Capture evidence using [`evidence/README.md`](system-manager/evidence/README.md)
+3. Validate System Manager access via NetApp Console
+4. Validate FSA and audit configuration
+5. Validate EMS webhook path
+6. Review Splunk searches in [`integrations/splunk-serverless/searches/`](../splunk-serverless/searches/)
