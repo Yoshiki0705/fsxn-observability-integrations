@@ -22,7 +22,7 @@ This template helps organizations assemble compliance evidence for FSx for ONTAP
 ### 1. Data Flow Documentation
 
 **Required evidence**:
-- [ ] Architecture diagram showing data flow from FSx ONTAP to vendor
+- [ ] Architecture diagram showing data flow from FSx for ONTAP to vendor
 - [ ] Network path documentation (VPC, endpoints, NAT, internet)
 - [ ] Data classification of fields in transit (see [Data Classification Guide](data-classification.md))
 - [ ] Encryption in transit verification (TLS 1.2+ for all vendor APIs)

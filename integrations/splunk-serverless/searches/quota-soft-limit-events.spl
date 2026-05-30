@@ -1,0 +1,2 @@
+index=fsxn sourcetype=fsxn:ems event_name="wafl.quota.softlimit.exceeded"
+| table _time svm volume qtree user severity message

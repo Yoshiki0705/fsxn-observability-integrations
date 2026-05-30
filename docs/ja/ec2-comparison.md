@@ -2,7 +2,7 @@
 
 ## 概要
 
-本ドキュメントでは、FSx for NetApp ONTAP の監査ログを Splunk に配信する 2 つのアーキテクチャパターンを比較します。
+本ドキュメントでは、FSx for ONTAP の監査ログを Splunk に配信する 2 つのアーキテクチャパターンを比較します。
 
 - **EC2 ベースパターン**: EC2 インスタンス上の syslog-ng + Splunk Universal Forwarder
 - **サーバーレスパターン**: S3 Access Point + EventBridge + Lambda + Secrets Manager
@@ -31,14 +31,14 @@ https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on
 
 **コンポーネント構成:**
 - EC2 インスタンス (t3.medium): syslog-ng と Universal Forwarder をホスト
-- syslog-ng: FSx ONTAP からの syslog メッセージを受信・パース
+- syslog-ng: FSx for ONTAP からの syslog メッセージを受信・パース
 - Splunk Universal Forwarder: パースされたログを Splunk Cloud/Enterprise へ転送
 
 ### サーバーレスパターン
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  FSx for ONTAP  │────▶│  FSx ONTAP       │────▶│  EventBridge    │
+│  FSx for ONTAP  │────▶│  FSx for ONTAP       │────▶│  EventBridge    │
 │  (監査ログ)      │     │  S3 Access Point │     │  Scheduler      │
 └─────────────────┘     └──────────────────┘     └────────┬────────┘
                                                            │
@@ -50,7 +50,7 @@ https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on
 ```
 
 **コンポーネント構成:**
-- S3 Access Point: FSx ONTAP 監査ログへの S3 API アクセスレイヤー
+- S3 Access Point: FSx for ONTAP 監査ログへの S3 API アクセスレイヤー
 - EventBridge Scheduler: Lambda を定期起動（5分間隔）
 - Lambda: ログ取得・パース・Splunk HEC へ配信
 - Secrets Manager: HEC トークンの安全な管理

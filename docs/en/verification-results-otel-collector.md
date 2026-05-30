@@ -63,7 +63,7 @@
 | Item | Details |
 |------|---------|
 | Method | Search `service:fsxn-audit` in Datadog Logs UI (Past 15 Minutes) |
-| Expected | FSx ONTAP audit logs arrive within 5 minutes. Structured attributes present: `event.type`, `user.name`, `fsxn.operation`, `client.address`, `fsxn.result`, `fsxn.path` |
+| Expected | FSx for ONTAP audit logs arrive within 5 minutes. Structured attributes present: `event.type`, `user.name`, `fsxn.operation`, `client.address`, `fsxn.result`, `fsxn.path` |
 | Actual | **2 logs confirmed** in Datadog (May 18, 2026). Service: `fsxn-audit`. Structured attributes present: `event.type`, `user.name`, `fsxn.operation`, `client.address`, `fsxn.result`, `fsxn.path`, `fsxn.svm`, `cloud.provider`, `cloud.platform`. Status correctly mapped: INFO for Success, WARN for Failure. |
 | Verdict | ✅ PASS |
 | Screenshot | `docs/screenshots/03-datadog-otel-s3-audit-logs.png`, `docs/screenshots/04-datadog-otel-s3-audit-attributes.png` |

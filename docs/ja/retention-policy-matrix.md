@@ -79,7 +79,7 @@ Lambda -> Vendor (hot, 30-90 days) -> Vendor archive OR S3 Glacier (7 years)
 1 年超の保持が必要な規制には、デュアルパスを実装します：
 
 ```
-FSx ONTAP -> Lambda -> +-> Vendor (hot, 30-90 days) -- リアルタイムクエリ
+FSx for ONTAP -> Lambda -> +-> Vendor (hot, 30-90 days) -- リアルタイムクエリ
                        +-> S3 (archive, 7 years) -- コンプライアンス証拠
                                |
                                +-> S3 Standard (0-90 days)

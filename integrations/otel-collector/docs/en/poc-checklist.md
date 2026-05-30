@@ -12,7 +12,7 @@ Direct Send  →  Introduce Collector  →  Parallel Delivery  →  Compare  →
 
 Before starting the PoC, confirm all preconditions are met:
 
-- [ ] FSx ONTAP audit logging is enabled and producing logs to S3
+- [ ] FSx for ONTAP audit logging is enabled and producing logs to S3
 - [ ] S3 Access Point is configured and accessible from Lambda
 - [ ] At least one backend account is provisioned (Grafana/Honeycomb/Datadog)
 - [ ] Docker environment available for local Collector testing

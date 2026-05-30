@@ -56,7 +56,7 @@ If data localization required:
 
 If no strict localization:
   → Any vendor with acceptable security posture
-  → Prefer region closest to FSx ONTAP for latency
+  → Prefer region closest to FSx for ONTAP for latency
 ```
 
 ### Step 4: Document the decision

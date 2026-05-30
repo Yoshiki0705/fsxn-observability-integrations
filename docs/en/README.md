@@ -11,7 +11,7 @@ EC2-free observability integrations for Amazon FSx for NetApp ONTAP via FSx for 
 ## Architecture Pattern
 
 ```
-FSx ONTAP → Enable audit logging → Output to audit volume
+FSx for ONTAP → Enable audit logging → Output to audit volume
 audit volume → FSx for ONTAP S3 Access Point for S3 API access
 EventBridge Scheduler → Lambda → Vendor API endpoint
 
@@ -77,7 +77,7 @@ aws cloudformation deploy \
     FsxS3AccessPointArn=arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap \
   --capabilities CAPABILITY_IAM
 
-# 4. Enable FSx ONTAP audit logging (dry run)
+# 4. Enable FSx for ONTAP audit logging (dry run)
 bash shared/scripts/ontap-audit-setup.sh \
   --endpoint <management-ip> --svm <svm-name> --dry-run
 

@@ -1,4 +1,4 @@
-# CloudTrail Data Events as an Alternative Trigger for FSx ONTAP S3 Access Points
+# CloudTrail Data Events as an Alternative Trigger for FSx for ONTAP S3 Access Points
 
 ## Summary
 
@@ -25,7 +25,7 @@ arn:aws:s3:<region>:<account-id>:accesspoint/<access-point-name>/object/<key>
 ### NetApp Workload Factory Validation
 
 NetApp's Workload Factory product uses exactly this pattern for its **Journal table** feature:
-- CloudTrail data events capture S3 API calls on FSx ONTAP access points
+- CloudTrail data events capture S3 API calls on FSx for ONTAP access points
 - Events flow through CloudTrail → EventBridge → processing pipeline
 - This confirms the pattern works in production
 
@@ -43,7 +43,7 @@ Reference: [NetApp Workload Factory — Journal Table Setup](https://docs.netapp
 ## Architecture: CloudTrail → EventBridge → Lambda
 
 ```
-FSx ONTAP S3 Access Point
+FSx for ONTAP S3 Access Point
         │
         ▼ (GetObject/PutObject via S3 API)
    CloudTrail Trail
@@ -62,18 +62,18 @@ FSx ONTAP S3 Access Point
 
 ## CloudFormation Example
 
-The following snippet shows how to configure CloudTrail data events for an FSx ONTAP S3 Access Point and route them to a Lambda function via EventBridge:
+The following snippet shows how to configure CloudTrail data events for an FSx for ONTAP S3 Access Point and route them to a Lambda function via EventBridge:
 
 ```yaml
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  CloudTrail data events trigger for FSx ONTAP S3 Access Point.
+  CloudTrail data events trigger for FSx for ONTAP S3 Access Point.
   Alternative to EventBridge Scheduler polling pattern.
 
 Parameters:
   S3AccessPointArn:
     Type: String
-    Description: ARN of the FSx ONTAP S3 Access Point
+    Description: ARN of the FSx for ONTAP S3 Access Point
     # Example: arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-ap
 
   LogShipperFunctionArn:
@@ -108,7 +108,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: fsxn-s3ap-object-access
-      Description: Trigger Lambda on S3 GetObject via FSx ONTAP Access Point
+      Description: Trigger Lambda on S3 GetObject via FSx for ONTAP Access Point
       State: ENABLED
       EventPattern:
         source:
@@ -166,7 +166,7 @@ Stick with the EventBridge Scheduler polling pattern when:
 
 NetApp's Workload Factory provides a managed version of the CloudTrail-based pattern:
 - Automatically deploys CloudTrail trail, EventBridge rules, and processing pipeline
-- Captures user access events and object operations on FSx ONTAP S3 access points
+- Captures user access events and object operations on FSx for ONTAP S3 access points
 - Stores results in a queryable "Journal table" (DynamoDB)
 - Includes CloudWatch log groups for monitoring
 

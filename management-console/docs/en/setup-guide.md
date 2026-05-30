@@ -73,12 +73,12 @@ aws acm request-certificate \
 aws acm list-certificates --query "CertificateSummaryList[?DomainName=='fsxn-mgmt.example.com'].CertificateArn"
 ```
 
-### 5. FSx ONTAP Security Group
+### 5. FSx for ONTAP Security Group
 
-The FSx ONTAP file system's security group ID is required so that the deploy script can automatically add ingress rules allowing Harvest and ToolJet to access the management endpoint on port 443.
+The FSx for ONTAP file system's security group ID is required so that the deploy script can automatically add ingress rules allowing Harvest and ToolJet to access the management endpoint on port 443.
 
 ```bash
-# Find the FSx ONTAP security group ID
+# Find the FSx for ONTAP security group ID
 aws ec2 describe-network-interfaces \
   --filters "Name=description,Values=*FSx*" \
   --query "NetworkInterfaces[0].Groups[0].GroupId" \
@@ -223,14 +223,14 @@ All 14 parameters used across the 5 CloudFormation stacks:
 | 1 | `VpcId` | `AWS::EC2::VPC::Id` | Yes | — | Target VPC for all resources |
 | 2 | `PrivateSubnetIds` | `List<AWS::EC2::Subnet::Id>` | Yes | — | Private subnets (2+ AZs) for ECS tasks and Lambda |
 | 3 | `PublicSubnetIds` | `List<AWS::EC2::Subnet::Id>` | Yes | — | Public subnets (2+ AZs) for ALB and NAT Gateway |
-| 4 | `OntapManagementEndpoint` | `String` | Yes | — | FSx ONTAP management IP or DNS name |
+| 4 | `OntapManagementEndpoint` | `String` | Yes | — | FSx for ONTAP management IP or DNS name |
 | 5 | `OntapCredentialsSecretArn` | `String` | Yes | — | Secrets Manager ARN for ONTAP credentials |
 | 6 | `CognitoUserPoolId` | `String` | Yes | — | Cognito User Pool ID (created by auth stack) |
 | 7 | `CognitoAppClientId` | `String` | Yes | — | Cognito App Client ID (created by auth stack) |
 | 8 | `CognitoDomain` | `String` | Yes | — | Cognito hosted UI domain prefix |
 | 9 | `HarvestImageTag` | `String` | Yes | `latest` | NetApp Harvest container image tag |
 | 10 | `ToolJetImageTag` | `String` | Yes | `latest` | ToolJet container image tag |
-| 11 | `S3AccessPointArn` | `String` | Yes | — | FSx ONTAP S3 Access Point ARN |
+| 11 | `S3AccessPointArn` | `String` | Yes | — | FSx for ONTAP S3 Access Point ARN |
 | 12 | `MfaConfiguration` | `String` | Yes | `OPTIONAL` | MFA mode: `OFF` / `OPTIONAL` / `REQUIRED` |
 | 13 | `SessionDurationHours` | `Number` | Yes | `8` | Session duration (1–12 hours) |
 | 14 | `AlertSnsTopicArn` | `String` | No | `""` | SNS topic ARN for alarms (empty = create new) |
@@ -489,11 +489,11 @@ aws cloudformation deploy --template-file templates/observability.yaml \
   --capabilities CAPABILITY_NAMED_IAM
 ```
 
-#### FSx ONTAP Security Group Rules
+#### FSx for ONTAP Security Group Rules
 
 **Symptom**: Harvest or ToolJet cannot connect to ONTAP management endpoint (timeout or connection refused).
 
-**Cause**: The FSx ONTAP file system's security group does not allow inbound port 443 from the Harvest/ToolJet task security groups.
+**Cause**: The FSx for ONTAP file system's security group does not allow inbound port 443 from the Harvest/ToolJet task security groups.
 
 **Resolution**: Set `FSXN_SECURITY_GROUP_ID` and re-run deploy, or add the rule manually:
 
@@ -513,7 +513,7 @@ aws ec2 authorize-security-group-ingress \
 
 **Symptom**: Network stack enters `DELETE_FAILED` state with error `resource sg-xxx has a dependent object`.
 
-**Cause**: The FSx ONTAP security group still references the Harvest/ToolJet task security groups. CloudFormation cannot delete a security group that is referenced by another security group.
+**Cause**: The FSx for ONTAP security group still references the Harvest/ToolJet task security groups. CloudFormation cannot delete a security group that is referenced by another security group.
 
 **Resolution**: Set `FSXN_SECURITY_GROUP_ID` before running cleanup:
 

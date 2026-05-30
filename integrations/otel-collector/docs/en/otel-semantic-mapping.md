@@ -8,18 +8,18 @@
 |-----------|--------|------------------------|-------|
 | `service.name` | Config | [Service resource](https://opentelemetry.io/docs/specs/semconv/resource/#service) | Standard |
 | `cloud.provider` | Config | [Cloud resource](https://opentelemetry.io/docs/specs/semconv/resource/cloud/) | Standard (`aws`) |
-| `user.name` | FSx ONTAP `UserName` | General convention | Widely understood |
-| `client.address` | FSx ONTAP `ClientIP` | [Client attributes](https://opentelemetry.io/docs/specs/semconv/attributes-registry/client/) | Standard |
+| `user.name` | FSx for ONTAP `UserName` | General convention | Widely understood |
+| `client.address` | FSx for ONTAP `ClientIP` | [Client attributes](https://opentelemetry.io/docs/specs/semconv/attributes-registry/client/) | Standard |
 
 ### Project-Specific Attributes (fsxn.* namespace)
 
 | Attribute | Source | Why Not Standard | Notes |
 |-----------|--------|-----------------|-------|
-| `fsxn.operation` | FSx ONTAP `Operation` | ONTAP-specific operation names | Could map to `event.action` in future |
-| `fsxn.path` | FSx ONTAP `ObjectName` | ONTAP volume path semantics differ from `file.path` | Volume-relative path |
-| `fsxn.result` | FSx ONTAP `Result` | ONTAP-specific result values | Drives severity mapping |
-| `fsxn.svm` | FSx ONTAP `SVMName` | No standard for storage VM | NetApp-specific concept |
-| `event.type` | FSx ONTAP `EventID` | Currently holds numeric ID (4663) | Consider `event.id` or `fsxn.event_id` in future |
+| `fsxn.operation` | FSx for ONTAP `Operation` | ONTAP-specific operation names | Could map to `event.action` in future |
+| `fsxn.path` | FSx for ONTAP `ObjectName` | ONTAP volume path semantics differ from `file.path` | Volume-relative path |
+| `fsxn.result` | FSx for ONTAP `Result` | ONTAP-specific result values | Drives severity mapping |
+| `fsxn.svm` | FSx for ONTAP `SVMName` | No standard for storage VM | NetApp-specific concept |
+| `event.type` | FSx for ONTAP `EventID` | Currently holds numeric ID (4663) | Consider `event.id` or `fsxn.event_id` in future |
 | `cloud.platform` | Config | `aws_fsx` is not in standard enum | Project-specific marker |
 
 ## Schema Evolution Considerations

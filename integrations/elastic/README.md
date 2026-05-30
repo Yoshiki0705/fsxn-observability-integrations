@@ -13,7 +13,7 @@ Ships Amazon FSx for NetApp ONTAP audit logs to Elasticsearch via the Bulk API. 
 ## Architecture
 
 ```
-FSx ONTAP → S3 Access Point → EventBridge → Lambda → Elasticsearch Bulk API
+FSx for ONTAP → S3 Access Point → EventBridge → Lambda → Elasticsearch Bulk API
 ```
 
 ## Prerequisites

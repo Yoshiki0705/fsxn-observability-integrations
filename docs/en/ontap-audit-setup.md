@@ -283,7 +283,7 @@ vol autosize -vserver svm-prod-01 -volume audit_logs \
 After enabling auditing and waiting for the first rotation interval, verify that rotated log files are being created:
 
 ```bash
-# SSH to FSx ONTAP CLI and list audit files
+# SSH to FSx for ONTAP CLI and list audit files
 vserver audit show -vserver svm-prod-01 -instance
 
 # List files in the audit volume

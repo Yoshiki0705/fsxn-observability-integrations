@@ -15,7 +15,7 @@ Ensure the following are ready before proceeding:
 - **AWS Account**: FSx for ONTAP running
 - **Splunk Account**: Splunk Enterprise or Splunk Cloud (HEC enabled)
 - **AWS CLI v2**: Configured (`aws configure` completed)
-- **FSx ONTAP Audit Logs**: Outputting to an S3 bucket
+- **FSx for ONTAP Audit Logs**: Outputting to an S3 bucket
 - **Prerequisites Stack**: [Prerequisites](../../../../docs/en/prerequisites.md) deployed
 
 ## Step 1: Create Splunk HEC Token
@@ -104,7 +104,7 @@ Verify the output is `CREATE_COMPLETE` or `UPDATE_COMPLETE`.
 
 | Parameter | Description |
 |-----------|-------------|
-| `S3AccessPointArn` | S3 Access Point ARN for FSx ONTAP audit logs |
+| `S3AccessPointArn` | S3 Access Point ARN for FSx for ONTAP audit logs |
 | `SplunkHecTokenSecretArn` | Secrets Manager ARN for the stored HEC token |
 | `SplunkHecEndpoint` | Splunk HEC endpoint URL (port 8088) |
 | `S3BucketName` | S3 bucket name where audit logs are output |

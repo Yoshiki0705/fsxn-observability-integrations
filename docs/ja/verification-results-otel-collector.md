@@ -63,7 +63,7 @@
 | 項目 | 内容 |
 |------|------|
 | 確認方法 | Datadog Logs UI で `service:fsxn-audit` を検索（Past 15 Minutes） |
-| 期待結果 | 5分以内に FSx ONTAP 監査ログが到着。構造化属性（`event.type`, `user.name`, `fsxn.operation`, `client.address`, `fsxn.result`, `fsxn.path`）が含まれる |
+| 期待結果 | 5分以内に FSx for ONTAP 監査ログが到着。構造化属性（`event.type`, `user.name`, `fsxn.operation`, `client.address`, `fsxn.result`, `fsxn.path`）が含まれる |
 | 実際の結果 | **2件のログを確認**（2026年5月18日）。Service: `fsxn-audit`。構造化属性あり: `event.type`, `user.name`, `fsxn.operation`, `client.address`, `fsxn.result`, `fsxn.path`, `fsxn.svm`, `cloud.provider`, `cloud.platform`。ステータスマッピング正常: Success→INFO, Failure→WARN |
 | 判定 | ✅ PASS |
 | スクリーンショット | `docs/screenshots/03-datadog-otel-s3-audit-logs.png`, `docs/screenshots/04-datadog-otel-s3-audit-attributes.png` |

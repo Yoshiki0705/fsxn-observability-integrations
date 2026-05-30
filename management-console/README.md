@@ -8,7 +8,7 @@
 
 Amazon FSx for NetApp ONTAP 向けのセルフホスト管理コンソールです。NetApp Data Infrastructure Insights および NetApp System Manager の主要機能を、AWS マネージドサービスのみで再現します。
 
-**30秒サマリー**: FSx ONTAP のストレージ性能メトリクスと管理操作を VPC 内で統合的に提供し、外部 SaaS へのデータ送信なしで MTTR を短縮します。
+**30秒サマリー**: FSx for ONTAP のストレージ性能メトリクスと管理操作を VPC 内で統合的に提供し、外部 SaaS へのデータ送信なしで MTTR を短縮します。
 
 | レイヤー | 目的 | コンポーネント |
 |---------|------|-------------|
@@ -47,13 +47,13 @@ The Management Console is a **2-layer architecture** deployed entirely within yo
 
 ## Value Proposition
 
-**30-second summary**: This console gives FSx ONTAP operators a unified view of storage performance + management operations within their VPC, without sending data to external SaaS platforms. It reduces MTTR for storage issues by combining real-time metrics with one-click remediation actions in a single pane of glass.
+**30-second summary**: This console gives FSx for ONTAP operators a unified view of storage performance + management operations within their VPC, without sending data to external SaaS platforms. It reduces MTTR for storage issues by combining real-time metrics with one-click remediation actions in a single pane of glass.
 
 ### Customer Question → Pattern → Business Outcome
 
 | Customer Question | Pattern | Expected Outcome |
 |-------------------|---------|-----------------|
-| "How do I monitor FSx ONTAP without NetApp Cloud SaaS?" | Harvest + AMP + AMG (Layer 1) | Real-time visibility into 50+ ONTAP metrics, 20+ dashboards, no data leaves VPC |
+| "How do I monitor FSx for ONTAP without NetApp Cloud SaaS?" | Harvest + AMP + AMG (Layer 1) | Real-time visibility into 50+ ONTAP metrics, 20+ dashboards, no data leaves VPC |
 | "How do I manage volumes/snapshots without ONTAP CLI?" | Appsmith/ToolJet + ONTAP REST API (Layer 2) | Self-service storage operations via web UI, 80% reduction in CLI dependency |
 | "How do I unify authentication across monitoring and management?" | Cognito + ALB authenticate action | Single login for all console components, MFA support, no custom auth code |
 | "How do I comply with data residency requirements?" | VPC-internal deployment, no external SaaS | All data stays within customer's AWS account and VPC |
@@ -134,7 +134,7 @@ graph TB
         end
     end
 
-    subgraph "FSx ONTAP"
+    subgraph "FSx for ONTAP"
         ONTAP[Management Endpoint :443]
         S3AP[S3 Access Point]
     end
@@ -201,7 +201,7 @@ The deploy script orchestrates all 5 stacks in dependency order, passing outputs
 | **ADOT Sidecar** | Scrapes Harvest `/metrics` endpoint, remote-writes to AMP with SigV4 auth. | `public.ecr.aws/aws-observability/aws-otel-collector` |
 | **Appsmith / ToolJet** | Low-code management UI for volume, SVM, snapshot, and replication operations. | `appsmith/appsmith-ce` or `tooljet/tooljet` |
 | **Amazon Managed Grafana** | 20+ pre-built Harvest dashboards. Embedded panels in management UI via iframe. | Managed service |
-| **S3 Copy Lambda** | Copies files from FSx ONTAP S3 AP to temp bucket for presigned URL generation (S3 AP does not support presigned URLs). | Python 3.12 |
+| **S3 Copy Lambda** | Copies files from FSx for ONTAP S3 AP to temp bucket for presigned URL generation (S3 AP does not support presigned URLs). | Python 3.12 |
 
 ## Cost Estimate
 
@@ -270,7 +270,7 @@ management-console/
 - An existing VPC with at least 2 AZs (public + private subnets)
 - An FSx for ONTAP file system with management endpoint accessible from the VPC
 - ONTAP admin credentials stored in Secrets Manager (JSON: `{"username": "...", "password": "..."}`)
-- (Optional) FSx ONTAP S3 Access Point for file browser functionality
+- (Optional) FSx for ONTAP S3 Access Point for file browser functionality
 - Docker (for local development only)
 
 ## Deployment
@@ -287,14 +287,14 @@ Full deployment guides with step-by-step instructions:
 | `VPC_ID` | Yes | Target VPC ID |
 | `PRIVATE_SUBNET_IDS` | Yes | Comma-separated private subnet IDs (2+ AZs) |
 | `PUBLIC_SUBNET_IDS` | Yes | Comma-separated public subnet IDs (2+ AZs) |
-| `ONTAP_MGMT_ENDPOINT` | Yes | FSx ONTAP management IP or DNS |
+| `ONTAP_MGMT_ENDPOINT` | Yes | FSx for ONTAP management IP or DNS |
 | `ONTAP_CREDENTIALS_SECRET_ARN` | Yes | Secrets Manager ARN for ONTAP credentials |
-| `S3_ACCESS_POINT_ARN` | Yes | FSx ONTAP S3 Access Point ARN |
+| `S3_ACCESS_POINT_ARN` | Yes | FSx for ONTAP S3 Access Point ARN |
 | `HARVEST_IMAGE_TAG` | No | Harvest image tag (default: `latest`) |
 | `TOOLJET_IMAGE_TAG` | No | ToolJet/Appsmith image tag (default: `latest`) |
 | `MFA_CONFIGURATION` | No | Cognito MFA mode: OFF/OPTIONAL/REQUIRED (default: `OPTIONAL`) |
 | `SESSION_DURATION_HOURS` | No | Session duration 1-12 (default: `8`) |
-| `FSXN_SECURITY_GROUP_ID` | No | FSx ONTAP file system SG ID (auto-adds access rules for task SGs) |
+| `FSXN_SECURITY_GROUP_ID` | No | FSx for ONTAP file system SG ID (auto-adds access rules for task SGs) |
 
 ## Local Development
 
@@ -360,7 +360,7 @@ bash scripts/cleanup.sh --stacks monitoring,console,observability
 | Dashboard platform | AMG (managed) | SAML/SSO integration, AMP native data source, no patching |
 | Authentication | Cognito + ALB | Native ALB integration, no custom auth code, session management built-in |
 | IaC | CloudFormation YAML | Project constraint — no CDK, no SAM build step |
-| S3 AP file download | Copy to temp bucket + presign | FSx ONTAP S3 APs do not support presigned URLs |
+| S3 AP file download | Copy to temp bucket + presign | FSx for ONTAP S3 APs do not support presigned URLs |
 | Network path for S3 AP | NAT Gateway | Internet-origin S3 APs require NAT for VPC-internal access (verified constraint) |
 | S3 AP network origin | Internet-origin (existing) | VPC-origin APs would eliminate NAT Gateway requirement but cannot be changed after creation. Document both paths. |
 | Container orchestration | ECS Fargate | Serverless containers, no EC2 management, existing project pattern |
@@ -399,15 +399,15 @@ The Harvest Docker image (`ghcr.io/netapp/harvest`) includes `/busybox/sh`, whic
 **Verified deployment pattern** (current `templates/observability.yaml`):
 - **`/busybox/sh` is available**: Use it as the entrypoint to write `harvest.yml` then `exec bin/poller`
 - **Correct CLI syntax**: `bin/poller --config harvest.yml -p <poller-name>` (NOT `start --config`)
-- **`use_insecure_tls: true` is REQUIRED**: FSx ONTAP uses a self-signed certificate with IP-based connection. Without this flag, TLS verification fails.
+- **`use_insecure_tls: true` is REQUIRED**: FSx for ONTAP uses a self-signed certificate with IP-based connection. Without this flag, TLS verification fails.
 - **Volume mount at `/opt/harvest` is safe**: When using `/busybox/sh` entrypoint (no shared volume needed)
 - **No init container needed**: Single container writes config then execs the poller binary
 
-**RestPerf counter availability**: The `RestPerf` collector gathers ONTAP performance counters, but not all counters are available on FSx ONTAP (managed service). Some Grafana dashboard panels may show "No data" for unsupported counters. See [AWS Docs](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring-harvest-grafana.html) for supported dashboards.
+**RestPerf counter availability**: The `RestPerf` collector gathers ONTAP performance counters, but not all counters are available on FSx for ONTAP (managed service). Some Grafana dashboard panels may show "No data" for unsupported counters. See [AWS Docs](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring-harvest-grafana.html) for supported dashboards.
 
 ### S3 Access Point Network Constraint
 
-FSx ONTAP S3 Access Points (Internet-origin) require NAT Gateway for access from VPC-internal resources. The S3 Gateway VPC Endpoint alone is insufficient. This is handled by Stack 1 (network) which provisions the NAT Gateway.
+FSx for ONTAP S3 Access Points (Internet-origin) require NAT Gateway for access from VPC-internal resources. The S3 Gateway VPC Endpoint alone is insufficient. This is handled by Stack 1 (network) which provisions the NAT Gateway.
 
 ### S3 Access Point Network Origin Selection
 
@@ -418,25 +418,25 @@ The NAT Gateway requirement depends on the S3 Access Point's network origin:
 | **Internet** (default) | Requires NAT Gateway | Yes | No |
 | **VPC** | Works with S3 Gateway Endpoint | No | No |
 
-If you are creating a NEW S3 Access Point for FSx ONTAP, consider using **VPC-origin** to eliminate the NAT Gateway cost (~$32/month + data transfer). However, VPC-origin APs can only be accessed from within the bound VPC.
+If you are creating a NEW S3 Access Point for FSx for ONTAP, consider using **VPC-origin** to eliminate the NAT Gateway cost (~$32/month + data transfer). However, VPC-origin APs can only be accessed from within the bound VPC.
 
 Reference: [AWS Docs — Configuring network access for S3 access points](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)
 
-### Harvest Dashboard Compatibility with FSx ONTAP
+### Harvest Dashboard Compatibility with FSx for ONTAP
 
-Not all Harvest dashboards work with FSx ONTAP. FSx is a managed service with limited access to certain subsystems:
+Not all Harvest dashboards work with FSx for ONTAP. FSx is a managed service with limited access to certain subsystems:
 
 **Supported** (20+ dashboards): Volume, Aggregate, SVM, Network, Compliance, Data Protection, LUN, Qtree, Security, SnapMirror, FlexCache, FlexGroup, NFS Clients, SMB, Workload
 
 **NOT Supported**: Disk, External Service Operation, FSA, Headroom, Health, MAV Request, MetroCluster, Power, Shelf, S3 Object Stores
 
-**Harvest API Load**: Harvest polls the ONTAP REST API every 60 seconds. For FSx ONTAP, this adds minimal load to the management endpoint. However, if monitoring multiple file systems from a single Harvest instance, consider the aggregate API call volume.
+**Harvest API Load**: Harvest polls the ONTAP REST API every 60 seconds. For FSx for ONTAP, this adds minimal load to the management endpoint. However, if monitoring multiple file systems from a single Harvest instance, consider the aggregate API call volume.
 
-Reference: [AWS Docs — Monitoring FSx ONTAP with Harvest](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring-harvest-grafana.html)
+Reference: [AWS Docs — Monitoring FSx for ONTAP with Harvest](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring-harvest-grafana.html)
 
-### FSx ONTAP Security Group Management
+### FSx for ONTAP Security Group Management
 
-The FSx ONTAP file system has its own security group that must allow inbound port 443 from the Harvest and ToolJet task security groups. This cannot be managed by the CloudFormation stacks (the FSx SG is external).
+The FSx for ONTAP file system has its own security group that must allow inbound port 443 from the Harvest and ToolJet task security groups. This cannot be managed by the CloudFormation stacks (the FSx SG is external).
 
 **Automated approach** (recommended): Set `FSXN_SECURITY_GROUP_ID` environment variable before running `deploy.sh`:
 ```bash
@@ -461,7 +461,7 @@ aws ec2 revoke-security-group-ingress \
   --source-group <harvest-task-sg-id>
 ```
 
-**Why this is needed**: CloudFormation cannot modify security groups owned by other stacks (the FSx ONTAP stack). If you delete the network stack without removing these cross-references, the deletion will fail with `DELETE_FAILED` on the task security group.
+**Why this is needed**: CloudFormation cannot modify security groups owned by other stacks (the FSx for ONTAP stack). If you delete the network stack without removing these cross-references, the deletion will fail with `DELETE_FAILED` on the task security group.
 
 ### VPC Endpoint DNS Propagation Timing
 
@@ -535,7 +535,7 @@ Each alarm links to a troubleshooting section in the setup guide:
 The Harvest container configuration has been fully validated:
 - **`/busybox/sh` is available** in the Harvest image — init container pattern is NOT needed
 - **Correct CLI syntax**: `bin/poller --config harvest.yml -p <poller-name>`
-- **`use_insecure_tls: true` is required** for FSx ONTAP (self-signed certificate, IP-based connection)
+- **`use_insecure_tls: true` is required** for FSx for ONTAP (self-signed certificate, IP-based connection)
 - **401 auth error with placeholder credentials** confirms the auth flow works — real Secrets Manager injection will resolve this
 - Volume mount at `/opt/harvest` is safe when using `/busybox/sh` entrypoint (no shared volume needed)
 - The template now uses a single container with `/busybox/sh -c` that writes config then `exec bin/poller`

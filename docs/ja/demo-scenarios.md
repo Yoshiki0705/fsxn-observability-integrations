@@ -14,7 +14,7 @@
 ### 手順
 
 1. **準備**: Datadog 統合をデプロイ済み
-2. **操作**: FSx ONTAP マウントポイントで権限のないファイルにアクセス
+2. **操作**: FSx for ONTAP マウントポイントで権限のないファイルにアクセス
    ```bash
    # 権限のないユーザーで機密ファイルにアクセス試行
    sudo -u testuser cat /mnt/fsxn/confidential/secret-report.pdf
@@ -108,7 +108,7 @@ OTel Collector を使って、同一の監査ログを Grafana Cloud と Honeyco
        logs:
          exporters: [otlp_http/grafana, otlp_http/honeycomb]
    ```
-2. **操作**: FSx ONTAP でファイル操作
+2. **操作**: FSx for ONTAP でファイル操作
 3. **確認**:
    - Grafana: Explore → Loki → `{job="fsxn-audit"}`
    - Honeycomb: Dataset `fsxn-audit` → Query
@@ -172,7 +172,7 @@ OTel Collector を使って、同一の監査ログを Grafana Cloud と Honeyco
 
 ## デモ環境セットアップチェックリスト
 
-- [ ] FSx ONTAP ファイルシステム稼働中
+- [ ] FSx for ONTAP ファイルシステム稼働中
 - [ ] 監査ログ有効化済み
 - [ ] S3 バケット + Access Point デプロイ済み
 - [ ] 対象ベンダー統合スタックデプロイ済み

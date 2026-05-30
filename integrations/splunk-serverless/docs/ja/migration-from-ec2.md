@@ -8,13 +8,13 @@
 
 ```
 [移行前: EC2 ベース]
-FSx ONTAP → syslog-ng (EC2) → Splunk Universal Forwarder (EC2) → Splunk Enterprise/Cloud
+FSx for ONTAP → syslog-ng (EC2) → Splunk Universal Forwarder (EC2) → Splunk Enterprise/Cloud
   - 2台の EC2 インスタンスを管理
   - OS パッチ適用、エージェント更新が必要
   - ログ量に関係なく固定コスト
 
 [移行後: サーバーレス]
-FSx ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Splunk HEC
+FSx for ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Splunk HEC
   - EC2 インスタンスゼロ
   - パッチ適用不要、エージェント管理不要
   - 従量課金（ゼロスケール可能）
@@ -28,7 +28,7 @@ FSx ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Splunk HE
 - [ ] 現在の syslog-ng フィルタルール（転送対象イベント）を文書化
 - [ ] Splunk HEC が有効でアクセス可能であることを確認
 - [ ] サーバーレス統合用の新しい HEC トークンを作成
-- [ ] FSx ONTAP 監査ログが S3 に書き込まれていることを確認（S3 Access Point 経由）
+- [ ] FSx for ONTAP 監査ログが S3 に書き込まれていることを確認（S3 Access Point 経由）
 - [ ] UF のカスタムフィールド抽出やトランスフォームを特定
 
 ### フェーズ 2: 並行デプロイ（2-3日目）
@@ -95,14 +95,14 @@ FSx ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Splunk HE
 切り替え後に問題が発見された場合:
 
 1. 停止した EC2 インスタンスを起動（syslog-ng + UF）
-2. syslog-ng が FSx ONTAP からイベントを受信していることを確認
+2. syslog-ng が FSx for ONTAP からイベントを受信していることを確認
 3. サーバーレス CloudFormation スタックを削除
 4. 問題を調査・解決してから再度移行を試行
 
 ## FAQ
 
 **Q: 両方のパイプラインを同時に実行できますか？**
-A: はい。検証中は別の Splunk インデックスを使用してください。両方とも同じ FSx ONTAP 監査ログから読み取れます。
+A: はい。検証中は別の Splunk インデックスを使用してください。両方とも同じ FSx for ONTAP 監査ログから読み取れます。
 
 **Q: 切り替え時にイベントを失いますか？**
 A: いいえ。サーバーレス Lambda はチェックポイントを使用しており、最後のチェックポイント以降のすべての監査ログファイルを処理します。重複期間中に一時的な重複イベントが発生する可能性があります。

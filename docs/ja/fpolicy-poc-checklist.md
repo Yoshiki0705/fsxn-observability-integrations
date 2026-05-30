@@ -8,7 +8,7 @@ FPolicy ファイルアクティビティパイプラインの E2E 検証: ONTAP
 
 - [ ] FSx for ONTAP ファイルシステムがデプロイ済み
 - [ ] CIFS 対応 SVM に SMB 共有が1つ以上存在
-- [ ] FSx ONTAP と同じ VPC のプライベートサブネット
+- [ ] FSx for ONTAP と同じ VPC のプライベートサブネット
 - [ ] Fargate 用のエグレスパス: NAT Gateway または VPC エンドポイント（ECR, CloudWatch Logs, SQS）
 - [ ] ECR リポジトリに FPolicy サーバーイメージ（`linux/amd64` でビルド）
 - [ ] Datadog API キーが Secrets Manager に保存済み
@@ -31,6 +31,68 @@ FPolicy ファイルアクティビティパイプラインの E2E 検証: ONTAP
 - Multi-AZ HA 設計
 - 高ボリュームパフォーマンスベンチマーク
 - 監査ログの代替
+
+## 検証ステップ
+
+### Step 1: インフラストラクチャのデプロイ
+
+```bash
+# Fargate スタックのデプロイ
+aws cloudformation deploy \
+  --template-file shared/templates/fpolicy-server-fargate.yaml \
+  --stack-name fsxn-fpolicy-server \
+  --parameter-overrides \
+    VpcId=<vpc-id> SubnetIds=<subnet-id> \
+    FsxnSvmSecurityGroupId=<fsx-sg-id> \
+    ContainerImage=<ecr-uri>:latest \
+  --capabilities CAPABILITY_NAMED_IAM
+
+# Datadog Lambda のデプロイ
+SQS_ARN=$(aws cloudformation describe-stacks --stack-name fsxn-fpolicy-server \
+  --query "Stacks[0].Outputs[?OutputKey=='FPolicyQueueArn'].OutputValue" --output text)
+
+aws cloudformation deploy \
+  --template-file integrations/datadog/template-ems-fpolicy.yaml \
+  --stack-name fsxn-datadog-ems-fpolicy \
+  --parameter-overrides \
+    DatadogApiKeySecretArn=<secret-arn> DatadogSite=<site> \
+    FPolicySqsQueueArn=${SQS_ARN} \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+### Step 2: ONTAP FPolicy の設定
+
+```bash
+# Fargate タスク IP の取得
+TASK_IP=$(aws ecs describe-tasks --cluster fsxn-fpolicy-server-cluster \
+  --tasks $(aws ecs list-tasks --cluster fsxn-fpolicy-server-cluster \
+    --query "taskArns[0]" --output text) \
+  --query "tasks[0].containers[0].networkInterfaces[0].privateIpv4Address" --output text)
+
+# ONTAP の設定（CLI または REST API 経由）
+# 参照: docs/en/fpolicy-production-architecture-patterns.md
+```
+
+### Step 3: 接続の検証
+
+- [ ] ECS CloudWatch Logs に `[+] Connection from` が表示される
+- [ ] ECS CloudWatch Logs に `[Handshake] Policy=...` が表示される
+- [ ] ECS CloudWatch Logs に `[KeepAlive] Received` が表示される
+
+### Step 4: イベント配信の検証
+
+- [ ] SMB 共有上にファイルを作成
+- [ ] ECS ログに `[Event] create <filename>` が表示される
+- [ ] ECS ログに `[SQS] Sent: <filename> (create)` が表示される
+- [ ] Lambda CloudWatch Logs に `shipped: 1` が表示される
+- [ ] Datadog Log Explorer: `source:fsxn-fpolicy` でイベントが返される
+
+### Step 5: 再起動復旧の検証
+
+- [ ] Fargate を 0 にスケールし、1 に戻す
+- [ ] ONTAP エンジン IP を更新（`fpolicy-update-engine-ip.sh --auto`）
+- [ ] 再接続を確認（ログに KeepAlive）
+- [ ] 別のファイルを作成し、Datadog への配信を確認
 
 ## 成功基準
 

@@ -1,0 +1,93 @@
+# OTel Collector configuration for scraping ONTAP REST API metrics
+# Use case: FlexCache hit rate, SnapMirror lag, volume capacity
+# Requires: otel/opentelemetry-collector-contrib (with httpcheck receiver)
+#
+# This config uses the httpcheck receiver to probe ONTAP REST API endpoints.
+# For production with comprehensive ONTAP metrics (300+ counters), consider
+# NetApp Harvest → Prometheus → OTel Collector (prometheusreceiver).
+#
+# Verified with: otel/opentelemetry-collector-contrib:0.152.0
+
+receivers:
+  # Health probe for ONTAP management endpoint
+  httpcheck/ontap_health:
+    targets:
+      - endpoint: https://${env:ONTAP_MGMT_ENDPOINT}/api/cluster
+        method: GET
+    collection_interval: 60s
+    tls:
+      insecure_skip_verify: true  # FSx ONTAP uses self-signed certs
+    auth:
+      authenticator: basicauth/ontap
+
+extensions:
+  basicauth/ontap:
+    client_auth:
+      username: ${env:ONTAP_USERNAME}
+      password: ${env:ONTAP_PASSWORD}
+
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+processors:
+  batch:
+    timeout: 60s
+    send_batch_size: 100
+
+  resource:
+    attributes:
+      - key: cloud.provider
+        value: aws
+        action: upsert
+      - key: cloud.platform
+        value: aws_fsx
+        action: upsert
+      - key: service.name
+        value: fsxn-metrics
+        action: upsert
+
+exporters:
+  otlphttp/grafana:
+    endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
+    headers:
+      Authorization: "Basic ${env:GRAFANA_BASIC_AUTH}"
+
+  datadog:
+    api:
+      key: ${env:DD_API_KEY}
+      site: ${env:DD_SITE}
+
+  debug:
+    verbosity: detailed
+
+service:
+  extensions: [health_check, basicauth/ontap]
+  pipelines:
+    metrics:
+      receivers: [httpcheck/ontap_health]
+      processors: [resource, batch]
+      exporters: [otlphttp/grafana]
+
+# ---
+# PRODUCTION RECOMMENDATION
+# ---
+# For comprehensive ONTAP metrics (300+ counters including FlexCache hit rate,
+# SnapMirror lag, volume IOPS, latency percentiles), use NetApp Harvest:
+#
+#   NetApp Harvest → Prometheus → OTel Collector (prometheusreceiver)
+#                                       |
+#                              Grafana Cloud / Datadog / Any OTLP backend
+#
+# Harvest provides:
+# - Pre-built ONTAP metric definitions (no custom parsing)
+# - 300+ counters across volumes, aggregates, LIFs, SVMs
+# - Grafana dashboards included (harvest-grafana-dashboards)
+# - 60-second collection interval
+#
+# Install: https://netapp.github.io/harvest/
+# GitHub: https://github.com/NetApp/harvest
+#
+# Vendor-neutral alternative without Harvest:
+# - Lambda calls ONTAP REST API -> publishes to CloudWatch custom namespace
+# - OTel Collector scrapes CloudWatch via awscloudwatchreceiver
+# - See: shared/templates/lakehouse-monitoring.yaml

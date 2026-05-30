@@ -34,7 +34,7 @@
 
 ### 配信経路
 ```
-FSx ONTAP (vserver audit) → S3 バケット → EventBridge → Lambda → Vendor API
+FSx for ONTAP (vserver audit) → S3 バケット → EventBridge → Lambda → Vendor API
 ```
 
 ### 設定方法
@@ -90,10 +90,10 @@ event notification create -filter-name arp-and-quota \
 
 #### パターン B: CloudWatch → EventBridge → Lambda
 
-FSx ONTAP は EMS イベントを CloudWatch Events として発行します。
+FSx for ONTAP は EMS イベントを CloudWatch Events として発行します。
 
 ```
-FSx ONTAP EMS → CloudWatch Events → EventBridge Rule → Lambda → Vendor API
+FSx for ONTAP EMS → CloudWatch Events → EventBridge Rule → Lambda → Vendor API
 ```
 
 **EventBridge ルール例:**
@@ -107,7 +107,7 @@ FSx ONTAP EMS → CloudWatch Events → EventBridge Rule → Lambda → Vendor A
 }
 ```
 
-参考: [AWS Docs - Monitoring FSx ONTAP](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring_overview.html) | [EMS alerts for ARP](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/EMS-ARP.html)
+参考: [AWS Docs - Monitoring FSx for ONTAP](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring_overview.html) | [EMS alerts for ARP](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/EMS-ARP.html)
 
 ---
 
@@ -130,7 +130,7 @@ FPolicy は独自バイナリプロトコル (TCP) を使用するため、HTTP/
 
 ```
 ┌──────────────┐     TCP:9898      ┌──────────────────┐
-│ FSx ONTAP    │ ─────────────────→ │ ECS Fargate      │
+│ FSx for ONTAP    │ ─────────────────→ │ ECS Fargate      │
 │ FPolicy      │   (直接接続)       │ FPolicy Server   │
 └──────────────┘                    └────────┬─────────┘
                                              │ SQS SendMessage

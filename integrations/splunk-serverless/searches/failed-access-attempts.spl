@@ -1,0 +1,3 @@
+index=fsxn sourcetype=fsxn:audit result=failure
+| stats count by user, client_ip, operation, path
+| sort - count

@@ -79,7 +79,7 @@ No fixed minimum — retain only as long as necessary for the stated purpose.
 For regulations requiring > 1 year retention, implement a dual-path:
 
 ```
-FSx ONTAP -> Lambda -> +-> Vendor (hot, 30-90 days) -- real-time queries
+FSx for ONTAP -> Lambda -> +-> Vendor (hot, 30-90 days) -- real-time queries
                        +-> S3 (archive, 7 years) -- compliance evidence
                                |
                                +-> S3 Standard (0-90 days)

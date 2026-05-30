@@ -1,0 +1,4 @@
+index=fsxn sourcetype=fsxn:pipeline metric_name="audit_delivery_lag_seconds"
+| stats max(audit_delivery_lag_seconds) as max_lag,
+        latest(last_success_time) as last_success
+  by pipeline_stage
