@@ -120,7 +120,9 @@ URL: `https://console.netapp.com/system-manager/<file-system-id>`
 
 ## Overview
 
-ONTAP System Manager is a **free, built-in Web UI** for FSx for ONTAP. No additional licenses or NetApp accounts are required. Access it via the management endpoint (HTTPS:443) from a browser.
+ONTAP System Manager is the built-in GUI management tool for ONTAP. **System Manager IS accessible for FSx for ONTAP via NetApp Console** — access it through NetApp Console > Systems > SERVICES > "Open" (System Manager).
+
+> ⚠️ **Important**: Unlike on-premises ONTAP, you cannot access System Manager by directly browsing to `https://<management-endpoint-ip>` (returns 404). You MUST go through NetApp Console. The REST API (`/api/`) remains directly accessible.
 
 ### Target Users
 
@@ -130,21 +132,24 @@ ONTAP System Manager is a **free, built-in Web UI** for FSx for ONTAP. No additi
 
 ### Verified Operations
 
-> ⚠️ **May 2026 Verification Result**: The current NetApp Console (Workload Factory integrated version) does NOT provide the traditional "ONTAP System Manager" UI as a standalone interface. The Workload Factory UI provides volume management, but audit log and quota configuration require CLI/REST API.
+> **May 2026 Verification Result**: System Manager is accessible via NetApp Console > Systems > SERVICES > "Open". All ONTAP management operations including FSA, audit logs, Qtrees, quotas are available in the GUI.
 
-| Operation | Workload Factory UI (GUI) | CLI/REST API | Status |
-|-----------|--------------------------|--------------|--------|
-| Volume list & management | ✅ Available | ✅ Available | ✅ E2E verified |
-| SVM list | ✅ Available | ✅ Available | ✅ E2E verified |
-| Replication management | ✅ Available | ✅ Available | — |
-| ARP status check | ✅ Available | ✅ Available | ✅ Verified |
-| Capacity & tiering | ✅ Available | ✅ Available | ✅ Verified |
-| Enable audit logging | ❌ Not in GUI | ✅ Available | ✅ Verified via REST API |
-| Create Qtree | ❌ Not in GUI | ✅ Available | ✅ Verified via REST API |
-| Configure quota rules | ❌ Not in GUI | ✅ Available | ✅ Verified via REST API |
-| Initialize quotas | ❌ Not in GUI | ✅ Available | ✅ Verified via REST API |
+| Operation | System Manager (GUI) | CLI/REST API | Status |
+|-----------|---------------------|--------------|--------|
+| Volume management | ✅ Available | ✅ Available | ✅ E2E verified |
+| **FSA (File System Analytics)** | ✅ Available | ✅ Available | ✅ GUI verified |
+| **Activity Tracking** | ✅ Available (toggle to enable) | ✅ Available | ✅ GUI verified |
+| **FSA Explorer** | ✅ Available | ✅ Available | ✅ GUI verified |
+| **FSA Usage** | ✅ Available | ✅ Available | ✅ GUI verified |
+| **Quota Usage** | ✅ Available | ✅ Available | ✅ GUI verified |
+| Enable audit logging | ✅ Available | ✅ Available | ✅ Verified via REST API |
+| Create Qtree | ✅ Available | ✅ Available | ✅ Verified via REST API |
+| Configure quota rules | ✅ Available | ✅ Available | ✅ Verified via REST API |
+| SMB share management | ✅ Available | ✅ Available | — |
 | EMS Webhook setup | ❌ Not in GUI | ✅ CLI only | ✅ Verified via CLI |
 | FPolicy setup | ❌ Not in GUI | ✅ CLI only | ✅ Verified via CLI |
+
+> **Important**: System Manager is a **separate interface** from Workload Factory UI. Workload Factory UI (`/fsxstorage/`) provides volume management only, while System Manager (`/system-manager/`) provides full ONTAP management including FSA, audit logs, Qtrees, and quotas.
 
 ### Connection Method
 
