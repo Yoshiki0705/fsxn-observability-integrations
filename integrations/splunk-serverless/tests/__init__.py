@@ -1,1 +1,0 @@
-"""Splunk Serverless integration tests."""
