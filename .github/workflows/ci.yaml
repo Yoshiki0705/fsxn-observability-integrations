@@ -92,7 +92,7 @@ jobs:
         run: |
           curl -L https://github.com/aws-cloudformation/cloudformation-guard/releases/latest/download/cfn-guard-v3-ubuntu-latest.tar.gz -o cfn-guard.tar.gz
           tar -xzf cfn-guard.tar.gz
-          sudo mv cfn-guard /usr/local/bin/
+          sudo mv cfn-guard-v3-ubuntu-latest/cfn-guard /usr/local/bin/
           cfn-guard --version
 
       - name: Run cfn-guard critical rules (blocking)
