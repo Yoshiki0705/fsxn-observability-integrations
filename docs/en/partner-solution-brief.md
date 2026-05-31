@@ -133,3 +133,15 @@ See [Vendor Comparison](vendor-comparison.md) for detailed cost tables per vendo
 3. Propose a 1-week PoC engagement using the model above
 4. Deploy using the CloudFormation templates (30-minute Quick Start)
 5. Deliver PoC Report with Go/No-Go recommendation
+
+## Setup Time Reference
+
+| Component | Time to Deploy | Prerequisites |
+|-----------|---------------|---------------|
+| Serverless pipeline (CloudFormation) | 30 minutes | AWS account, FSx for ONTAP with audit enabled |
+| NetApp Console + System Manager (GUI) | 1-2 business days | NSS account creation (free, 1 business day for approval) |
+| EMS Webhook (quota alerts) | 1 hour | ONTAP CLI access (fsxadmin) |
+| FPolicy (real-time file ops) | 2-4 hours | VPC networking, ECS Fargate, ONTAP CLI |
+| Full PoC (pipeline + dashboard + alerts) | 1 week | All above + vendor account |
+
+> **Note**: NetApp Console account creation requires 1 business day for Customer Level access approval. Plan accordingly when scheduling PoC engagements that include GUI-based management demonstrations.

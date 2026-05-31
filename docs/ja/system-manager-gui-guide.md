@@ -96,6 +96,10 @@ NetApp Console のセットアップが不要な管理方法:
 
 > **推奨**: 監査ログやクォータの初期設定は CLI/REST API で実施し、日常的な監視・確認に NetApp Console (System Manager) を使用するハイブリッドアプローチが現実的です。
 
+> **セキュリティベストプラクティス**:
+> - `fsxadmin` パスワードは AWS Secrets Manager に保存すること
+> - System Manager の全操作は ONTAP 監査ログに記録される
+
 ---
 
 ## 2. 監査ログ設定（GUI 手順）

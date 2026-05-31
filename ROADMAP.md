@@ -7,6 +7,7 @@ All 9 vendor integrations are E2E verified. The project provides a complete serv
 ## Phase 1: Foundation (Completed)
 
 - [x] 9 vendor integrations (Datadog, New Relic, Splunk, OTel Collector, Grafana, Elastic, Dynatrace, Sumo Logic, Honeycomb)
+- [x] NetApp Console / System Manager GUI management (FSA, audit, quotas verified)
 - [x] 3 event sources (Audit logs, EMS webhooks, FPolicy)
 - [x] CloudFormation templates for all integrations
 - [x] Bilingual documentation (ja/en)
@@ -31,7 +32,7 @@ Target: Q3 2026
 - [x] Cost validation template (estimated vs actual)
 - [ ] Cost validation data (requires 1 month of production billing)
 
-## Phase 3: Enterprise Features (Planned)
+## Phase 3: Enterprise Features (Completed)
 
 Target: Q4 2026
 
@@ -61,14 +62,16 @@ Target: 2027 H1
 
 | Part | Title | Status |
 |------|-------|--------|
-| 1-8 | Foundation series | Published |
+| 1-6 | Foundation series | Published |
+| 7 | OTel Collector Multi-Backend | Draft |
+| 8 | Grafana Cloud OTLP Gateway | Draft |
 | 9 | Data Sovereignty with Elastic | Draft |
 | 10 | High-Cardinality Analysis with Honeycomb | Draft |
 | 11 | AI-Powered Root Cause with Dynatrace | Draft |
 | 12 | JP Region with Sumo Logic | Draft |
-| 13 | 9 Vendors, One Architecture: Lessons Learned (series finale) | Draft |
-| 14 | Production Hardening: SLOs, Runbooks, and Data Classification | Planned |
-| 15 | Multi-Account Deployment with AWS Organizations | Planned (Phase 3) |
+| 13 | 9 Vendors, One Architecture: Lessons Learned | Draft |
+| 14 | System Manager Reality Check: GUI vs CLI vs Observability | Draft |
+| 15 | Multi-Account Deployment with AWS Organizations | Planned (Phase 4) |
 
 ## Contributing
 
