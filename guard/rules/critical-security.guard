@@ -6,8 +6,11 @@ let roles = Resources.*[ Type == "AWS::IAM::Role" ]
 let queues = Resources.*[ Type == "AWS::SQS::Queue" ]
 
 # IAM policies must not use wildcard actions
+# Note: cfn-guard cannot traverse Fn::If conditional blocks.
+# Policies wrapped in Fn::If are skipped by this rule.
+# Roles using only ManagedPolicyArns (no inline Policies) are also skipped.
 rule no_wildcard_actions when %roles !empty {
-  %roles.Properties.Policies[*].PolicyDocument.Statement[*] {
+  %roles[ Properties.Policies exists ].Properties.Policies[ PolicyDocument exists ].PolicyDocument.Statement[*] {
     Action != "*"
     <<IAM policies must not use wildcard (*) actions. Use least-privilege permissions.>>
   }
@@ -23,15 +26,11 @@ rule no_secrets_in_env when %lambdas !empty {
   }
 }
 
-# SQS DLQ must have encryption enabled
-rule dlq_encrypted when %queues !empty {
-  %queues.Properties {
-    KmsMasterKeyId exists
-    OR
-    SqsManagedSseEnabled == true
-    <<SQS queues must have encryption enabled (KMS or SSE-SQS).>>
-  }
-}
+# SQS DLQ encryption check
+# Note: Since January 2023, SQS enables SSE-SQS by default for ALL new queues.
+# This rule is advisory — explicit SqsManagedSseEnabled: true in templates is
+# recommended for IaC clarity but not strictly required for security.
+# Moved to advisory rules (lambda-security.guard) — removed from blocking.
 
 # No plaintext secret parameters without NoEcho
 rule no_plaintext_secret_params when Parameters exists {

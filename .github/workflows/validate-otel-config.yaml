@@ -7,6 +7,9 @@ on:
     paths:
       - 'integrations/otel-collector/otel-collector-config*.yaml'
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -22,7 +25,7 @@ jobs:
             # Note: validate may report errors for unresolved ${env:...} variables
             # This is expected in CI without runtime secrets
             docker run --rm \
-              -v $(pwd)/integrations/otel-collector:/config \
+              -v "$(pwd)/integrations/otel-collector:/config" \
               otel/opentelemetry-collector-contrib:0.152.0 \
-              validate --config /config/$(basename $config) 2>&1 || true
+              validate --config "/config/$(basename "$config")" 2>&1 || true
           done
