@@ -132,9 +132,55 @@ For production deployments, consider implementing SLO burn rate alerting:
 | Poison-pill handling tested | Simulated bad file processed | Yes |
 | DR/failover tested | Cross-region or backup path | Yes |
 
+## Telemetry Cost SLO
+
+Observability pipelines can generate unbounded costs if telemetry volume is not controlled. Define a cost ceiling as an operational SLO.
+
+### Cost Targets
+
+| Component | Monthly Budget | Alarm Threshold | Action on Breach |
+|-----------|---------------|-----------------|-----------------|
+| AWS infrastructure (Lambda, EventBridge, S3, SQS) | < $50 | > $40 (80% of budget) | Review schedule interval, filter unnecessary events |
+| Vendor ingestion (Datadog, Grafana, etc.) | Customer-defined | > 80% of budget | Reduce log verbosity, increase sampling, filter at source |
+| NAT Gateway (if VPC Lambda) | < $50 | > $40 | Consider VPC-external Lambda placement |
+| Total pipeline cost | < $150 | > $120 | Escalate to FinOps review |
+
+### Cost Control Mechanisms
+
+| Mechanism | Implementation | Effect |
+|-----------|---------------|--------|
+| Audit policy filtering | ONTAP `vserver audit` event selection | Reduce log volume at source |
+| Schedule interval tuning | EventBridge Scheduler `rate(15 minutes)` for low-activity SVMs | Reduce Lambda invocations |
+| Batch size optimization | Lambda batch processing (fewer API calls) | Reduce vendor API costs |
+| OTel Collector sampling | `probabilistic_sampler` processor | Reduce high-volume FPolicy events |
+| Adaptive telemetry | Grafana Cloud Adaptive Metrics / Logs | Automatic noise reduction |
+| VPC-external Lambda | Remove VPC config from Lambda | Eliminate NAT Gateway cost |
+
+### Measurement
+
+```bash
+# Monthly cost check (AWS infrastructure)
+aws ce get-cost-and-usage \
+  --time-period Start=$(date -v-30d +%Y-%m-%d),End=$(date +%Y-%m-%d) \
+  --granularity MONTHLY \
+  --metrics UnblendedCost \
+  --filter '{"Tags":{"Key":"Project","Values":["fsxn-observability"]}}'
+```
+
+### Cost Anomaly Detection
+
+Configure AWS Cost Anomaly Detection for the pipeline:
+- Monitor by tag: `Project=fsxn-observability`
+- Alert threshold: 20% above expected daily spend
+- Notification: SNS → Slack/Email
+
+> **Anti-pattern**: Collecting all audit events (including read operations) without filtering. Read events typically generate 10-100x more volume than write events. Filter at the ONTAP audit policy level unless read auditing is explicitly required for compliance.
+
 ## Related Documents
 
 - [Delivery Guarantee Patterns](delivery-guarantees.md)
 - [Operational Guide](operational-guide.md)
 - [PoC Success Criteria](poc-success-criteria.md)
 - [Security Review Checklist](security-review-checklist.md)
+- [Cost Validation Template](cost-validation.md)
+- [Management & Monitoring Decision Tree](decision-tree-management-monitoring.md)

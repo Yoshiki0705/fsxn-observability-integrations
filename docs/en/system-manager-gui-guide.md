@@ -96,8 +96,9 @@ Management methods that do NOT require NetApp Console setup:
 
 > **Recommended**: Perform initial configuration (audit logs, quotas) via CLI/REST API, then use NetApp Console (System Manager) for day-to-day monitoring and management. This hybrid approach is the most practical.
 
-4. **Password management**: Store `fsxadmin` password in AWS Secrets Manager
-5. **Audit trail**: All System Manager operations are recorded in ONTAP audit logs
+> **Security best practices**:
+> - Store `fsxadmin` password in AWS Secrets Manager
+> - All System Manager operations are recorded in ONTAP audit logs
 
 ---
 

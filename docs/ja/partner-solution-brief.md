@@ -133,3 +133,15 @@ FSx for ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Vendo
 3. 上記モデルを使用した 1 週間の PoC エンゲージメントを提案
 4. CloudFormation テンプレートを使用してデプロイ（30 分クイックスタート）
 5. Go/No-Go 推奨付きの PoC レポートを納品
+
+## セットアップ所要時間リファレンス
+
+| コンポーネント | デプロイ所要時間 | 前提条件 |
+|-------------|---------------|---------|
+| サーバーレスパイプライン（CloudFormation） | 30 分 | AWS アカウント、監査ログ有効化済み FSx for ONTAP |
+| NetApp Console + System Manager（GUI） | 1-2 営業日 | NSS アカウント作成（無料、承認に 1 営業日） |
+| EMS Webhook（クォータアラート） | 1 時間 | ONTAP CLI アクセス（fsxadmin） |
+| FPolicy（リアルタイムファイル操作） | 2-4 時間 | VPC ネットワーキング、ECS Fargate、ONTAP CLI |
+| フル PoC（パイプライン + ダッシュボード + アラート） | 1 週間 | 上記全て + ベンダーアカウント |
+
+> **注意**: NetApp Console アカウント作成には Customer Level アクセス承認に 1 営業日が必要です。GUI ベースの管理デモを含む PoC エンゲージメントのスケジュール時に考慮してください。

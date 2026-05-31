@@ -370,6 +370,113 @@ Reference: [Data Classification Guide](data-classification.md) | [PII Redaction 
 
 ---
 
+## FSA Metrics → Grafana / Prometheus Collection Pattern
+
+FSA Activity Tracking provides real-time hotspot data (5-second intervals), but retains only 5 minutes of history. To build long-term dashboards in Grafana, collect FSA metrics periodically via ONTAP REST API.
+
+### Architecture
+
+```
+EventBridge Scheduler (every 60s)
+  → Lambda (ONTAP REST API call)
+  → Prometheus Remote Write (AMP or self-hosted)
+  → Grafana Dashboard
+
+Alternative:
+  NetApp Harvest (ECS Fargate)
+  → Prometheus (AMP)
+  → Grafana Cloud / AMG
+```
+
+### Option A: Lambda + ONTAP REST API → Prometheus Remote Write
+
+Lightweight, serverless approach for FSA-specific metrics:
+
+```python
+# Lambda collects FSA metrics via ONTAP REST API
+# Endpoint: GET /api/storage/volumes/{uuid}/files?analytics=true
+# Metrics to collect:
+#   - bytes_read, bytes_written (per volume)
+#   - iops_read, iops_written (per volume)
+#   - top_clients, top_files (from Activity Tracking)
+
+# Push to Amazon Managed Prometheus (AMP) via remote_write
+```
+
+| Metric | ONTAP REST API Endpoint | Grafana Panel |
+|--------|------------------------|---------------|
+| Volume IOPS | `/api/cluster/counter/tables/volume:node` | Time series |
+| Top clients | `/api/storage/volumes/{uuid}/top-metrics/clients` | Table / Bar |
+| Top files | `/api/storage/volumes/{uuid}/top-metrics/files` | Table |
+| Top directories | `/api/storage/volumes/{uuid}/top-metrics/directories` | Tree map |
+| Capacity used | `/api/storage/volumes/{uuid}` (fields: space) | Gauge |
+
+### Option B: NetApp Harvest (Recommended for 300+ Metrics)
+
+For comprehensive ONTAP metrics (performance, capacity, network, protocol), use [NetApp Harvest](https://github.com/NetApp/harvest):
+
+```
+NetApp Harvest (ECS Fargate, linux/amd64)
+  → Prometheus exporter (:12990)
+  → Amazon Managed Prometheus (AMP)
+  → Amazon Managed Grafana (AMG) or Grafana Cloud
+```
+
+| Aspect | Lambda + REST API | NetApp Harvest |
+|--------|------------------|----------------|
+| Metrics count | 10-20 (FSA-focused) | 300+ (full ONTAP) |
+| Collection interval | 60s (Scheduler) | 60s (built-in) |
+| Infrastructure | Serverless (Lambda) | ECS Fargate (~$36/month) |
+| Dashboards | Custom build | Pre-built (Harvest includes Grafana JSON) |
+| Maintenance | Minimal | Harvest version updates |
+
+### Option C: Grafana Alloy (OpenTelemetry-native)
+
+For teams already using Grafana Alloy as their telemetry collector:
+
+```
+Grafana Alloy (ECS Fargate)
+  → prometheus.scrape (Harvest exporter)
+  → prometheus.remote_write (Grafana Cloud Mimir)
+```
+
+### Grafana Alerting Rules for FSA Metrics
+
+```yaml
+# Example: Alert when volume IOPS exceeds threshold
+groups:
+  - name: fsxn-fsa-alerts
+    rules:
+      - alert: HighVolumeIOPS
+        expr: ontap_volume_read_ops + ontap_volume_write_ops > 5000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High IOPS on volume {{ $labels.volume }}"
+
+      - alert: InactiveDataRatioHigh
+        expr: ontap_volume_inactive_data_bytes / ontap_volume_used_bytes > 0.7
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "70%+ inactive data on {{ $labels.volume }} — consider tiering"
+```
+
+### Cost Comparison
+
+| Approach | Monthly Cost | Metrics Scope |
+|----------|-------------|---------------|
+| Lambda + REST API (FSA only) | ~$2-5 | 10-20 metrics |
+| Harvest + AMP + AMG | ~$95-250 | 300+ metrics |
+| Harvest + Grafana Cloud | ~$50-100 | 300+ metrics (managed) |
+| CloudWatch only | ~$0.30 | FSx-level only (5 metrics) |
+
+> **Recommendation**: Start with CloudWatch for volume-level monitoring. Add Lambda + REST API for FSA-specific metrics. Graduate to Harvest when you need full ONTAP observability (protocol-level, aggregate-level, node-level metrics).
+
+---
+
 ## References
 
 ### AWS Documentation
