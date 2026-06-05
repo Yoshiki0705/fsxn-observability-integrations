@@ -119,6 +119,8 @@ vserver audit create -vserver <svm-name> -destination /audit_log -rotate-size 20
 
 Reference: [AWS Docs — File access auditing](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html) | [NetApp Docs — Create auditing config](https://docs.netapp.com/us-en/ontap/nas-audit/create-auditing-config-task.html)
 
+> **NFS audit note**: NFS file access auditing (ONTAP 9.13.1+) may include additional fields not present in SMB audit events. The field mapping above is based on SMB access events (EventID 4656/4660/4663). Verify actual field availability in your ONTAP version when configuring NFS auditing.
+
 ### 2. FSx for ONTAP S3 Access Point
 
 An S3 Access Point attached to an FSx for ONTAP volume.

@@ -35,6 +35,11 @@ Environment variables (set in .env or export):
 
 Prerequisites:
   pip install urllib3
+
+Security note:
+  This script reads credentials from .env (gitignored). Never commit .env to
+  version control. In CI/CD, use environment variables or secrets injection
+  (e.g., GitHub Actions secrets, AWS Secrets Manager) instead of .env files.
 """
 import argparse
 import json

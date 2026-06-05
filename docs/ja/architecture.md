@@ -136,6 +136,8 @@ vserver audit create -vserver <svm-name> -destination /audit_log -rotate-size 20
 
 参考: [AWS Docs — ファイルアクセス監査](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html) | [NetApp Docs — 監査設定の作成](https://docs.netapp.com/us-en/ontap/nas-audit/create-auditing-config-task.html)
 
+> **NFS 監査に関する注意**: NFS ファイルアクセス監査（ONTAP 9.13.1+）では、SMB 監査イベントにはない追加フィールドが含まれる場合があります。上記のフィールドマッピングは SMB アクセスイベント（EventID 4656/4660/4663）に基づいています。NFS 監査を設定する際は、ご利用の ONTAP バージョンで実際のフィールド可用性を確認してください。
+
 ### 2. FSx for ONTAP S3 Access Point
 
 FSx for ONTAP ボリュームにアタッチされる S3 Access Point です。
