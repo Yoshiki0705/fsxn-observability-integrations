@@ -132,7 +132,7 @@ vserver audit create -vserver <svm-name> -destination /audit_log -rotate-size 20
 | JSON | ✅ 完全実装（`_parse_json_logs`） | 全フィールド |
 | EVTX | ⚠️ 簡易実装（`_parse_evtx`） | タイムスタンプのみ（EventID = "unknown"） |
 
-> EVTX の本格パースには [`python-evtx`](https://github.com/williballenthin/python-evtx) を Lambda Layer としてパッケージングする方法があります。ただし、ONTAP 監査設定レベルで XML に切り替えることを推奨します — サーバーレスパイプラインにはこちらが最適です。
+> EVTX の本格パースには [`python-evtx`](https://github.com/williballenthin/python-evtx) を Lambda Layer としてパッケージングする方法があります（展開時 ~15 MB）。ただし、ONTAP 監査設定レベルで XML に切り替えることを推奨します — サーバーレスパイプラインには追加依存なしで動作するこちらが最適です。
 
 参考: [AWS Docs — ファイルアクセス監査](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html) | [NetApp Docs — 監査設定の作成](https://docs.netapp.com/us-en/ontap/nas-audit/create-auditing-config-task.html)
 

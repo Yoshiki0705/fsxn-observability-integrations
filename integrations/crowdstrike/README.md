@@ -58,6 +58,8 @@ FSx for ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → LogSc
 - LogScale Ingest Token (associated with a repository)
 - AWS account + FSx for ONTAP (audit logging enabled)
 
+> **ONTAP constraint**: Each SVM supports only one audit log format at a time (`-format evtx` or `-format xml`). You cannot generate both formats simultaneously for the same SVM. For this integration, **XML format is recommended** — it enables full field extraction without additional dependencies. See [architecture.md](../../docs/en/architecture.md#audit-log-format-evtx-vs-xml) for details.
+
 ### Quick Start
 
 ```bash
@@ -77,7 +79,28 @@ aws cloudformation deploy \
     LogScaleIngestTokenSecretArn=<secret-arn> \
     LogScaleUrl=https://cloud.us.humio.com \
   --capabilities CAPABILITY_NAMED_IAM
+
+# 4. Update Lambda code (template uses placeholder — real code must be uploaded)
+cd integrations/crowdstrike/lambda
+zip function.zip handler.py
+aws lambda update-function-code \
+  --function-name fsxn-crowdstrike-integration-shipper \
+  --zip-file fileb://function.zip \
+  --region ap-northeast-1
 ```
+
+> **Note**: The CloudFormation template deploys a placeholder Lambda. After stack creation, upload the actual handler code using step 4 above or via `scripts/deploy.sh`.
+
+### Roadmap
+
+- [x] Audit log handler (HEC delivery)
+- [ ] EMS Webhook handler (`template-ems.yaml`)
+- [ ] FPolicy handler (`template-fpolicy.yaml`)
+- [ ] E2E verification with live LogScale instance
+
+### Architecture Note: Shared Parser
+
+The handler includes an inline XML/JSON parser for self-contained deployment. For production, consider using the shared Lambda Layer (`shared/lambda-layers/log-parser/`) to centralize parser updates across all vendors.
 
 ### CrowdStrike LogScale URLs
 

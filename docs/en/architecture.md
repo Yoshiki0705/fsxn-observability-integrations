@@ -115,7 +115,7 @@ vserver audit create -vserver <svm-name> -destination /audit_log -rotate-size 20
 | JSON | ✅ Complete (`_parse_json_logs`) | All fields |
 | EVTX | ⚠️ Simplified (`_parse_evtx`) | Timestamp only (EventID = "unknown") |
 
-> For production EVTX parsing, consider the [`python-evtx`](https://github.com/williballenthin/python-evtx) library packaged as a Lambda Layer. Alternatively, switch to XML format at the ONTAP audit configuration level — this is the recommended approach for serverless pipelines.
+> For production EVTX parsing, consider the [`python-evtx`](https://github.com/williballenthin/python-evtx) library packaged as a Lambda Layer (~15 MB unzipped). Alternatively, switch to XML format at the ONTAP audit configuration level — this is the recommended approach for serverless pipelines as it requires zero additional dependencies.
 
 Reference: [AWS Docs — File access auditing](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html) | [NetApp Docs — Create auditing config](https://docs.netapp.com/us-en/ontap/nas-audit/create-auditing-config-task.html)
 
