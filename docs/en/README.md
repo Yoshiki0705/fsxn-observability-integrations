@@ -62,6 +62,7 @@ FSx for ONTAP S3 Access Points do **NOT** support S3 Event Notifications or Even
 | [Dynatrace](../../integrations/dynatrace/) | ✅ E2E verified | Log Ingest API v2 |
 | [Sumo Logic](../../integrations/sumo-logic/) | ✅ E2E verified | HTTP Source |
 | [Honeycomb](../../integrations/honeycomb/) | ✅ E2E verified | Events Batch API |
+| [CrowdStrike Falcon LogScale](../../integrations/crowdstrike/) | 🧪 Implementation ready | HEC via Lambda (Splunk HEC compatible) |
 | [NetApp Console / System Manager](../../integrations/netapp-console/) | ✅ Verified | GUI management + FSA (File System Analytics) |
 
 Status:

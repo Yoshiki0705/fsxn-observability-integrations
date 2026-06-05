@@ -8,6 +8,7 @@
 | New Relic | Log API | License Key (Header) | 1MB/request | ✅ |
 | Grafana Cloud | OTLP Gateway | Basic Auth | No limit (4MB recommended) | ❌ |
 | Splunk | HEC | HEC Token (Header) | No limit | ✅ (Built-in) |
+| CrowdStrike Falcon LogScale | HEC (Splunk-compatible) | Bearer Token (Ingest Token) | No limit | ❌ |
 | Elastic | Bulk API | API Key / Basic Auth | No limit (10MB recommended) | ❌ |
 | Dynatrace | Log Ingest API | API Token (Header) | 1MB/request | ✅ |
 | Sumo Logic | HTTP Source | Embedded in URL | 1MB/request | ❌ |
@@ -28,6 +29,7 @@ Estimated monthly costs for the **observability platform ingestion** (excludes A
 | Splunk | None (license-based) | License-dependent | License-dependent | License-dependent | Daily indexing volume license |
 | Dynatrace | None (DDU-based) | ~$1 DDU/day | ~$10 DDU/day | ~$100 DDU/day | Davis Data Units |
 | Elastic Cloud | 14-day trial | ~$30 (min deployment) | ~$95 | ~$300+ | Storage + compute |
+| CrowdStrike Falcon LogScale | Community: 1 GB/day | $0 | License-dependent | License-dependent | Per-GB/day or Falcon bundle |
 | OTel Collector | N/A (self-hosted) | $0 (infra only) | $0 (infra only) | $0 (infra only) | Backend cost only |
 
 > **Note**: Prices are approximate and may vary by region, contract, and commitment. Always verify with the vendor's current pricing page. AWS infrastructure costs (Lambda, EventBridge, S3, Secrets Manager) are typically $5-50/month for most audit log volumes.
@@ -63,6 +65,7 @@ Estimated monthly costs for the **observability platform ingestion** (excludes A
 
 ### Enterprise / Compliance
 - **Splunk**: Established SIEM, compliance reporting
+- **CrowdStrike Falcon LogScale**: Next-Gen SIEM, integrated with Falcon XDR ecosystem
 - **Elastic**: Self-hosted for data sovereignty
 - **Datadog**: SOC 2, HIPAA, FedRAMP options
 

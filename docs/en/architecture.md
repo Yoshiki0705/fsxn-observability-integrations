@@ -62,12 +62,64 @@ ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Vendor API
 
 Enable audit logging on FSx for ONTAP to output logs to an audit volume inside the SVM.
 
-- **Log Format**: EVTX (Windows Event Log) or XML
+- **Log Format**: EVTX (Windows Event Log) or XML — configurable via `-format {evtx|xml}`
 - **Destination**: Audit volume inside the SVM (`vserver audit create -destination /audit_log`)
 - **Log Content**: File access (SMB/NFS), authentication events
 - **Access Method**: Read via FSx for ONTAP S3 Access Point using S3 APIs
 
 > **Important**: Audit logs are stored on the FSx volume. They are NOT written to an S3 bucket. Lambda reads the log files through an FSx for ONTAP S3 Access Point using S3 APIs.
+
+#### Audit Log Format: EVTX vs XML
+
+Both formats contain the same event fields — they are different serializations of the same underlying audit data. ONTAP writes events to intermediate staging files, then converts them to the configured output format.
+
+| Aspect | EVTX | XML |
+|--------|------|-----|
+| Content | Same fields (EventID, TimeCreated, UserName, ObjectName, etc.) | Same fields |
+| Encoding | Binary (Windows Event Log format) | Text (human-readable) |
+| Parse complexity | High (requires binary struct parsing or `python-evtx` library) | Low (standard XML parser, included in Python stdlib) |
+| External viewer | Microsoft Event Viewer | Any text editor / XML tool |
+| Lambda compatibility | ⚠️ Simplified parser (header only) or heavy library dependency | ✅ Full parsing with stdlib `xml.etree.ElementTree` |
+| Lambda Layer size impact | Large (if using `python-evtx`) | None (stdlib only) |
+| Default | ✅ (ONTAP default) | Must specify `-format xml` |
+
+**Recommendation for serverless pipelines**: Use **XML format** (`-format xml`). It enables complete field extraction in Lambda without third-party dependencies.
+
+```bash
+# Create audit config with XML format (recommended for pipeline delivery)
+vserver audit create -vserver <svm-name> -destination /audit_log -format xml -rotate-size 200MB
+
+# Create audit config with EVTX format (default, for Windows Event Viewer)
+vserver audit create -vserver <svm-name> -destination /audit_log -rotate-size 200MB
+```
+
+**Fields extracted (both formats)**:
+
+| Field | Description | Example |
+|-------|------------|---------|
+| EventID | Windows security event ID | 4663 (Read/Write Object) |
+| TimeCreated | Event timestamp (UTC) | 2026-05-31T10:00:00Z |
+| Computer | SVM name | FPolicySMB |
+| SubjectUserName | User who performed the action | DOMAIN\username |
+| IpAddress | Client IP address | 10.0.1.50 |
+| ObjectName | File/directory path | /share/folder/report.xlsx |
+| ObjectType | File or Directory | File |
+| HandleID | Object handle | — |
+| Keywords | Success or Failure | Audit Success |
+
+**Parser implementation status in this project**:
+
+| Format | Parser | Fields Extracted |
+|--------|--------|-----------------|
+| XML | ✅ Complete (`_parse_xml_logs`) | All fields above |
+| JSON | ✅ Complete (`_parse_json_logs`) | All fields |
+| EVTX | ⚠️ Simplified (`_parse_evtx`) | Timestamp only (EventID = "unknown") |
+
+> For production EVTX parsing, consider the [`python-evtx`](https://github.com/williballenthin/python-evtx) library packaged as a Lambda Layer (~15 MB unzipped). Alternatively, switch to XML format at the ONTAP audit configuration level — this is the recommended approach for serverless pipelines as it requires zero additional dependencies.
+
+Reference: [AWS Docs — File access auditing](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html) | [NetApp Docs — Create auditing config](https://docs.netapp.com/us-en/ontap/nas-audit/create-auditing-config-task.html)
+
+> **NFS audit note**: NFS file access auditing (ONTAP 9.13.1+) may include additional fields not present in SMB audit events. The field mapping above is based on SMB access events (EventID 4656/4660/4663). Verify actual field availability in your ONTAP version when configuring NFS auditing.
 
 ### 2. FSx for ONTAP S3 Access Point
 

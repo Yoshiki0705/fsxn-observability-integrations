@@ -62,6 +62,7 @@ FSx for ONTAP S3 Access Points は **S3 Event Notifications および EventBridg
 | [Dynatrace](../../integrations/dynatrace/) | ✅ E2E 検証済み | Log Ingest API v2 |
 | [Sumo Logic](../../integrations/sumo-logic/) | ✅ E2E 検証済み | HTTP Source |
 | [Honeycomb](../../integrations/honeycomb/) | ✅ E2E 検証済み | Events Batch API |
+| [CrowdStrike Falcon LogScale](../../integrations/crowdstrike/) | 🧪 実装準備完了 | HEC via Lambda (Splunk HEC 互換) |
 | [NetApp Console / System Manager](../../integrations/netapp-console/) | ✅ 検証済み | GUI 管理 + FSA (File System Analytics) |
 
 ステータス:

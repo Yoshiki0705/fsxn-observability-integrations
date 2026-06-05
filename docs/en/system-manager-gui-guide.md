@@ -416,6 +416,73 @@ aws events put-targets \
 
 ---
 
+## 5.1 FSA Explorer: Folder Drill-Down and File Path Analysis
+
+FSA Explorer enables **folder-level drill-down** to analyze file access patterns at any directory depth.
+
+### Accessing FSA Explorer
+
+1. System Manager → **Storage** → **Volumes** → Click target volume
+2. Select **File system** tab
+3. Click **Explorer** sub-tab
+4. Ensure **Analytics enabled** toggle is ON
+
+### Explorer Capabilities
+
+| Feature | Description |
+|---------|-------------|
+| **Directory tree navigation** | Left panel shows folder hierarchy; click any folder to drill down |
+| **File list with metadata** | Right panel shows files in selected directory with Name and Size |
+| **Subdirectory/file count** | Displays correct count of subdirectories and files at each level |
+| **Access history column** | Shows last access time for each file/directory |
+| **Modify history column** | Shows last modification time |
+| **Breadcrumb navigation** | Path bar shows current location (e.g., `/folder1/folder2/`) |
+
+### Drill-Down Behavior (Verified)
+
+When clicking a folder in the Explorer directory tree:
+
+```
+Root (/)
+  └── folder1 (click)
+        ├── text2.txt, text22.txt          ← Files in folder1
+        ├── folder2 (click)
+        │     ├── text3.txt, text33.txt    ← Files in folder2
+        │     ├── folder3
+        │     ├── folder4
+        │     └── folder5
+        ├── folder3
+        ├── folder4
+        └── folder5
+```
+
+**Verified behavior**:
+- Clicking `folder1` shows: 4 subdirectories (folder2-5), 8 files (text2-5.txt + text22-55.txt)
+- Clicking `folder2` shows: 3 subdirectories (folder3-5), 6 files (text3-5.txt + text33-55.txt)
+- Directory and file counts update correctly at each level
+- Current directory path is displayed in the breadcrumb bar
+
+### CSV Export from Explorer
+
+The Explorer view supports CSV download:
+- Click the **download icon** (↓) in the Explorer toolbar
+- CSV contains: file/directory name, size, access history, modify history
+- **Important**: This is a **point-in-time snapshot** of the currently displayed view, NOT a time-series export
+
+> ⚠️ **Limitation**: Explorer CSV captures only what is currently visible. For long-term access history analysis, use audit logs (S3 → Athena). See [Decision Tree](decision-tree-management-monitoring.md) for the recommended architecture.
+
+### Use Cases
+
+| Use Case | Explorer Capability | Limitation |
+|----------|-------------------|-----------|
+| Identify inactive files | ✅ Access history column shows last access date | Requires `-atime-update` enabled |
+| Verify folder structure | ✅ Full directory tree navigation | — |
+| Count files per department folder | ✅ File/directory count at each level | — |
+| Export file list for review | ✅ CSV download | Point-in-time only |
+| Long-term access trend analysis | ❌ Not available | Use audit logs + Athena |
+
+---
+
 ## 6. Verification Checklist
 
 ### Phase 1: System Manager Access
