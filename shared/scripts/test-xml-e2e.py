@@ -137,6 +137,14 @@ def test_new_relic(events: list) -> dict:
     """Ship to New Relic Log API."""
     key = os.environ.get("NR_LICENSE_KEY", "")
     if not key:
+        try:
+            import boto3
+            sm = boto3.client('secretsmanager', region_name=os.environ.get('AWS_REGION', 'ap-northeast-1'))
+            secret = json.loads(sm.get_secret_value(SecretId='new-relic/fsxn-license-key')['SecretString'])
+            key = secret.get('license_key', '')
+        except Exception:
+            pass
+    if not key:
         return {"status": "SKIP", "reason": "NR_LICENSE_KEY not set"}
 
     nr_payload = [{"common": {"attributes": {"logtype": "fsxn-audit-xml"}},
@@ -173,6 +181,15 @@ def test_elastic(events: list) -> dict:
     key = os.environ.get("ELASTIC_API_KEY", "")
     url = os.environ.get("ELASTIC_URL", "")
     if not key or not url:
+        try:
+            import boto3
+            sm = boto3.client('secretsmanager', region_name=os.environ.get('AWS_REGION', 'ap-northeast-1'))
+            secret = json.loads(sm.get_secret_value(SecretId='elastic/fsxn-api-key')['SecretString'])
+            key = key or secret.get('api_key', '')
+            url = url or secret.get('url', '')
+        except Exception:
+            pass
+    if not key or not url:
         return {"status": "SKIP", "reason": "ELASTIC credentials not set"}
 
     bulk = "".join(json.dumps({"index": {"_index": "fsxn-audit-xml"}}) + "\n" +
@@ -187,6 +204,15 @@ def test_dynatrace(events: list) -> dict:
     """Ship to Dynatrace Log Ingest API v2."""
     token = os.environ.get("DT_API_TOKEN", "")
     url = os.environ.get("DT_ENV_URL", "")
+    if not token or not url:
+        try:
+            import boto3
+            sm = boto3.client('secretsmanager', region_name=os.environ.get('AWS_REGION', 'ap-northeast-1'))
+            secret = json.loads(sm.get_secret_value(SecretId='dynatrace/fsxn-api-token')['SecretString'])
+            token = token or secret.get('api_token', '')
+            url = url or secret.get('env_url', '')
+        except Exception:
+            pass
     if not token or not url:
         return {"status": "SKIP", "reason": "DT credentials not set"}
 
@@ -203,6 +229,14 @@ def test_sumo_logic(events: list) -> dict:
     """Ship to Sumo Logic HTTP Source."""
     url = os.environ.get("SUMO_HTTP_URL", "")
     if not url:
+        try:
+            import boto3
+            sm = boto3.client('secretsmanager', region_name=os.environ.get('AWS_REGION', 'ap-northeast-1'))
+            secret = json.loads(sm.get_secret_value(SecretId='sumo-logic/fsxn-http-source')['SecretString'])
+            url = secret.get('url', '')
+        except Exception:
+            pass
+    if not url:
         return {"status": "SKIP", "reason": "SUMO_HTTP_URL not set"}
 
     payload = "\n".join(json.dumps(e, default=str) for e in events)
@@ -215,6 +249,14 @@ def test_sumo_logic(events: list) -> dict:
 def test_honeycomb(events: list) -> dict:
     """Ship to Honeycomb Events API."""
     key = os.environ.get("HONEYCOMB_API_KEY", "")
+    if not key:
+        try:
+            import boto3
+            sm = boto3.client('secretsmanager', region_name=os.environ.get('AWS_REGION', 'ap-northeast-1'))
+            secret = json.loads(sm.get_secret_value(SecretId='honeycomb/fsxn-api-key')['SecretString'])
+            key = secret.get('api_key', '')
+        except Exception:
+            pass
     if not key:
         return {"status": "SKIP", "reason": "HONEYCOMB_API_KEY not set"}
 
