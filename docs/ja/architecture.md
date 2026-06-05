@@ -79,12 +79,62 @@ ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Vendor API
 
 FSx for ONTAP の監査ログ機能を有効化し、SVM 内の audit volume に出力します。
 
-- **ログ形式**: EVTX (Windows Event Log) または XML
+- **ログ形式**: EVTX (Windows Event Log) または XML — `-format {evtx|xml}` で設定
 - **出力先**: SVM 内の audit volume（`vserver audit create -destination /audit_log`）
 - **ログ内容**: ファイルアクセス（SMB/NFS）、認証イベント
 - **アクセス方式**: FSx for ONTAP S3 Access Point 経由で S3 API としてアクセス
 
 > **重要**: 監査ログは FSx ボリューム上に保存されます。S3 バケットには書き込まれません。Lambda は FSx for ONTAP S3 Access Point を通じて S3 API でログファイルを読み取ります。
+
+#### 監査ログフォーマット: EVTX vs XML
+
+両フォーマットは**同一のイベントフィールド**を含みます。ONTAP は内部のステージングファイル（中間バイナリ）にイベントを記録した後、設定されたフォーマットに変換して出力するため、情報量に差はありません。
+
+| 観点 | EVTX | XML |
+|------|------|-----|
+| 含まれる情報 | 同一（EventID, TimeCreated, UserName, ObjectName 等） | 同一 |
+| エンコーディング | バイナリ（Windows Event Log 形式） | テキスト（人間可読） |
+| パース複雑度 | 高（バイナリ構造解析 or `python-evtx` ライブラリ必要） | 低（標準 XML パーサーで処理可能） |
+| 外部ビューア | Microsoft Event Viewer | 任意のテキストエディタ / XML ツール |
+| Lambda 互換性 | ⚠️ 簡易パーサー（ヘッダーのみ）or 大きなライブラリ依存 | ✅ stdlib `xml.etree.ElementTree` で完全パース |
+| Lambda Layer サイズ影響 | 大（`python-evtx` 使用時） | なし（stdlib のみ） |
+| デフォルト | ✅（ONTAP デフォルト） | `-format xml` を明示指定 |
+
+**サーバーレスパイプライン向け推奨**: **XML フォーマット**（`-format xml`）を使用してください。サードパーティ依存なしで Lambda で全フィールドを抽出できます。
+
+```bash
+# XML 形式で監査設定を作成（パイプライン配信向け推奨）
+vserver audit create -vserver <svm-name> -destination /audit_log -format xml -rotate-size 200MB
+
+# EVTX 形式で監査設定を作成（デフォルト、Windows Event Viewer 向け）
+vserver audit create -vserver <svm-name> -destination /audit_log -rotate-size 200MB
+```
+
+**抽出されるフィールド（両フォーマット共通）**:
+
+| フィールド | 説明 | 例 |
+|-----------|------|-----|
+| EventID | Windows セキュリティイベント ID | 4663 (Read/Write Object) |
+| TimeCreated | イベント発生日時 (UTC) | 2026-05-31T10:00:00Z |
+| Computer | SVM 名 | FPolicySMB |
+| SubjectUserName | 操作を実行したユーザー | DOMAIN\username |
+| IpAddress | クライアント IP アドレス | 10.0.1.50 |
+| ObjectName | ファイル/ディレクトリパス | /share/folder/report.xlsx |
+| ObjectType | File または Directory | File |
+| HandleID | オブジェクトハンドル | — |
+| Keywords | 成功 or 失敗 | Audit Success |
+
+**本プロジェクトのパーサー実装状況**:
+
+| フォーマット | パーサー | 抽出フィールド |
+|------------|---------|-------------|
+| XML | ✅ 完全実装（`_parse_xml_logs`） | 上記全フィールド |
+| JSON | ✅ 完全実装（`_parse_json_logs`） | 全フィールド |
+| EVTX | ⚠️ 簡易実装（`_parse_evtx`） | タイムスタンプのみ（EventID = "unknown"） |
+
+> EVTX の本格パースには [`python-evtx`](https://github.com/williballenthin/python-evtx) を Lambda Layer としてパッケージングする方法があります。ただし、ONTAP 監査設定レベルで XML に切り替えることを推奨します — サーバーレスパイプラインにはこちらが最適です。
+
+参考: [AWS Docs — ファイルアクセス監査](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html) | [NetApp Docs — 監査設定の作成](https://docs.netapp.com/us-en/ontap/nas-audit/create-auditing-config-task.html)
 
 ### 2. FSx for ONTAP S3 Access Point
 
