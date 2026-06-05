@@ -59,6 +59,12 @@ FSx for ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Vendo
 - **Recommended path**: EMS webhook (ARP events) + FPolicy (file operation stream)
 - **PoC scope**: Simulate ARP trigger, confirm alert in <30 seconds
 
+### Profile E: CrowdStrike Falcon LogScale Integration
+- **Current state**: CrowdStrike Falcon deployed for endpoint protection; LogScale available but no file storage logs ingested
+- **Pain point**: File access audit logs are not correlated with endpoint telemetry in Falcon
+- **Recommended path**: Lambda → LogScale HEC (Splunk-compatible endpoint, zero migration friction)
+- **PoC scope**: Deploy audit log shipper, confirm structured events in LogScale repository, build first search query
+
 ## PoC Engagement Model
 
 ### Scope (1-week engagement)

@@ -247,50 +247,75 @@ def main():
     ap = argparse.ArgumentParser(description="XML audit log E2E test for all vendors")
     ap.add_argument("--vendor", default="all", choices=list(VENDORS.keys()) + ["all"])
     ap.add_argument("--dry-run", action="store_true", help="Parse only, don't ship")
+    ap.add_argument("--output", choices=["text", "json"], default="text", help="Output format (json for CI)")
     args = ap.parse_args()
 
     load_env()
-    print("=" * 60)
-    print("FSx for ONTAP XML Audit Log — Cross-Vendor E2E Test")
-    print("=" * 60)
-    print()
-    print("[1/3] Generating XML with current timestamps...")
+
+    if args.output == "text":
+        print("=" * 60)
+        print("FSx for ONTAP XML Audit Log — Cross-Vendor E2E Test")
+        print("=" * 60)
+        print()
+        print("[1/3] Generating XML with current timestamps...")
+
     xml_data = generate_fresh_xml()
-    print(f"      Source: {SAMPLE_XML_PATH.relative_to(PROJECT_ROOT)}")
-    print()
-    print("[2/3] Parsing XML...")
+
+    if args.output == "text":
+        print(f"      Source: {SAMPLE_XML_PATH.relative_to(PROJECT_ROOT)}")
+        print()
+        print("[2/3] Parsing XML...")
+
     events = parse_xml(xml_data)
-    print(f"      Parsed: {len(events)} events")
-    for e in events:
-        print(f"        EventID={e.get('event_type')}, user={e.get('user')}, "
-              f"path={e.get('path', '')[:40]}..., result={e.get('result')}")
-    print()
+
+    if args.output == "text":
+        print(f"      Parsed: {len(events)} events")
+        for e in events:
+            print(f"        EventID={e.get('event_type')}, user={e.get('user')}, "
+                  f"path={e.get('path', '')[:40]}..., result={e.get('result')}")
+        print()
 
     if args.dry_run:
-        print("[3/3] DRY RUN — skipping delivery")
-        print(json.dumps(events[0], indent=2, default=str))
+        if args.output == "json":
+            print(json.dumps({"status": "dry_run", "events_parsed": len(events), "events": events}, indent=2, default=str))
+        else:
+            print("[3/3] DRY RUN — skipping delivery")
+            print(json.dumps(events[0], indent=2, default=str))
         return 0
 
     targets = VENDORS.keys() if args.vendor == "all" else [args.vendor]
-    print(f"[3/3] Shipping to: {', '.join(targets)}")
-    print()
+
+    if args.output == "text":
+        print(f"[3/3] Shipping to: {', '.join(targets)}")
+        print()
+
     results = {}
     for v in targets:
         r = VENDORS[v](events)
         results[v] = r
-        icon = {"OK": "\u2705", "FAIL": "\u274c", "SKIP": "\u23ed\ufe0f"}.get(r["status"], "?")
-        line = f"  {icon} {v:12} {r['status']}"
-        if r.get("http_status"):
-            line += f" (HTTP {r['http_status']}, {r.get('events_sent', 0)} events)"
-        if r.get("reason"):
-            line += f" [{r['reason']}]"
-        print(line)
+        if args.output == "text":
+            icon = {"OK": "\u2705", "FAIL": "\u274c", "SKIP": "\u23ed\ufe0f"}.get(r["status"], "?")
+            line = f"  {icon} {v:12} {r['status']}"
+            if r.get("http_status"):
+                line += f" (HTTP {r['http_status']}, {r.get('events_sent', 0)} events)"
+            if r.get("reason"):
+                line += f" [{r['reason']}]"
+            print(line)
 
-    print()
     ok = sum(1 for r in results.values() if r["status"] == "OK")
     skip = sum(1 for r in results.values() if r["status"] == "SKIP")
     fail = sum(1 for r in results.values() if r["status"] == "FAIL")
-    print(f"Summary: {ok} OK, {skip} skipped, {fail} failed")
+
+    if args.output == "json":
+        print(json.dumps({
+            "summary": {"ok": ok, "skip": skip, "fail": fail},
+            "events_parsed": len(events),
+            "results": results,
+        }, indent=2, default=str))
+    else:
+        print()
+        print(f"Summary: {ok} OK, {skip} skipped, {fail} failed")
+
     return 1 if fail > 0 else 0
 
 

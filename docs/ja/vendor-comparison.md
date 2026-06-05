@@ -63,6 +63,7 @@
 
 ### エンタープライズ / コンプライアンス
 - **Splunk**: 確立された SIEM、コンプライアンスレポート
+- **CrowdStrike Falcon LogScale**: 次世代 SIEM、Falcon XDR エコシステムと統合
 - **Elastic**: セルフホストによるデータ主権確保
 - **Datadog**: SOC 2, HIPAA, FedRAMP オプション
 
