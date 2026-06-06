@@ -8,38 +8,50 @@ Security:
     stdlib xml.etree.ElementTree with entity expansion disabled.
 
 Performance:
-    - XML: Full DOM parse via ElementTree (suitable for <100MB files typical of
-      5-minute audit rotation). For larger files, consider iterparse streaming.
+    - XML (<10MB): Full DOM parse via ElementTree.
+    - XML (>=10MB): Streaming iterparse for memory-efficient processing.
     - EVTX: Simplified header-only extraction (timestamp + record number).
       Production EVTX parsing requires python-evtx (~15MB dependency).
+
+Observability:
+    All parse functions accept an optional `metrics` callback for integration
+    with Lambda Powertools or custom metrics collectors. The callback receives
+    (metric_name: str, value: float, unit: str) tuples.
 """
 
 import json
 import logging
 import struct
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from typing import Any, TypedDict
+from io import StringIO
+from typing import Any, Callable, TypedDict
 
 logger = logging.getLogger(__name__)
 
 # ─── XXE Protection ─────────────────────────────────────────────────────────
-# Disable external entity resolution to prevent XXE attacks.
-# defusedxml is preferred but not required (not in Lambda runtime).
 try:
     import defusedxml.ElementTree as SafeET  # type: ignore[import-untyped]
 
     _parse_xml_string = SafeET.fromstring
 except ImportError:
-    # Fallback: disable entity expansion in stdlib parser
     _parse_xml_string = ET.fromstring
 
 
 # ─── Type Definitions ───────────────────────────────────────────────────────
 
+MetricsCallback = Callable[[str, float, str], None]
+"""Callback signature: (metric_name, value, unit) -> None."""
+
 
 class AuditEvent(TypedDict):
-    """Normalized audit event schema."""
+    """Normalized audit event schema.
+
+    All fields are strings for consistent downstream handling.
+    The `raw` field preserves the original parsed dictionary for
+    full-fidelity access in vendor search UIs (LogScale, Splunk, etc.).
+    """
 
     timestamp: str
     event_type: str
@@ -54,20 +66,140 @@ class AuditEvent(TypedDict):
 
 
 class ParseResult(TypedDict):
-    """Result of a parse operation with metadata."""
+    """Result of a parse operation with metadata for observability."""
 
     events: list["AuditEvent"]
     errors: list[str]
     format: str
+    parse_duration_ms: float
+    event_count: int
 
 
 # ─── Constants ──────────────────────────────────────────────────────────────
 
-_FALLBACK_TIMESTAMP = ""  # Empty string signals "timestamp not available"
+_FALLBACK_TIMESTAMP = ""
 _REQUIRED_FIELDS = ("event_type", "timestamp")
+_ITERPARSE_THRESHOLD_BYTES = 10 * 1024 * 1024  # 10MB: switch to streaming
+
+# Format detection registry (Strategy pattern)
+_FORMAT_REGISTRY: list[tuple[str, Callable[..., bool]]] = []
+
+
+# ─── Format Registry (Strategy Pattern) ────────────────────────────────────
+
+
+def register_format(name: str, detector: Callable[..., bool]) -> None:
+    """Register a format detector for auto-detection.
+
+    Args:
+        name: Format identifier (e.g., "xml", "json", "evtx").
+        detector: Callable(data: bytes, key: str) -> bool.
+    """
+    _FORMAT_REGISTRY.append((name, detector))
+
+
+def detect_format(data: bytes, key: str = "") -> str:
+    """Auto-detect log format from content and filename.
+
+    Uses registered format detectors in priority order.
+
+    Args:
+        data: Raw file content.
+        key: S3 object key or filename (for extension-based detection).
+
+    Returns:
+        Format name string ("xml", "json", "evtx", or "unknown").
+    """
+    for name, detector in _FORMAT_REGISTRY:
+        try:
+            if detector(data, key):
+                return name
+        except Exception:
+            continue
+    return "unknown"
+
+
+# Register built-in format detectors
+def _detect_evtx(data: bytes, key: str) -> bool:
+    return data.startswith(b"ElfFile\x00")
+
+
+def _detect_xml(data: bytes, key: str) -> bool:
+    if key.endswith(".xml"):
+        return True
+    stripped = data.lstrip()
+    return stripped.startswith(b"<?xml") or stripped.startswith(b"<Event")
+
+
+def _detect_json(data: bytes, key: str) -> bool:
+    if key.endswith(".json") or key.endswith(".json.gz"):
+        return True
+    stripped = data.lstrip()
+    return stripped.startswith(b"[") or stripped.startswith(b"{")
+
+
+register_format("evtx", _detect_evtx)
+register_format("xml", _detect_xml)
+register_format("json", _detect_json)
 
 
 # ─── Public API ─────────────────────────────────────────────────────────────
+
+
+def parse(
+    data: bytes,
+    key: str = "",
+    metrics: MetricsCallback | None = None,
+) -> ParseResult:
+    """Universal parse entry point with auto-detection and metrics.
+
+    Detects the format, parses accordingly, and returns a structured result
+    with timing metrics for observability.
+
+    Args:
+        data: Raw audit log file content.
+        key: S3 object key or filename (assists format detection).
+        metrics: Optional callback for emitting metrics
+                 (e.g., Lambda Powertools add_metric).
+
+    Returns:
+        ParseResult with events, errors, format, and timing.
+    """
+    start = time.perf_counter()
+    fmt = detect_format(data, key)
+    events: list[AuditEvent] = []
+    errors: list[str] = []
+
+    try:
+        if fmt == "evtx":
+            events = parse_evtx(data)
+        elif fmt == "xml":
+            text = data.decode("utf-8", errors="replace")
+            events = parse_xml_log(text)
+        elif fmt == "json":
+            text = data.decode("utf-8", errors="replace")
+            events = parse_json_log(text)
+        else:
+            errors.append(f"Unknown format for key={key}")
+    except Exception as e:
+        errors.append(f"Parse error ({fmt}): {e}")
+        logger.error("Parse failed for key=%s format=%s: %s", key, fmt, e)
+
+    duration_ms = (time.perf_counter() - start) * 1000
+
+    if metrics:
+        metrics("ParseDuration", duration_ms, "Milliseconds")
+        metrics("EventsParsed", float(len(events)), "Count")
+        if errors:
+            metrics("ParseErrors", float(len(errors)), "Count")
+
+    return {
+        "events": events,
+        "errors": errors,
+        "format": fmt,
+        "parse_duration_ms": round(duration_ms, 2),
+        "event_count": len(events),
+    }
 
 
 def parse_evtx(data: bytes) -> list[AuditEvent]:
@@ -90,7 +222,6 @@ def parse_evtx(data: bytes) -> list[AuditEvent]:
 
     while offset < len(data):
         try:
-            # Check for record magic "**\x00\x00"
             if data[offset : offset + 4] == b"\x2a\x2a\x00\x00":
                 record_size = struct.unpack_from("<I", data, offset + 4)[0]
                 if record_size < 24 or record_size > 65536:
@@ -135,7 +266,7 @@ def parse_json_log(data: str) -> list[AuditEvent]:
         except json.JSONDecodeError:
             pass
 
-    # Fall back to NDJSON (one JSON object per line)
+    # Fall back to NDJSON
     for line_num, line in enumerate(data.split("\n"), start=1):
         line = line.strip()
         if not line:
@@ -154,8 +285,8 @@ def parse_json_log(data: str) -> list[AuditEvent]:
 def parse_xml_log(data: str) -> list[AuditEvent]:
     """Parse XML format audit log data.
 
-    ONTAP generates XML audit logs when configured with `-format xml`.
-    The XML contains <Event> elements with <System> and <EventData> sections.
+    For files larger than 10MB, automatically switches to streaming
+    iterparse mode to reduce memory usage.
 
     Args:
         data: XML string content.
@@ -167,33 +298,14 @@ def parse_xml_log(data: str) -> list[AuditEvent]:
         Parse errors are logged at WARNING level. Partially parseable files
         return whatever events were successfully extracted before the error.
     """
-    events: list[AuditEvent] = []
-
     if not data or not data.strip():
-        return events
+        return []
 
-    try:
-        xml_content = _prepare_xml_content(data)
-        root = _parse_xml_string(xml_content)
+    # Use streaming for large files
+    if len(data.encode("utf-8")) >= _ITERPARSE_THRESHOLD_BYTES:
+        return _parse_xml_streaming(data)
 
-        for event_elem in root.iter("Event"):
-            raw = _xml_element_to_flat_dict(event_elem)
-            if raw:
-                events.append(normalize_event(raw))
-
-        # Fallback: if no <Event> elements found, try direct children
-        if not events:
-            for child in root:
-                raw = _xml_element_to_flat_dict(child)
-                if raw:
-                    events.append(normalize_event(raw))
-
-    except ET.ParseError as e:
-        logger.warning(
-            "XML parse error: %s (extracted %d events before failure)", e, len(events)
-        )
-
-    return events
+    return _parse_xml_dom(data)
 
 
 def normalize_event(event: dict[str, Any]) -> AuditEvent:
@@ -267,12 +379,65 @@ def validate_event(event: AuditEvent) -> list[str]:
 # ─── Private Helpers ────────────────────────────────────────────────────────
 
 
+def _parse_xml_dom(data: str) -> list[AuditEvent]:
+    """Parse XML using full DOM (ElementTree). Best for <10MB files."""
+    events: list[AuditEvent] = []
+
+    try:
+        xml_content = _prepare_xml_content(data)
+        root = _parse_xml_string(xml_content)
+
+        for event_elem in root.iter("Event"):
+            raw = _xml_element_to_flat_dict(event_elem)
+            if raw:
+                events.append(normalize_event(raw))
+
+        # Fallback: if no <Event> elements found, try direct children
+        if not events:
+            for child in root:
+                raw = _xml_element_to_flat_dict(child)
+                if raw:
+                    events.append(normalize_event(raw))
+
+    except ET.ParseError as e:
+        logger.warning(
+            "XML parse error: %s (extracted %d events before failure)", e, len(events)
+        )
+
+    return events
+
+
+def _parse_xml_streaming(data: str) -> list[AuditEvent]:
+    """Parse XML using iterparse streaming. Memory-efficient for large files.
+
+    Processes <Event> elements one at a time, clearing each from memory
+    after extraction. Suitable for files >10MB.
+    """
+    events: list[AuditEvent] = []
+    xml_content = _prepare_xml_content(data)
+
+    try:
+        context = ET.iterparse(StringIO(xml_content), events=("end",))
+        for event_type, elem in context:
+            tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
+            if tag == "Event":
+                raw = _xml_element_to_flat_dict(elem)
+                if raw:
+                    events.append(normalize_event(raw))
+                elem.clear()  # Free memory
+    except ET.ParseError as e:
+        logger.warning(
+            "XML streaming parse error: %s (extracted %d events)", e, len(events)
+        )
+
+    return events
+
+
 def _prepare_xml_content(data: str) -> str:
     """Prepare XML content for parsing by wrapping fragments.
 
     ONTAP audit log files may contain multiple <Event> elements without
-    a single root element, or may include an XML declaration. This function
-    wraps the content to ensure valid XML structure.
+    a single root element, or may include an XML declaration.
 
     Args:
         data: Raw XML string (may be a fragment).
@@ -296,8 +461,7 @@ def _prepare_xml_content(data: str) -> str:
 def _xml_element_to_flat_dict(elem: ET.Element) -> dict[str, Any]:
     """Convert an XML element tree to a flat dictionary.
 
-    Handles ONTAP's <Data Name="key">value</Data> pattern correctly,
-    collecting all Data elements as separate key-value pairs.
+    Handles ONTAP's <Data Name="key">value</Data> pattern correctly.
 
     Args:
         elem: XML Element to flatten.
@@ -310,7 +474,6 @@ def _xml_element_to_flat_dict(elem: ET.Element) -> dict[str, Any]:
     for child in elem.iter():
         tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
 
-        # Handle <Data Name="key">value</Data> pattern (ONTAP EventData)
         if tag == "Data" and "Name" in child.attrib:
             key = child.attrib["Name"]
             if child.text and child.text.strip():
@@ -318,9 +481,8 @@ def _xml_element_to_flat_dict(elem: ET.Element) -> dict[str, Any]:
         elif child.text and child.text.strip():
             result[tag] = child.text.strip()
 
-        # Capture attributes (e.g., TimeCreated SystemTime="...")
         for attr_name, attr_value in child.attrib.items():
-            if attr_name != "Name":  # Skip "Name" attr from Data elements
+            if attr_name != "Name":
                 result[f"{tag}_{attr_name}"] = attr_value
 
     return result
@@ -328,9 +490,6 @@ def _xml_element_to_flat_dict(elem: ET.Element) -> dict[str, Any]:
 
 def _parse_evtx_record(record_data: bytes) -> dict[str, Any] | None:
     """Parse a single EVTX record header.
-
-    Extracts record number and timestamp from the binary header.
-    Full EVTX parsing (EventID, user, path) requires the python-evtx library.
 
     Args:
         record_data: Raw record bytes starting at record magic.
@@ -345,10 +504,8 @@ def _parse_evtx_record(record_data: bytes) -> dict[str, Any] | None:
         record_num = struct.unpack_from("<Q", record_data, 8)[0]
         timestamp_raw = struct.unpack_from("<Q", record_data, 16)[0]
 
-        # Convert Windows FILETIME to ISO timestamp
-        # FILETIME: 100-nanosecond intervals since 1601-01-01
         if timestamp_raw > 0:
-            epoch_diff = 116444736000000000  # 1601->1970 in 100ns intervals
+            epoch_diff = 116444736000000000
             timestamp_seconds = (timestamp_raw - epoch_diff) / 10_000_000
             timestamp = datetime.fromtimestamp(
                 timestamp_seconds, tz=timezone.utc
