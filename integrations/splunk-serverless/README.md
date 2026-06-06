@@ -138,6 +138,7 @@ index=fsxn_audit sourcetype=fsxn:ontap:audit user="admin@corp.local"
 - `VerifySSL=false` disables TLS verification (⚠️ do NOT use in production)
 - Splunk Cloud HEC endpoints require allowlisting of Lambda's outbound IP (NAT Gateway EIP)
 - For sustained >1000 events/sec, use the Firehose path (`template-firehose.yaml`)
+- **Splunk Cloud free trial**: HEC DNS records (`http-inputs-<stack>.splunkcloud.com`) are not provisioned for free trial accounts. This is a [known Community issue](https://community.splunk.com/t5/Getting-Data-In/HEC-with-Splunk-Cloud-trial/td-p/596680). Use Splunk Enterprise (Docker) for local E2E validation.
 - **Data residency**: For Splunk Cloud, data is stored in the region of your Splunk Cloud deployment. For self-managed Splunk, data stays in your infrastructure. Evaluate cross-border data transfer requirements with your compliance team.
 
 ## Cost Estimate
@@ -149,6 +150,24 @@ index=fsxn_audit sourcetype=fsxn:ontap:audit user="admin@corp.local"
 | 100 GB | ~$50 | Significant — consider Firehose path |
 
 > Splunk pricing is license-based (daily indexing volume). This integration does not change your Splunk license cost — it only changes the delivery mechanism from EC2 to Lambda.
+
+## E2E Verification Evidence
+
+Verified with Splunk Enterprise 10.4.0 (Docker, local):
+
+| Item | Result |
+|------|--------|
+| XML audit log parsing | ✅ 5 events parsed (EventID 4663/4656/4660) |
+| HEC delivery | ✅ HTTP 200 (`{"text":"Success","code":0}`) |
+| Splunk indexing | ✅ `fsxn_audit` index, 5 events confirmed |
+| Field extraction | ✅ user, path, client_ip, event_type, result, svm, timestamp |
+| Splunk Search UI | ✅ All events searchable and field-parsed |
+
+**Verification method**: Splunk Enterprise (Docker `splunk/splunk:latest`, `--platform linux/amd64`) with HEC token pre-configured via `SPLUNK_HEC_TOKEN` environment variable. Test executed using `shared/scripts/test-xml-e2e.py --vendor splunk`.
+
+**Splunk Cloud trial note**: Free trial accounts do not provision HEC DNS records (`http-inputs-<stack>.splunkcloud.com`) reliably. Use Splunk Enterprise (Docker) for local validation or Splunk Cloud paid tier for production.
+
+Screenshot: [`screenshots/splunk-e2e-search-fsxn-audit-xml.png`](screenshots/splunk-e2e-search-fsxn-audit-xml.png)
 
 ## Related Documents
 
