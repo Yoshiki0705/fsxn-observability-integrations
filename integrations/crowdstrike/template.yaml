@@ -42,6 +42,11 @@ Parameters:
     MinValue: 30
     MaxValue: 900
 
+  HecPath:
+    Type: String
+    Default: /api/v1/ingest/hec
+    Description: HEC endpoint path (LogScale default /api/v1/ingest/hec, Splunk /services/collector/event)
+
 Resources:
   DeadLetterQueue:
     Type: AWS::SQS::Queue
@@ -122,6 +127,7 @@ Resources:
           SOURCE: fsxn-ontap
           SOURCETYPE: 'fsxn:audit'
           INDEX: fsxn_audit
+          HEC_PATH: !Ref HecPath
 
   LogGroup:
     Type: AWS::Logs::LogGroup

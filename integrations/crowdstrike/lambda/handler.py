@@ -27,7 +27,7 @@ LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 SOURCE = os.environ.get("SOURCE", "fsxn-ontap")
 SOURCETYPE = os.environ.get("SOURCETYPE", "fsxn:audit")
 INDEX = os.environ.get("INDEX", "fsxn_audit")
-HEC_PATH = "/api/v1/ingest/hec"
+HEC_PATH = os.environ.get("HEC_PATH", "/api/v1/ingest/hec")
 
 MAX_BATCH_SIZE_BYTES = 5 * 1024 * 1024
 MAX_RETRIES = 3
@@ -202,20 +202,30 @@ def _format_for_logscale(logs: list[dict[str, Any]], source_key: str) -> list[di
     Per LogScale HEC docs, top-level `time` must be epoch seconds (float).
     This is translated to @timestamp on ingestion. If omitted, LogScale
     uses ingest time instead of event time.
+
+    Searchable metadata (s3_key, log_format) is placed inside the `event`
+    object rather than `fields`, because LogScale auto-parses JSON `event`
+    objects into searchable fields. The `fields` behavior may differ between
+    Splunk and LogScale implementations.
     """
     formatted = []
     for log in logs:
         epoch_time = _iso_to_epoch(log.get("timestamp", ""))
-        event: dict[str, Any] = {
-            "event": log,
+        # Put metadata inside event for consistent field extraction
+        enriched_event = {
+            **log,
+            "s3_key": source_key,
+            "log_format": "xml" if log.get("timestamp") else "unknown",
+        }
+        hec_event: dict[str, Any] = {
+            "event": enriched_event,
             "source": SOURCE,
             "sourcetype": SOURCETYPE,
             "index": INDEX,
         }
         if epoch_time is not None:
-            event["time"] = epoch_time
-        event["fields"] = {"s3_key": source_key, "svm": log.get("svm", "")}
-        formatted.append(event)
+            hec_event["time"] = epoch_time
+        formatted.append(hec_event)
     return formatted
 
 

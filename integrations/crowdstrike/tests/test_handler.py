@@ -85,7 +85,8 @@ class TestFormatForLogscale:
         assert result[0]["sourcetype"] == "fsxn:audit"
         assert result[0]["index"] == "fsxn_audit"
         assert result[0]["event"]["user"] == "testuser"
-        assert result[0]["fields"]["s3_key"] == "audit/test.xml"
+        assert result[0]["event"]["s3_key"] == "audit/test.xml"
+        assert "time" in result[0]  # epoch seconds
 
     def test_empty_logs(self, reset_handler):
         handler = reset_handler
