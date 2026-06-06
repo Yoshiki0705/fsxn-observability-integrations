@@ -59,12 +59,17 @@ def get_ingest_token() -> str:
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Lambda handler for shipping audit logs to CrowdStrike LogScale."""
     logger.info("Processing event: %s", json.dumps(event, default=str))
+    invocation_start = time.time()
 
     token = get_ingest_token()
     records = _extract_s3_records(event)
 
     total_logs = 0
     total_shipped = 0
+    files_scanned = len(records)
+    files_processed = 0
+    hec_success = 0
+    hec_failure = 0
     errors: list[dict[str, str]] = []
 
     for record in records:
@@ -80,9 +85,28 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             hec_events = _format_for_logscale(logs, key)
             shipped = _ship_to_logscale(hec_events, token)
             total_shipped += shipped
+            files_processed += 1
+            if shipped > 0:
+                hec_success += 1
+            else:
+                hec_failure += 1
         except Exception as e:
             logger.error("Failed: %s/%s: %s", bucket, key, str(e))
             errors.append({"bucket": bucket, "key": key, "error": str(e)})
+            hec_failure += 1
+
+    delivery_latency_ms = (time.time() - invocation_start) * 1000
+
+    # Emit pipeline metrics using CloudWatch EMF (Embedded Metric Format)
+    _emit_pipeline_metrics(
+        files_scanned=files_scanned,
+        files_processed=files_processed,
+        events_parsed=total_logs,
+        events_sent=total_shipped,
+        hec_success=hec_success,
+        hec_failure=hec_failure,
+        delivery_latency_ms=delivery_latency_ms,
+    )
 
     result = {
         "statusCode": 200 if not errors else 207,
@@ -90,6 +114,50 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     }
     logger.info("Complete: %s", json.dumps(result))
     return result
+
+
+def _emit_pipeline_metrics(
+    files_scanned: int,
+    files_processed: int,
+    events_parsed: int,
+    events_sent: int,
+    hec_success: int,
+    hec_failure: int,
+    delivery_latency_ms: float,
+) -> None:
+    """Emit pipeline health metrics using CloudWatch Embedded Metric Format.
+
+    EMF allows custom metrics to be extracted from CloudWatch Logs without
+    a separate PutMetricData API call, reducing cost and latency.
+    """
+    emf_payload = {
+        "_aws": {
+            "Timestamp": int(time.time() * 1000),
+            "CloudWatchMetrics": [{
+                "Namespace": "FSxN/CrowdStrike/Pipeline",
+                "Dimensions": [["FunctionName"]],
+                "Metrics": [
+                    {"Name": "FilesScanned", "Unit": "Count"},
+                    {"Name": "FilesProcessed", "Unit": "Count"},
+                    {"Name": "EventsParsed", "Unit": "Count"},
+                    {"Name": "EventsSent", "Unit": "Count"},
+                    {"Name": "HecSuccess", "Unit": "Count"},
+                    {"Name": "HecFailure", "Unit": "Count"},
+                    {"Name": "DeliveryLatencyMs", "Unit": "Milliseconds"},
+                ],
+            }],
+        },
+        "FunctionName": os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown"),
+        "FilesScanned": files_scanned,
+        "FilesProcessed": files_processed,
+        "EventsParsed": events_parsed,
+        "EventsSent": events_sent,
+        "HecSuccess": hec_success,
+        "HecFailure": hec_failure,
+        "DeliveryLatencyMs": round(delivery_latency_ms, 2),
+    }
+    # EMF: print as JSON to stdout — CloudWatch extracts metrics automatically
+    print(json.dumps(emf_payload))
 
 
 def _extract_s3_records(event: dict[str, Any]) -> list[dict[str, str]]:
