@@ -70,6 +70,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     files_processed = 0
     hec_success = 0
     hec_failure = 0
+    max_log_file_age_seconds = 0.0
     errors: list[dict[str, str]] = []
 
     for record in records:
@@ -78,7 +79,14 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         logger.info("Processing: s3://%s/%s", bucket, key)
 
         try:
-            data = s3_client.get_object(Bucket=S3_ACCESS_POINT_ARN, Key=key)["Body"].read()
+            s3_response = s3_client.get_object(Bucket=S3_ACCESS_POINT_ARN, Key=key)
+            data = s3_response["Body"].read()
+            # Track file age for SLO measurement
+            last_modified = s3_response.get("LastModified")
+            if last_modified:
+                file_age = time.time() - last_modified.timestamp()
+                max_log_file_age_seconds = max(max_log_file_age_seconds, file_age)
+
             logs = _parse_audit_logs(data, key)
             total_logs += len(logs)
 
@@ -106,6 +114,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         hec_success=hec_success,
         hec_failure=hec_failure,
         delivery_latency_ms=delivery_latency_ms,
+        log_file_age_seconds=max_log_file_age_seconds,
     )
 
     result = {
@@ -124,6 +133,7 @@ def _emit_pipeline_metrics(
     hec_success: int,
     hec_failure: int,
     delivery_latency_ms: float,
+    log_file_age_seconds: float,
 ) -> None:
     """Emit pipeline health metrics using CloudWatch Embedded Metric Format.
 
@@ -144,6 +154,7 @@ def _emit_pipeline_metrics(
                     {"Name": "HecSuccess", "Unit": "Count"},
                     {"Name": "HecFailure", "Unit": "Count"},
                     {"Name": "DeliveryLatencyMs", "Unit": "Milliseconds"},
+                    {"Name": "LogFileAgeSeconds", "Unit": "Seconds"},
                 ],
             }],
         },
@@ -155,6 +166,7 @@ def _emit_pipeline_metrics(
         "HecSuccess": hec_success,
         "HecFailure": hec_failure,
         "DeliveryLatencyMs": round(delivery_latency_ms, 2),
+        "LogFileAgeSeconds": round(log_file_age_seconds, 1),
     }
     # EMF: print as JSON to stdout — CloudWatch extracts metrics automatically
     print(json.dumps(emf_payload))
