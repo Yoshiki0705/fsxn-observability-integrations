@@ -25,6 +25,7 @@ venv/
 
 # Blog drafts (not for public repo)
 docs/blog/
+docs/internal/
 
 # Kiro Web screenshots (contain account info, not for public repo)
 docs/kiro-web-screenshots/
