@@ -113,6 +113,8 @@ aws lambda update-function-code \
 
 **Protocol verification**: Since Falcon LogScale uses a Splunk HEC-compatible endpoint (`/api/v1/ingest/hec`), the successful Splunk Enterprise E2E test (HTTP 200, 5 events indexed and searchable) validates the HEC payload format used by this integration.
 
+Screenshot: [`screenshots/crowdstrike-hec-verification-splunk.png`](screenshots/crowdstrike-hec-verification-splunk.png) — CrowdStrike HEC payload (sourcetype `fsxn:audit:xml-crowdstrike`, field `integration=crowdstrike-logscale`) accepted and searchable in Splunk Enterprise (HEC-compatible receiver).
+
 ### Architecture Note: Shared Parser
 
 The handler includes an inline XML/JSON parser for self-contained deployment. For production, consider using the shared Lambda Layer (`shared/lambda-layers/log-parser/`) to centralize parser updates across all vendors.
