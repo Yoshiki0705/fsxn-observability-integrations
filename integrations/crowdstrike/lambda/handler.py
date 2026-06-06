@@ -184,8 +184,7 @@ def _parse_json(data: str) -> list[dict[str, Any]]:
 def _normalize(event: dict[str, Any]) -> dict[str, Any]:
     """Normalize to common schema."""
     return {
-        "timestamp": event.get("TimeCreated_SystemTime", event.get("timestamp",
-                     datetime.now(timezone.utc).isoformat())),
+        "timestamp": event.get("TimeCreated_SystemTime", event.get("timestamp", "")),
         "event_type": event.get("EventID", event.get("event_type", "unknown")),
         "source": SOURCE,
         "svm": event.get("Computer", event.get("SVMName", event.get("svm", ""))),
@@ -198,15 +197,42 @@ def _normalize(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def _format_for_logscale(logs: list[dict[str, Any]], source_key: str) -> list[dict[str, Any]]:
-    """Format logs as HEC events for LogScale."""
-    return [{
-        "event": log,
-        "source": SOURCE,
-        "sourcetype": SOURCETYPE,
-        "index": INDEX,
-        "time": log.get("timestamp", ""),
-        "fields": {"s3_key": source_key, "svm": log.get("svm", "")},
-    } for log in logs]
+    """Format logs as HEC events for LogScale.
+
+    Per LogScale HEC docs, top-level `time` must be epoch seconds (float).
+    This is translated to @timestamp on ingestion. If omitted, LogScale
+    uses ingest time instead of event time.
+    """
+    formatted = []
+    for log in logs:
+        epoch_time = _iso_to_epoch(log.get("timestamp", ""))
+        event: dict[str, Any] = {
+            "event": log,
+            "source": SOURCE,
+            "sourcetype": SOURCETYPE,
+            "index": INDEX,
+        }
+        if epoch_time is not None:
+            event["time"] = epoch_time
+        event["fields"] = {"s3_key": source_key, "svm": log.get("svm", "")}
+        formatted.append(event)
+    return formatted
+
+
+def _iso_to_epoch(iso_str: str) -> float | None:
+    """Convert ISO 8601 timestamp to epoch seconds for HEC time field.
+
+    Returns None if parsing fails (LogScale will use ingest time).
+    """
+    if not iso_str:
+        return None
+    try:
+        # Handle both 'Z' suffix and '+00:00' timezone formats
+        iso_str = iso_str.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(iso_str)
+        return dt.timestamp()
+    except (ValueError, AttributeError):
+        return None
 
 
 def _ship_to_logscale(events: list[dict[str, Any]], token: str) -> int:

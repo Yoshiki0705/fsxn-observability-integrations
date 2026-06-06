@@ -69,8 +69,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - s3:GetObject
+                  - s3:ListBucket
                 Resource:
                   - !Sub '${FsxS3AccessPointArn}/object/*'
+                  - !Ref FsxS3AccessPointArn
         - PolicyName: SecretsManagerRead
           PolicyDocument:
             Version: '2012-10-17'
