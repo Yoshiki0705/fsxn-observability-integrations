@@ -97,3 +97,32 @@ S3 AP → Lambda (OTLP) → OTel Collector → Multiple Backends
 - ✅ Routing, filtering, redaction in Collector config
 - ❌ Requires Collector infrastructure (ECS Fargate recommended)
 - ❌ Additional operational complexity
+
+## Trial & Verification Notes
+
+### Splunk Cloud Platform
+
+The Splunk Cloud Platform **free trial does NOT provision HEC DNS records** (`http-inputs-<stack>.splunkcloud.com`). This is a [widely reported issue](https://community.splunk.com/t5/Getting-Data-In/HEC-with-Splunk-Cloud-trial/td-p/596680) in the Splunk Community (2020–2025). Port 8088 is also blocked on the trial instance.
+
+**Workaround**: Use Splunk Enterprise (Docker) for local E2E validation at $0 cost. The `splunk/splunk:latest` image includes a fully functional HEC. Our E2E verification was completed with Splunk Enterprise 10.4.0 (Docker, linux/amd64).
+
+### CrowdStrike Falcon LogScale
+
+The CrowdStrike Falcon **EDR trial** includes read-only access to the Next-Gen SIEM UI (log search, repository list) but **does NOT include the Data Connectors / HEC ingest functionality**. The "Add data connector" page returns "Page not found" on the trial. A paid Falcon Next-Gen SIEM license is required for external data ingestion via HEC.
+
+**Protocol verification**: Since Falcon LogScale uses a Splunk HEC-compatible endpoint (`/api/v1/ingest/hec`), the Splunk Enterprise E2E test validates the identical HEC payload format used by this integration.
+
+### Verification Summary
+
+| Vendor | E2E Method | Cost |
+|--------|-----------|------|
+| Datadog | Cloud trial (14-day) | $0 |
+| New Relic | Free tier (100 GB/month) | $0 |
+| Grafana Cloud | Free tier (50 GB/month) | $0 |
+| Splunk | Docker local (Enterprise trial) | $0 |
+| Elastic | Cloud trial (14-day) | $0 |
+| Dynatrace | Free tier (15-day trial) | $0 |
+| Sumo Logic | Free tier (500 MB/day) | $0 |
+| Honeycomb | Free tier (20M events/month) | $0 |
+| CrowdStrike | HEC protocol verified via Splunk | $0 |
+| OTel Collector | Self-hosted (Docker Compose) | $0 |
