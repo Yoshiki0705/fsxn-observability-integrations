@@ -95,3 +95,32 @@ S3 AP → Lambda (OTLP) → OTel Collector → 複数バックエンド
 - ✅ Collector 設定でルーティング、フィルタリング、リダクション
 - ❌ Collector インフラが必要（ECS Fargate 推奨）
 - ❌ 運用の複雑さが増加
+
+## トライアル・検証に関する注意事項
+
+### Splunk Cloud Platform
+
+Splunk Cloud Platform の **無料トライアルでは HEC 用 DNS レコード** (`http-inputs-<stack>.splunkcloud.com`) **がプロビジョニングされません**。これは [Splunk Community で広く報告されている問題](https://community.splunk.com/t5/Getting-Data-In/HEC-with-Splunk-Cloud-trial/td-p/596680)です（2020〜2025年）。ポート 8088 もトライアルインスタンスではブロックされています。
+
+**回避策**: Splunk Enterprise (Docker) をローカルで使用し、$0 で E2E 検証が可能です。`splunk/splunk:latest` イメージには完全に機能する HEC が含まれています。本プロジェクトの E2E 検証は Splunk Enterprise 10.4.0 (Docker, linux/amd64) で完了しました。
+
+### CrowdStrike Falcon LogScale
+
+CrowdStrike Falcon の **EDR トライアル**では、Next-Gen SIEM UI への読み取り専用アクセス（ログ検索、リポジトリ一覧）は含まれますが、**Data Connectors / HEC インジェスト機能は含まれません**。「Add data connector」ページはトライアルでは "Page not found" を返します。HEC 経由での外部データインジェストには有料の Falcon Next-Gen SIEM ライセンスが必要です。
+
+**プロトコル検証**: Falcon LogScale は Splunk HEC 互換エンドポイント (`/api/v1/ingest/hec`) を使用するため、Splunk Enterprise での E2E テスト成功が、本統合で使用する HEC ペイロードフォーマットの互換性を検証しています。
+
+### 検証方法サマリー
+
+| ベンダー | E2E 検証方法 | コスト |
+|---------|-------------|------|
+| Datadog | Cloud トライアル (14日間) | $0 |
+| New Relic | Free tier (100 GB/月) | $0 |
+| Grafana Cloud | Free tier (50 GB/月) | $0 |
+| Splunk | Docker ローカル (Enterprise trial) | $0 |
+| Elastic | Cloud トライアル (14日間) | $0 |
+| Dynatrace | Free tier (15日間トライアル) | $0 |
+| Sumo Logic | Free tier (500 MB/日) | $0 |
+| Honeycomb | Free tier (2000万イベント/月) | $0 |
+| CrowdStrike | HEC プロトコル検証 (Splunk 経由) | $0 |
+| OTel Collector | セルフホスト (Docker Compose) | $0 |
