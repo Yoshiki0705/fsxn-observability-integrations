@@ -94,9 +94,24 @@ aws lambda update-function-code \
 ### Roadmap
 
 - [x] Audit log handler (HEC delivery)
+- [x] Unit tests (14 tests passing)
+- [x] HEC protocol verification (via Splunk Enterprise Docker — same HEC format)
 - [ ] EMS Webhook handler (`template-ems.yaml`)
 - [ ] FPolicy handler (`template-fpolicy.yaml`)
-- [ ] E2E verification with live LogScale instance
+- [ ] E2E verification with live LogScale instance (requires paid Next-Gen SIEM license)
+
+### E2E Verification Status
+
+| Item | Result |
+|------|--------|
+| Lambda handler code | ✅ Complete (HEC format) |
+| Unit tests | ✅ 14 tests passing |
+| HEC protocol compatibility | ✅ Verified via Splunk Enterprise (identical HEC format) |
+| Live LogScale ingest | ⚠️ Requires paid Next-Gen SIEM license |
+
+**Trial limitation**: The CrowdStrike Falcon EDR trial includes read-only access to the Next-Gen SIEM UI (log search, dashboards, repository list) but **does NOT include the Data Connectors / HEC ingest functionality**. The "Add data connector" page returns "Page not found" on the trial. A paid Falcon Next-Gen SIEM license is required for external data ingestion via HEC.
+
+**Protocol verification**: Since Falcon LogScale uses a Splunk HEC-compatible endpoint (`/api/v1/ingest/hec`), the successful Splunk Enterprise E2E test (HTTP 200, 5 events indexed and searchable) validates the HEC payload format used by this integration.
 
 ### Architecture Note: Shared Parser
 
