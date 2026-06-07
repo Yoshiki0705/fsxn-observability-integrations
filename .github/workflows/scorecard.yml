@@ -15,12 +15,12 @@ jobs:
       security-events: write
       id-token: write
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
 
       - name: Run Scorecard analysis
-        uses: ossf/scorecard-action@99c09fe975337306107572b4fdf4db224cf8e2f2 # v2.4.3
+        uses: ossf/scorecard-action@af76153369ae1eb1eaffc4118046b7fda9a8419e # main (post-v2.4.3)
         with:
           results_file: results.sarif
           results_format: sarif
