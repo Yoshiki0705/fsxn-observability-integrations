@@ -74,6 +74,7 @@ jobs:
             integrations/dynatrace/tests/ \
             integrations/sumo-logic/tests/ \
             integrations/honeycomb/tests/ \
+            integrations/crowdstrike/tests/ \
             --import-mode=importlib \
             -v --tb=short \
             --cov=integrations \
@@ -92,6 +93,35 @@ jobs:
             shared/lambda-layers/ems-parser/tests/ \
             --import-mode=importlib \
             -v --tb=short
+
+      - name: Python tests - Shared Parser (log-parser v1.1.0)
+        env:
+          AWS_DEFAULT_REGION: ap-northeast-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+          AWS_SECURITY_TOKEN: testing
+          AWS_SESSION_TOKEN: testing
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, 'shared/lambda-layers/log-parser/python')
+          from fsxn_log_parser import parse, detect_format, validate_event, __version__
+          assert __version__ == '1.1.0', f'Expected 1.1.0, got {__version__}'
+          # Smoke test: XML parse
+          xml = b'<Event><System><EventID>4663</EventID><TimeCreated SystemTime=\"2026-01-01T00:00:00Z\"/><Computer>SVM</Computer></System><EventData><Data Name=\"SubjectUserName\">user</Data><Data Name=\"ObjectName\">/test</Data><Data Name=\"Keywords\">Audit Success</Data></EventData></Event>'
+          result = parse(xml, key='test.xml')
+          assert result['event_count'] == 1
+          assert result['format'] == 'xml'
+          assert result['events'][0]['user'] == 'user'
+          # Format detection
+          assert detect_format(b'ElfFile\x00test', '') == 'evtx'
+          assert detect_format(b'{\"test\":1}', '') == 'json'
+          assert detect_format(xml, '') == 'xml'
+          # Validation
+          errors = validate_event(result['events'][0])
+          assert errors == []
+          print(f'Parser v{__version__} smoke test passed.')
+          "
 
       - name: Upload coverage report
         if: always()
@@ -171,6 +201,13 @@ jobs:
           BLOG_COUNT=$(git ls-files docs/blog/ | wc -l)
           if [ "${BLOG_COUNT}" -gt 0 ]; then
             echo "❌ docs/blog/ files are tracked"
+            FAILED=1
+          fi
+
+          # Check docs/internal/ is not tracked
+          INTERNAL_COUNT=$(git ls-files docs/internal/ | wc -l)
+          if [ "${INTERNAL_COUNT}" -gt 0 ]; then
+            echo "❌ docs/internal/ files are tracked"
             FAILED=1
           fi
 
