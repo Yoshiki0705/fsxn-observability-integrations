@@ -116,6 +116,33 @@ The pipeline (`FSx for ONTAP Audit Logs`) applies to logs matching `source:fsxn`
 | Abnormal Access Volume | >1000 accesses/1h per user | High | Detects potential data exfiltration |
 | Access Failure Spike | >10 failures/15min per user | Medium | Detects unauthorized access attempts |
 
+## Saved Views
+
+Pre-configured views for common investigation scenarios:
+
+| View Name | Query | Use Case |
+|-----------|-------|----------|
+| FSxN File Deletions | `source:fsxn @event_type:4660` | Track all file deletion events |
+| FSxN Access Failures | `source:fsxn @result:"Audit Failure"` | Permission denied / unauthorized access |
+| FSxN All Events | `source:fsxn` | Full audit log stream |
+| FSxN Sensitive Share Access | `source:fsxn (@path:*finance* OR @path:*hr* OR @path:*legal*)` | Access to sensitive file shares |
+| FSxN After-Hours Access | `source:fsxn` | Filter by time for off-hours monitoring |
+
+![Saved Views](screenshots/datadog-saved-views.png)
+
+## Facets Setup
+
+After deploying and sending initial logs, add custom Facets for faster filtering in Log Explorer:
+
+1. Open Log Explorer → Click any log entry to expand it
+2. Hover over a field (e.g., `event_type`) → Click the gear icon → "Create facet"
+3. Repeat for: `@event_type`, `@user`, `@svm`, `@path`, `@client_ip`, `@operation`, `@result`, `@operation_name`
+
+These facets enable:
+- Left sidebar filtering by user, SVM, operation type
+- One-click drill-down from dashboard widgets
+- Saved View facet panels for team-specific workflows
+
 ## Important Notes
 
 - **FSx for ONTAP S3 APs do NOT support S3 Event Notifications.** Lambda is invoked on a schedule (EventBridge Scheduler) and uses checkpointing to process only newly rotated files.
