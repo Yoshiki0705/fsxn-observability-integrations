@@ -1,8 +1,8 @@
 # Roadmap
 
-## Current State (May 2026)
+## Current State (June 2026)
 
-All 9 vendor integrations are E2E verified. The project provides a complete serverless observability pattern library for FSx for ONTAP.
+All 9 vendor integrations are E2E verified. Datadog paid plan verification complete (Pipeline, Monitors, Dashboard, Saved Views). CrowdStrike Falcon LogScale blog article (Part 15) ready for publication. Existing audit tool coexistence guide published.
 
 ## Phase 1: Foundation (Completed)
 
@@ -15,9 +15,7 @@ All 9 vendor integrations are E2E verified. The project provides a complete serv
 - [x] dev.to blog series (Parts 1-12)
 - [x] Partner assets (Solution Brief, PoC Proposal, Workshop Agenda)
 
-## Phase 2: Production Hardening (In Progress)
-
-Target: Q3 2026
+## Phase 2: Production Hardening (Completed)
 
 - [x] Pipeline SLO definitions with Go/No-Go criteria
 - [x] Data Classification Guide (PII field mapping + handling patterns)
@@ -30,11 +28,11 @@ Target: Q3 2026
 - [x] cfn-guard rules refinement (critical rules blocking)
 - [x] Japanese documentation sync verification script
 - [x] Cost validation template (estimated vs actual)
+- [x] Datadog paid plan E2E verification (Pipeline, Monitors, Dashboard, Saved Views)
+- [x] Existing audit tool coexistence guide (ONTAP format constraint documented)
 - [ ] Cost validation data (requires 1 month of production billing)
 
 ## Phase 3: Enterprise Features (Completed)
-
-Target: Q4 2026
 
 - [x] Multi-account deployment pattern (AWS Organizations + StackSets)
 - [x] Cross-region replication for audit log DR
@@ -45,7 +43,7 @@ Target: Q4 2026
 - [x] Compliance evidence pack template (ISMAP, FISC, SOC2)
 - [ ] Cost model validation (estimated vs actual billing comparison)
 
-## Phase 4: Community & Ecosystem (Planned)
+## Phase 4: Community & Ecosystem (In Progress)
 
 Target: 2027 H1
 
@@ -57,6 +55,9 @@ Target: 2027 H1
 - [x] Community contribution guidelines (CONTRIBUTING.md)
 - [ ] GitHub Discussions for Q&A
 - [ ] Integration test suite with LocalStack
+- [x] CrowdStrike Falcon LogScale integration (handler + template + tests + docs)
+- [x] Parser v1.1.0 (FIELD_MAPPING, Strategy pattern, defusedxml, 178K events/sec)
+- [x] Blog Part 15: CrowdStrike Falcon LogScale via HEC (ready for publication)
 
 ## Blog Series Plan
 
@@ -71,7 +72,8 @@ Target: 2027 H1
 | 12 | JP Region with Sumo Logic | Draft |
 | 13 | 9 Vendors, One Architecture: Lessons Learned | Draft |
 | 14 | System Manager Reality Check: GUI vs CLI vs Observability | Draft |
-| 15 | Multi-Account Deployment with AWS Organizations | Planned (Phase 4) |
+| 15 | CrowdStrike Falcon LogScale via HEC — Parser v1.1.0 | Ready for publication |
+| 16 | Datadog Paid Plan: Pipeline, Monitors, and Detection Workflows | Planned |
 
 ## Contributing
 
