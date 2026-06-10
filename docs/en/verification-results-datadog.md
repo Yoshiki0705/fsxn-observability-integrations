@@ -450,3 +450,112 @@ Processing complete: {"statusCode": 200, "body": {"shipped": 1}}
 - ONTAP External Engine IP update is mandatory (automated via script)
 - Lambda retry logic correctly handles transient connection errors
 - Full recovery from restart: ~2 minutes (task start 45s + Engine update + connection 20s)
+
+---
+
+## Paid Plan Verification (June 2026)
+
+- **Verification Date**: 2026-06-10
+- **Plan**: Datadog Conventional Pricing (AP1)
+- **Purpose**: Verify Log Pipeline API, Monitors API, and full field extraction with paid plan
+
+### Step P1: XML Audit Log E2E Test (Paid Plan)
+
+- **Result**: ✅ Success
+
+```bash
+python3 shared/scripts/test-xml-e2e.py --vendor datadog
+# ✅ datadog OK (HTTP 202, 5 events)
+```
+
+- **Events in Log Explorer**: 15 total (multiple test runs)
+- **Field Extraction**: All fields searchable (user, path, client_ip, event_type, result, svm, operation, timestamp)
+- **Service**: `ontap-audit`
+- **Host**: `ProductionSVM`
+
+![Log Explorer — XML Audit Events](../../integrations/datadog/screenshots/datadog-log-explorer-fsxn-xml.png)
+
+---
+
+### Step P2: Log Pipeline Creation (API)
+
+- **Result**: ✅ Success
+- **Method**: Datadog Logs Pipeline API (`POST /api/v1/logs/config/pipelines`)
+- **Pipeline ID**: `qlElyf7BSnmASoI8iJtZrg`
+- **Pipeline Name**: `FSx for ONTAP Audit Logs`
+- **Filter**: `source:fsxn`
+
+| Processor | Type | Description |
+|-----------|------|-------------|
+| EventID to Operation Name | Category Processor | Maps EventID to human-readable operation names |
+| Map result to log status | Status Remapper | Uses `result` field for log severity |
+| Use event timestamp | Date Remapper | Uses `timestamp` field as official log time |
+| Map user to usr.id | Attribute Remapper | Enables Datadog user identity features |
+| Map client_ip to network.client.ip | Attribute Remapper | Enables Datadog network features |
+
+**Category Mappings**:
+| EventID | Operation Name |
+|---------|---------------|
+| 4663 | Object Access |
+| 4656 | Handle Request |
+| 4660 | Object Delete |
+| 4670 | Permission Change |
+| 4658 | Handle Close |
+| 5140 | Share Access |
+| 5145 | Share Check |
+| 4624 | Logon |
+| 4634 | Logoff |
+
+![Log Pipeline Configuration](../../integrations/datadog/screenshots/datadog-log-pipeline-config.png)
+
+---
+
+### Step P3: Security Monitors Creation (API)
+
+- **Result**: ✅ Success
+- **Method**: Datadog Monitors API (`POST /api/v1/monitor`)
+
+| Monitor ID | Name | Type | Threshold | Severity |
+|-----------|------|------|-----------|----------|
+| 13360510 | [FSxN] Mass File Deletion Detected | Log Alert | >50 deletes/5min per user | Critical |
+| 13360511 | [FSxN] Abnormal Access Volume | Log Alert | >1000 accesses/1h per user | High |
+| 13360512 | [FSxN] Access Failure Spike | Log Alert | >10 failures/15min per user | Medium |
+
+Each monitor includes:
+- Investigation steps in the notification message
+- Group-by user for per-user alerting
+- Warning and critical thresholds
+- Evaluation delay (60s) to avoid false positives during ingestion
+
+![Security Monitors](../../integrations/datadog/screenshots/datadog-monitors-fsxn.png)
+
+---
+
+### Step P4: Dashboard Verification (Paid Plan)
+
+- **Result**: ✅ Success
+- **Dashboard Name**: FSx ONTAP Audit Log Overview
+- **Dashboard ID**: ggx-7ad-6e4
+- **Status**: Active, receiving data
+
+![Dashboard — Paid Plan](../../integrations/datadog/screenshots/datadog-dashboard-fsxn-overview.png)
+
+---
+
+### Paid Plan Verification Summary
+
+| Step | Name | Result |
+|------|------|--------|
+| P1 | XML Audit Log E2E (Paid) | ✅ Success |
+| P2 | Log Pipeline API | ✅ Success |
+| P3 | Security Monitors API | ✅ Success |
+| P4 | Dashboard (Paid) | ✅ Success |
+
+**Paid Plan Overall Judgment**: ✅ PASS
+
+### Secrets Manager Keys
+
+| Secret Name | Purpose |
+|-------------|---------|
+| `fsxn-datadog-api-key` | Datadog API Key (log ingestion) |
+| `datadog/fsxn-app-key` | Datadog Application Key (Pipeline/Dashboard/Monitor management) |

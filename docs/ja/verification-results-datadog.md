@@ -450,3 +450,112 @@ Processing complete: {"statusCode": 200, "body": {"shipped": 1}}
 - ONTAP External Engine の IP 更新が必須（自動化スクリプトで対応可能）
 - Lambda のリトライロジックが一時的な接続エラーを正しくハンドリング
 - 再起動から完全復旧まで約2分（タスク起動45秒 + Engine更新 + 接続20秒）
+
+---
+
+## 有料プラン検証（2026年6月）
+
+- **検証日時**: 2026-06-10
+- **プラン**: Datadog Conventional Pricing (AP1)
+- **目的**: Log Pipeline API、Monitors API、有料プランでの完全フィールド抽出を検証
+
+### ステップ P1: XML 監査ログ E2E テスト（有料プラン）
+
+- **結果**: ✅ 成功
+
+```bash
+python3 shared/scripts/test-xml-e2e.py --vendor datadog
+# ✅ datadog OK (HTTP 202, 5 events)
+```
+
+- **Log Explorer 表示件数**: 15件（複数テスト実行分）
+- **フィールド抽出**: 全フィールド検索可能（user, path, client_ip, event_type, result, svm, operation, timestamp）
+- **Service**: `ontap-audit`
+- **Host**: `ProductionSVM`
+
+![Log Explorer — XML 監査イベント](../../integrations/datadog/screenshots/datadog-log-explorer-fsxn-xml.png)
+
+---
+
+### ステップ P2: Log Pipeline 作成（API）
+
+- **結果**: ✅ 成功
+- **方法**: Datadog Logs Pipeline API (`POST /api/v1/logs/config/pipelines`)
+- **Pipeline ID**: `qlElyf7BSnmASoI8iJtZrg`
+- **Pipeline 名**: `FSx for ONTAP Audit Logs`
+- **フィルタ**: `source:fsxn`
+
+| プロセッサ | 種別 | 説明 |
+|-----------|------|------|
+| EventID to Operation Name | Category Processor | EventID を人間が読める操作名に変換 |
+| Map result to log status | Status Remapper | `result` フィールドをログ重要度に使用 |
+| Use event timestamp | Date Remapper | `timestamp` フィールドを公式ログ時刻に使用 |
+| Map user to usr.id | Attribute Remapper | Datadog ユーザー識別機能を有効化 |
+| Map client_ip to network.client.ip | Attribute Remapper | Datadog ネットワーク機能を有効化 |
+
+**カテゴリマッピング**:
+| EventID | 操作名 |
+|---------|--------|
+| 4663 | Object Access |
+| 4656 | Handle Request |
+| 4660 | Object Delete |
+| 4670 | Permission Change |
+| 4658 | Handle Close |
+| 5140 | Share Access |
+| 5145 | Share Check |
+| 4624 | Logon |
+| 4634 | Logoff |
+
+![Log Pipeline 設定](../../integrations/datadog/screenshots/datadog-log-pipeline-config.png)
+
+---
+
+### ステップ P3: セキュリティモニター作成（API）
+
+- **結果**: ✅ 成功
+- **方法**: Datadog Monitors API (`POST /api/v1/monitor`)
+
+| Monitor ID | 名称 | 種別 | 閾値 | 重要度 |
+|-----------|------|------|------|--------|
+| 13360510 | [FSxN] Mass File Deletion Detected | Log Alert | >50 deletes/5min per user | Critical |
+| 13360511 | [FSxN] Abnormal Access Volume | Log Alert | >1000 accesses/1h per user | High |
+| 13360512 | [FSxN] Access Failure Spike | Log Alert | >10 failures/15min per user | Medium |
+
+各モニターの特徴:
+- 通知メッセージに調査手順を含む
+- ユーザー単位でグループ化
+- Warning と Critical の2段階閾値
+- 評価遅延60秒（取り込み中の誤検知を防止）
+
+![セキュリティモニター](../../integrations/datadog/screenshots/datadog-monitors-fsxn.png)
+
+---
+
+### ステップ P4: ダッシュボード確認（有料プラン）
+
+- **結果**: ✅ 成功
+- **ダッシュボード名**: FSx ONTAP Audit Log Overview
+- **ダッシュボード ID**: ggx-7ad-6e4
+- **ステータス**: アクティブ、データ受信中
+
+![ダッシュボード — 有料プラン](../../integrations/datadog/screenshots/datadog-dashboard-fsxn-overview.png)
+
+---
+
+### 有料プラン検証サマリ
+
+| ステップ | 名称 | 結果 |
+|---------|------|------|
+| P1 | XML 監査ログ E2E（有料） | ✅ 成功 |
+| P2 | Log Pipeline API | ✅ 成功 |
+| P3 | Security Monitors API | ✅ 成功 |
+| P4 | ダッシュボード（有料） | ✅ 成功 |
+
+**有料プラン総合判定**: ✅ 合格
+
+### Secrets Manager キー
+
+| シークレット名 | 用途 |
+|-------------|------|
+| `fsxn-datadog-api-key` | Datadog API Key（ログ取り込み用） |
+| `datadog/fsxn-app-key` | Datadog Application Key（Pipeline/Dashboard/Monitor 管理用） |
