@@ -70,8 +70,55 @@ aws cloudformation deploy \
 - CloudWatch Alarm: DLQ messages appearing
 - Dead Letter Queue: Failed events preserved for 14 days
 
+## E2E Verification Results
+
+✅ **Verified on paid Datadog AP1 plan** (June 2026)
+
+| Component | Status | Evidence |
+|-----------|--------|----------|
+| XML audit log parsing (5 events) | ✅ | EventID 4663/4656/4660 |
+| Datadog Logs API v2 delivery | ✅ HTTP 202 | 10 events in Log Explorer |
+| Field extraction | ✅ | user, path, client_ip, event_type, result, svm, operation |
+| Log Pipeline (EventID→Operation) | ✅ | Category processor applied |
+| Monitors (mass delete, abnormal access, failure spike) | ✅ | 3 monitors active |
+| Dashboard | ✅ | FSx ONTAP Audit Log Overview |
+
+### Screenshots
+
+| Screenshot | Description |
+|-----------|-------------|
+| ![Log Explorer](screenshots/datadog-log-explorer-fsxn-xml.png) | Log Explorer showing FSxN audit events with full field extraction |
+| ![Dashboard](screenshots/datadog-dashboard-fsxn-overview.png) | FSx ONTAP Audit Log Overview dashboard |
+| ![Pipeline](screenshots/datadog-log-pipeline-config.png) | Log Pipeline configuration (EventID→Operation Name mapping) |
+| ![Monitors](screenshots/datadog-monitors-fsxn.png) | Security monitors for mass deletion, abnormal access, and access failures |
+
+## Log Pipeline Configuration
+
+The pipeline (`FSx for ONTAP Audit Logs`) applies to logs matching `source:fsxn` and includes:
+
+1. **Category Processor** — Maps EventID to human-readable operation names:
+   - 4663 → Object Access
+   - 4656 → Handle Request
+   - 4660 → Object Delete
+   - 4670 → Permission Change
+   - 5140 → Share Access
+   - 4624 → Logon / 4634 → Logoff
+
+2. **Status Remapper** — Maps `result` field to Datadog log status
+3. **Date Remapper** — Uses `timestamp` field as the log timestamp
+4. **Attribute Remapper** — Maps `user` → `usr.id`, `client_ip` → `network.client.ip`
+
+## Security Monitors
+
+| Monitor | Threshold | Severity | Description |
+|---------|-----------|----------|-------------|
+| Mass File Deletion | >50 deletes/5min per user | Critical | Detects bulk file deletion (ransomware, accidental) |
+| Abnormal Access Volume | >1000 accesses/1h per user | High | Detects potential data exfiltration |
+| Access Failure Spike | >10 failures/15min per user | Medium | Detects unauthorized access attempts |
+
 ## Important Notes
 
 - **FSx for ONTAP S3 APs do NOT support S3 Event Notifications.** Lambda is invoked on a schedule (EventBridge Scheduler) and uses checkpointing to process only newly rotated files.
 - **Internet-origin S3 APs** timed out with only a Gateway Endpoint in our environment. If Lambda is in a VPC, use NAT Gateway or create a VPC-origin AP.
 - Audit log format: EVTX or XML (configured via `vserver audit create -format {evtx|xml}`)
+- **Datadog region**: This integration is verified on AP1 (ap1.datadoghq.com). Adjust `DatadogSite` parameter for other regions.
