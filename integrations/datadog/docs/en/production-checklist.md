@@ -69,3 +69,15 @@ Use this checklist before promoting the FSxN Datadog integration from PoC to pro
 - [ ] Rehydration procedure documented and tested
 - [ ] Audit trail for remediation actions verified (CloudTrail + ONTAP + Case)
 - [ ] Hash salt managed in Secrets Manager (if FIELD_MAPPING masking used)
+
+---
+
+## Related Documents
+
+- [Setup Guide](setup-guide.md)
+- [SPL vs CQL Comparison](spl-cql-comparison.md)
+- [Field Mapping](field-mapping.md)
+- [README (main)](../../README.md)
+- [Pipeline SLO](../../../../docs/en/pipeline-slo.md)
+- [DLQ Replay Runbook](../../../../docs/en/runbooks/dlq-replay.md)
+- [Existing Audit Tool Coexistence](../../../../docs/en/existing-audit-tool-coexistence.md)

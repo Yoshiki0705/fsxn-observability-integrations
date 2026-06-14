@@ -81,3 +81,14 @@ Both platforms use the same field names from the FSxN parser:
 | `svm` | Storage Virtual Machine | `ProductionSVM` |
 | `operation` | Operation type | `File` |
 | `timestamp` | Event time (ISO 8601) | `2026-06-14T12:13:00.000000Z` |
+
+---
+
+## Related Documents
+
+- [Production Checklist](production-checklist.md)
+- [Setup Guide](setup-guide.md)
+- [Field Mapping](field-mapping.md)
+- [README (main)](../../README.md)
+- [CrowdStrike LogScale Integration](../../../crowdstrike/README.md)
+- [Splunk Integration](../../../splunk-serverless/README.md)

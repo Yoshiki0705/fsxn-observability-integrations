@@ -3,6 +3,8 @@
 🌐 [日本語](docs/ja/setup-guide.md) | [English](docs/en/setup-guide.md)
 
 > 📖 **Shared docs**: [Delivery Guarantee Patterns](../../docs/en/delivery-guarantees.md) | [Webhook Security](../../docs/en/webhook-security.md)
+>
+> 📋 **Datadog docs**: [Production Checklist](docs/en/production-checklist.md) | [SPL vs CQL Comparison](docs/en/spl-cql-comparison.md) | [Field Mapping](docs/en/field-mapping.md) | [Setup Guide](docs/en/setup-guide.md)
 
 ## Overview
 
