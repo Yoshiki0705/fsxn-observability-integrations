@@ -601,7 +601,26 @@ Each monitor includes:
 | P5 | Monitor Alert Trigger | ✅ Success |
 | P6 | Pipeline Field Verification | ✅ Success |
 
-**Paid Plan Overall Judgment**: ✅ PASS
+---
+
+### Step P7: Facets Creation (Paid Plan)
+
+- **Result**: ✅ Success
+- **Verification Date**: 2026-06-14
+- **Method**: Playwright UI automation — hover field row → gear icon → "Create facet" → "Add"
+
+| Facet Path | Display Name | Status |
+|------------|-------------|--------|
+| `@attributes.event_type` | Event Type | ✅ Created |
+| `@attributes.user` | User | ✅ Created |
+| `@attributes.path` | File Path | ✅ Created |
+| `@attributes.svm` | SVM | ✅ Created |
+| `@attributes.client_ip` | Client IP | ✅ Created |
+| `@attributes.operation` | Operation | ✅ Created |
+| `@attributes.operation_name` | Operation Name | ✅ Created |
+| `@attributes.result` | Result | ✅ Created |
+
+**Paid Plan Overall Judgment**: ✅ PASS (all 7 steps verified)
 
 ### Secrets Manager Keys
 
