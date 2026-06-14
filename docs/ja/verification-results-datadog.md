@@ -553,6 +553,56 @@ python3 shared/scripts/test-xml-e2e.py --vendor datadog
 
 **有料プラン総合判定**: ✅ 合格
 
+### ステップ P5: モニターアラート発火検証（有料プラン）
+
+- **結果**: ✅ 成功
+- **検証日**: 2026-06-14
+- **方法**: Logs API 経由でモニター閾値超過のイベントを送信
+
+| モニター | クエリ（概要） | 閾値 | 送信イベント数 | 結果 |
+|---------|--------------|------|------------|------|
+| Mass File Deletion | `@event_type:4660` by `@user` in 5m | > 50 (critical) | 同一ユーザーから55件 | ✅ **ALERT 発火** |
+| Abnormal Access Volume | `@result:"Audit Success"` by `@user` in 1h | > 1000 (critical) | 閾値未満 | ✅ OK（期待通り） |
+| Access Failure Spike | `@result:"Audit Failure"` by `@user` in 15m | > 10 (critical) | 同一ユーザーから12件 | ✅ **ALERT 発火** |
+
+**主な確認事項**:
+- モニターはユーザー単位（`group by @user`）で正しく評価 — 異なるユーザーは集計されない
+- アラート状態遷移は閾値突破から3-5分以内
+- Pipeline の `operation_name` フィールドはモニター評価前に正しく付与済み
+
+---
+
+### ステップ P6: Pipeline フィールド検証（有料プラン）
+
+- **結果**: ✅ 成功
+- **方法**: Logs Search API で `source:fsxn` を検索し、`operation_name` 属性を確認
+
+| EventID | 期待する `operation_name` | 検証結果 |
+|---------|--------------------------|----------|
+| 4660 | Object Delete | ✅ |
+| 4656 | Handle Request | ✅ |
+| 4663 | Read/Write Object | ✅ |
+
+**主な確認事項**:
+- Pipeline プロセッサが Category Processor ルールに基づき `operation_name` を付与
+- 直近15分間の全ログエントリに `operation_name` が設定済み (5/5 = 100%)
+- リマッパー（`timestamp` → Date、`result` → Status）も機能確認
+
+---
+
+### 有料プラン検証サマリ
+
+| ステップ | 名称 | 結果 |
+|---------|------|------|
+| P1 | XML 監査ログ E2E（有料） | ✅ 成功 |
+| P2 | Log Pipeline API | ✅ 成功 |
+| P3 | Security Monitors API | ✅ 成功 |
+| P4 | ダッシュボード（有料） | ✅ 成功 |
+| P5 | モニターアラート発火 | ✅ 成功 |
+| P6 | Pipeline フィールド検証 | ✅ 成功 |
+
+**有料プラン総合判定**: ✅ 合格
+
 ### Secrets Manager キー
 
 | シークレット名 | 用途 |
