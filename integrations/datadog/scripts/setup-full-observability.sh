@@ -14,6 +14,10 @@
 #   bash scripts/setup-full-observability.sh
 set -euo pipefail
 
+# SECURITY: Never enable debug tracing — API keys would leak to logs
+# Do not use 'set -x' in this script.
+export BASH_XTRACEFD=999  # Redirect xtrace to null FD if accidentally enabled
+
 # Configuration
 DD_SITE="${DD_SITE:-ap1.datadoghq.com}"
 DD_API_KEY_SECRET_ID="${DD_API_KEY_SECRET_ID:-fsxn-datadog-api-key}"
