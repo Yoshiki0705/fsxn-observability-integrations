@@ -151,3 +151,64 @@ These facets enable:
 - **Internet-origin S3 APs** timed out with only a Gateway Endpoint in our environment. If Lambda is in a VPC, use NAT Gateway or create a VPC-origin AP.
 - Audit log format: EVTX or XML (configured via `vserver audit create -format {evtx|xml}`)
 - **Datadog region**: This integration is verified on AP1 (ap1.datadoghq.com). Adjust `DatadogSite` parameter for other regions.
+
+## Log-based Metrics
+
+Custom metrics generated from logs — enables cost-efficient long-term trending without retaining all raw logs.
+
+| Metric ID | Source Filter | Group By | Use Case |
+|-----------|--------------|----------|----------|
+| `fsxn.audit.delete_count` | `@event_type:4660` | user, svm | Delete rate per user/SVM for dashboards and anomaly detection |
+| `fsxn.audit.access_failure_count` | `@result:"Audit Failure"` | user, svm, client_ip | Failed access trends by source IP |
+| `fsxn.audit.event_count` | `source:fsxn` | event_type, svm | Overall event volume by type |
+| `fsxn.audit.unique_users` | `source:fsxn` | user | Active user tracking |
+
+![Log-based Metrics](screenshots/datadog-log-based-metrics.png)
+
+These metrics appear in Datadog Metrics Explorer as `fsxn.audit.*` and can be used in dashboards, monitors, and anomaly detection without log retention costs.
+
+## Sensitive Data Scanner
+
+PII auto-detection and redaction for audit log content. Protects against accidental exposure of personal data in file paths and usernames.
+
+| Rule | Pattern | Example Match | Action |
+|------|---------|---------------|--------|
+| Employee ID | `EMP-\d{6}` | `/hr/EMP-123456-review.xlsx` | Partial redact |
+| JP Phone Number | `0[789]0-?\d{4}-?\d{4}` | `090-1234-5678` | Partial redact |
+| Email Address | `[a-zA-Z0-9._%+-]+@...` | `user@example.com` | Partial redact |
+| Credit Card | `4[0-9]{12}...` | `4111111111111111` | Partial redact |
+| My Number (JP) | `\d{4}\s?\d{4}\s?\d{4}` | `1234 5678 9012` | Partial redact |
+
+![Sensitive Data Scanner](screenshots/datadog-sensitive-data-scanner.png)
+
+## Enhanced Dashboard (10 Widgets)
+
+The FSx ONTAP Audit Log Overview dashboard includes:
+
+| Widget | Type | Purpose |
+|--------|------|---------|
+| Log Volume Over Time | Timeseries | Overall ingestion trend |
+| Operations Breakdown | Top List | EventID distribution |
+| User Activity | Top List | Most active users |
+| Error Rate | Timeseries | Failure rate over time |
+| 🔴 File Deletions by User | Top List | Who is deleting the most files |
+| 🟡 Access Failures Timeline | Timeseries (bars) | Failure events by user over time |
+| 📊 Operation Distribution | Sunburst | Operation types grouped by SVM |
+| 🌐 Client IP Activity | Top List | Most active source IPs |
+| 📁 Most Accessed Paths | Top List | Hot file paths |
+| ⚡ Log-based Metrics: Delete Rate | Timeseries | Custom metric trend |
+
+![Enhanced Dashboard](screenshots/datadog-dashboard-enhanced.png)
+
+## Full Setup (One Script)
+
+Deploy the complete observability stack (Pipeline + Monitors + Metrics + Scanner) with a single script:
+
+```bash
+export DD_API_KEY_SECRET_ID="fsxn-datadog-api-key"
+export DD_APP_KEY_SECRET_ID="datadog/fsxn-app-key"
+export DD_SITE="ap1.datadoghq.com"
+bash scripts/setup-full-observability.sh
+```
+
+This creates everything in ~30 seconds via Datadog API. No manual UI clicks needed.
