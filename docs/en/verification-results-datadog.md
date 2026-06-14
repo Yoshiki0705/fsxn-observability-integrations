@@ -553,6 +553,56 @@ Each monitor includes:
 
 **Paid Plan Overall Judgment**: ✅ PASS
 
+### Step P5: Monitor Alert Trigger Verification (Paid Plan)
+
+- **Result**: ✅ Success
+- **Verification Date**: 2026-06-14
+- **Method**: Sent synthetic events exceeding monitor thresholds via Logs API
+
+| Monitor | Query (summary) | Threshold | Events Sent | Result |
+|---------|----------------|-----------|-------------|--------|
+| Mass File Deletion | `@event_type:4660` by `@user` in 5m | > 50 (critical) | 55 from single user | ✅ **ALERT triggered** |
+| Abnormal Access Volume | `@result:"Audit Success"` by `@user` in 1h | > 1000 (critical) | < threshold | ✅ OK (expected) |
+| Access Failure Spike | `@result:"Audit Failure"` by `@user` in 15m | > 10 (critical) | 12 from single user | ✅ **ALERT triggered** |
+
+**Key findings**:
+- Monitors correctly evaluate per-user (`group by @user`) — different users don't aggregate
+- Alert state transitions within 3-5 minutes of threshold breach
+- Pipeline `operation_name` field correctly applied before monitor evaluation
+
+---
+
+### Step P6: Pipeline Field Verification (Paid Plan)
+
+- **Result**: ✅ Success
+- **Method**: Logs Search API query for `source:fsxn`, inspecting `operation_name` attribute
+
+| EventID | Expected `operation_name` | Verified |
+|---------|--------------------------|----------|
+| 4660 | Object Delete | ✅ |
+| 4656 | Handle Request | ✅ |
+| 4663 | Read/Write Object | ✅ |
+
+**Key findings**:
+- Pipeline processors apply `operation_name` based on Category Processor rules
+- All log entries in last 15 minutes had `operation_name` populated (5/5 = 100%)
+- Remappers (`timestamp` → Date, `result` → Status) confirmed functional
+
+---
+
+### Paid Plan Verification Summary
+
+| Step | Name | Result |
+|------|------|--------|
+| P1 | XML Audit Log E2E (Paid) | ✅ Success |
+| P2 | Log Pipeline API | ✅ Success |
+| P3 | Security Monitors API | ✅ Success |
+| P4 | Dashboard (Paid) | ✅ Success |
+| P5 | Monitor Alert Trigger | ✅ Success |
+| P6 | Pipeline Field Verification | ✅ Success |
+
+**Paid Plan Overall Judgment**: ✅ PASS
+
 ### Secrets Manager Keys
 
 | Secret Name | Purpose |
