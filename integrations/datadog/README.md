@@ -138,6 +138,8 @@ After deploying and sending initial logs, add custom Facets for faster filtering
 2. Hover over a field (e.g., `event_type`) → Click the gear icon → "Create facet"
 3. Repeat for: `@event_type`, `@user`, `@svm`, `@path`, `@client_ip`, `@operation`, `@result`, `@operation_name`
 
+![Facets in Log Explorer](screenshots/datadog-log-explorer-facets.png)
+
 These facets enable:
 - Left sidebar filtering by user, SVM, operation type
 - One-click drill-down from dashboard widgets
