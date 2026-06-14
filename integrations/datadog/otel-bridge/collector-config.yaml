@@ -1,0 +1,88 @@
+# OpenTelemetry Collector Configuration — FSxN → Datadog Bridge
+#
+# This config enables routing FSxN audit logs through OTel Collector to Datadog,
+# adding trace_id context for cross-service correlation.
+#
+# Usage:
+#   export DD_API_KEY=<your-api-key>
+#   otelcol-contrib --config collector-config.yaml
+#
+# Benefits over direct Lambda→Datadog:
+#   - trace_id injection for distributed tracing correlation
+#   - Multi-backend fanout (send to Datadog + Grafana + S3 simultaneously)
+#   - Attribute enrichment (add environment, team, region tags)
+#   - Sampling and filtering at collector level
+
+receivers:
+  # Receive logs from Lambda via OTLP
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  # Add resource attributes for better filtering in Datadog
+  resource:
+    attributes:
+      - key: service.name
+        value: ontap-audit
+        action: upsert
+      - key: deployment.environment
+        value: ${ENV:ENVIRONMENT:-production}
+        action: upsert
+      - key: team
+        value: storage
+        action: upsert
+
+  # Batch for efficient delivery
+  batch:
+    send_batch_size: 100
+    send_batch_max_size: 200
+    timeout: 5s
+
+  # Add trace context for correlation (if trace_id present in log body)
+  transform:
+    log_statements:
+      - context: log
+        statements:
+          - set(resource.attributes["source"], "fsxn")
+          - set(attributes["ddsource"], "fsxn")
+          - set(attributes["ddtags"], Concat(["env:", resource.attributes["deployment.environment"]], ""))
+
+exporters:
+  # Primary: Datadog
+  datadog:
+    api:
+      key: ${env:DD_API_KEY}
+      site: ${env:DD_SITE:-ap1.datadoghq.com}
+    logs:
+      dump_payloads: false
+
+  # Secondary (optional): S3 for compliance archive
+  # awss3:
+  #   s3uploader:
+  #     region: ap-northeast-1
+  #     s3_bucket: fsxn-audit-archive
+  #     s3_prefix: otel-logs
+  #     s3_partition: minute
+
+  # Debug: stdout for development
+  debug:
+    verbosity: basic
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [resource, transform, batch]
+      exporters: [datadog]
+
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      address: 0.0.0.0:8888
