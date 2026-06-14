@@ -31,9 +31,14 @@ Parameters:
     Default: 2555
     MinValue: 365
     MaxValue: 2920
+  KmsKeyArn:
+    Type: String
+    Description: KMS CMK ARN for S3 bucket encryption (leave empty for AES256)
+    Default: ''
 
 Conditions:
   GenerateBucketName: !Equals [!Ref ArchiveBucketName, '']
+  UseKmsEncryption: !Not [!Equals [!Ref KmsKeyArn, '']]
 
 Resources:
   ArchiveBucket:
@@ -48,7 +53,9 @@ Resources:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
+              SSEAlgorithm: !If [UseKmsEncryption, 'aws:kms', 'AES256']
+              KMSMasterKeyID: !If [UseKmsEncryption, !Ref KmsKeyArn, !Ref 'AWS::NoValue']
+            BucketKeyEnabled: !If [UseKmsEncryption, true, !Ref 'AWS::NoValue']
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
