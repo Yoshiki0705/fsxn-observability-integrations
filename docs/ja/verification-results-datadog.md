@@ -601,7 +601,26 @@ python3 shared/scripts/test-xml-e2e.py --vendor datadog
 | P5 | モニターアラート発火 | ✅ 成功 |
 | P6 | Pipeline フィールド検証 | ✅ 成功 |
 
-**有料プラン総合判定**: ✅ 合格
+---
+
+### ステップ P7: Facets 作成（有料プラン）
+
+- **結果**: ✅ 成功
+- **検証日**: 2026-06-14
+- **方法**: Playwright UI 自動化 — フィールド行ホバー → 歯車アイコン → "Create facet" → "Add"
+
+| Facet パス | 表示名 | ステータス |
+|-----------|--------|----------|
+| `@attributes.event_type` | Event Type | ✅ 作成済み |
+| `@attributes.user` | User | ✅ 作成済み |
+| `@attributes.path` | File Path | ✅ 作成済み |
+| `@attributes.svm` | SVM | ✅ 作成済み |
+| `@attributes.client_ip` | Client IP | ✅ 作成済み |
+| `@attributes.operation` | Operation | ✅ 作成済み |
+| `@attributes.operation_name` | Operation Name | ✅ 作成済み |
+| `@attributes.result` | Result | ✅ 作成済み |
+
+**有料プラン総合判定**: ✅ 合格（全7ステップ検証完了）
 
 ### Secrets Manager キー
 
