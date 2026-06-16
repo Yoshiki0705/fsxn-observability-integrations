@@ -115,14 +115,26 @@ See [Vendor Comparison](vendor-comparison.md) for detailed cost tables per vendo
 - Sumo Logic: 500 MB/day (~15 GB/month)
 - Honeycomb: 20M events/month
 
-## Differentiation
+## Approach Comparison
 
-| vs. | This Solution | Alternative |
-|-----|--------------|-------------|
-| EC2-based (AWS Blog) | Zero EC2, pay-per-use, auto-scaling | Fixed cost, patching required |
-| CloudWatch Logs only | Multi-vendor, rich query, dashboards | Limited to CloudWatch ecosystem |
-| Third-party agents | No agent on FSx, S3 AP native | Agent compatibility issues |
-| Manual log download | Automated, real-time, alerting | Manual, delayed, no alerting |
+This serverless pattern is one option among several. Each approach suits a different context — the right choice depends on your team's operating model, log volume, and existing investments. Trade-offs are listed symmetrically, including for this pattern.
+
+| Approach | Suited for | Trade-offs to consider |
+|----------|-----------|------------------------|
+| This serverless pattern (Lambda / Firehose) | Variable or low-to-medium volume, teams minimizing infrastructure management, multi-vendor delivery | Cold starts and per-invocation limits; sustained very high throughput may call for Firehose or a streaming design |
+| EC2-based (e.g., AWS Blog: syslog-ng + Universal Forwarder) | Existing EC2/forwarder investments, very high sustained throughput, full host control | Fixed cost regardless of volume; OS and agent patching/capacity are your responsibility |
+| CloudWatch Logs only | Teams standardized on AWS-native console and tooling | Query and dashboards stay within the CloudWatch ecosystem; cross-vendor routing needs extra work |
+| Host-based vendor agents | Environments already operating a vendor agent fleet | An agent must run where the data lives; FSx for ONTAP does not host third-party agents, so this fits host-based sources better |
+| Manual log download | One-off investigations and ad hoc audits | No automation, scheduling, or alerting; not suited to continuous pipelines |
+
+### How to choose
+
+- Prioritize low operational overhead with variable volume → this serverless pattern
+- Already invested in EC2 forwarders, or need very high sustained throughput → EC2-based
+- Staying entirely within AWS-native tooling → CloudWatch Logs
+- Standardized on a host-based vendor agent fleet → vendor agents
+
+This solution does not aim to replace these options; it offers a serverless alternative for teams whose context favors it.
 
 ## Resources
 
