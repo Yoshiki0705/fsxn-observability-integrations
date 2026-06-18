@@ -51,6 +51,7 @@ Optional environment variables:
   CERTIFICATE_ARN             ACM certificate ARN for ALB HTTPS
   CUSTOM_DOMAIN_NAME          Custom domain for the console (e.g., console.example.com)
   HOSTED_ZONE_ID              Route 53 Hosted Zone ID for the custom domain
+  ADMIN_EMAIL                 Email of the initial admin user (added to fsxn-admins group)
   ALERT_SNS_TOPIC_ARN         Existing SNS topic ARN for alarms (optional)
   FSXN_SECURITY_GROUP_ID      FSx ONTAP file system security group ID (for auto-adding access rules)
   AWS_REGION                  AWS region (default: from aws configure or ap-northeast-1)
@@ -201,6 +202,7 @@ S3_ACCESS_POINT_ARN="${S3_ACCESS_POINT_ARN:-}"
 CERTIFICATE_ARN="${CERTIFICATE_ARN:-}"
 CUSTOM_DOMAIN_NAME="${CUSTOM_DOMAIN_NAME:-}"
 HOSTED_ZONE_ID="${HOSTED_ZONE_ID:-}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-}"
 ALERT_SNS_TOPIC_ARN="${ALERT_SNS_TOPIC_ARN:-}"
 
 # ---------------------------------------------------------------------------
@@ -291,6 +293,46 @@ deploy_stack() {
   log_success "Stack deployed successfully: ${stack_name}"
 }
 
+# Create initial admin user in Cognito and add to fsxn-admins group (idempotent)
+create_admin_user() {
+  local user_pool_id="$1"
+  local admin_email="$2"
+  local admin_group="${3:-fsxn-admins}"
+
+  if [[ -z "${admin_email}" ]]; then
+    return 0
+  fi
+
+  if [[ "${DRY_RUN}" == "true" ]]; then
+    log_info "[DRY-RUN] Would create admin user '${admin_email}' and add to group '${admin_group}'"
+    return 0
+  fi
+
+  # Create the user (idempotent: skip if already exists)
+  if aws cognito-idp admin-get-user \
+    --user-pool-id "${user_pool_id}" \
+    --username "${admin_email}" \
+    --region "${AWS_REGION}" > /dev/null 2>&1; then
+    log_info "Admin user already exists: ${admin_email} (skipping creation)"
+  else
+    aws cognito-idp admin-create-user \
+      --user-pool-id "${user_pool_id}" \
+      --username "${admin_email}" \
+      --user-attributes "Name=email,Value=${admin_email}" "Name=email_verified,Value=true" \
+      --desired-delivery-mediums EMAIL \
+      --region "${AWS_REGION}" > /dev/null
+    log_success "Created admin user: ${admin_email} (temporary password sent via email)"
+  fi
+
+  # Add the user to the admin group (idempotent: AddUserToGroup is a no-op if already a member)
+  aws cognito-idp admin-add-user-to-group \
+    --user-pool-id "${user_pool_id}" \
+    --username "${admin_email}" \
+    --group-name "${admin_group}" \
+    --region "${AWS_REGION}"
+  log_success "Added ${admin_email} to group: ${admin_group}"
+}
+
 # ---------------------------------------------------------------------------
 # Main deployment sequence
 # ---------------------------------------------------------------------------
@@ -361,6 +403,12 @@ main() {
   log_info "  UserPoolId: ${COGNITO_USER_POOL_ID}"
   log_info "  AppClientId: ${COGNITO_APP_CLIENT_ID}"
   log_info "  CognitoDomain: ${COGNITO_DOMAIN}"
+
+  # Create initial admin user if ADMIN_EMAIL is provided
+  if [[ -n "${ADMIN_EMAIL}" ]]; then
+    ADMIN_GROUP_NAME=$(get_stack_output "${STACK_PREFIX}-auth" "AdminGroupName")
+    create_admin_user "${COGNITO_USER_POOL_ID}" "${ADMIN_EMAIL}" "${ADMIN_GROUP_NAME:-fsxn-admins}"
+  fi
 
   # =========================================================================
   # Pre-Stack 3: Upload dashboards to S3 and ensure AMG API key secret
