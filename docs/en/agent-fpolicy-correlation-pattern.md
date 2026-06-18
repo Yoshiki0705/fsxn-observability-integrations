@@ -375,6 +375,29 @@ def normalize_path(path: str, protocol: str = "smb") -> str:
 
 ---
 
+### Databricks Platform Security Updates (as of 2026-06)
+
+> **Evidence tier**: Public ([DAIS 2026 announcement blog](https://www.databricks.com/blog/whats-new-databricks-platform-security-and-compliance-data-ai-summit-2026))
+> **Status**: Unverified — assessing design impact
+
+The following Databricks Platform Security features announced at DAIS 2026 (2026-06-17) may affect this pattern's agent audit design.
+
+| Feature | Summary | Impact on This Pattern |
+|---------|---------|----------------------|
+| Private Network Gateway / Lakebase Private Link | Private connectivity from serverless/AI workloads to Lakebase | If agents access Lakebase, verify that Private Link traffic is visible in CloudTrail / VPC Flow Logs. May require adding VPC Flow Logs as a data source for correlation logic |
+| Automatic Identity Management (AIM) for Entra ID — GA (AWS/GCP) | Automated identity management within Databricks workspaces | If agent service accounts are auto-provisioned by AIM, verify compatibility with the naming conventions and AD group design defined in this pattern's "Service Account Strategy" section |
+| Context-Based Ingress Policies | Access control based on context (device, network, identity attributes) | If agent execution environment context is evaluated by Ingress Policies, denial reasons may be recorded in audit logs. Consider including Databricks-side access denial events in correlation results |
+
+**Open items to verify**:
+
+- How agent access via Private Link is recorded in Databricks Unity Catalog audit logs (mapping to the `service_account` field)
+- Naming patterns for service principals auto-created by AIM and compatibility with this pattern's FPolicy filter configuration (`%svc-agent-%`)
+- Methods to incorporate Context-Based Ingress Policy denial events into OTel spans or Correlation Records
+
+> **Note**: The above are considerations based on publicly available DAIS 2026 information and do not change this pattern's existing design (OTel × FPolicy correlation). Correlation logic extensions will be evaluated when Lakebase integration becomes concrete.
+
+---
+
 ## Related Documents
 
 - [FPolicy Server Design](../../shared/templates/fpolicy-server-fargate.yaml)
