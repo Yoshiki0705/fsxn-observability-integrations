@@ -375,6 +375,29 @@ def normalize_path(path: str, protocol: str = "smb") -> str:
 
 ---
 
+### Databricks Platform Security 新機能への対応検討（2026-06 時点）
+
+> **Evidence tier**: Public（[DAIS 2026 発表ブログ](https://www.databricks.com/blog/whats-new-databricks-platform-security-and-compliance-data-ai-summit-2026)）
+> **ステータス**: 未検証 — 設計への影響を確認中
+
+DAIS 2026（2026-06-17）で発表された Databricks Platform Security の新機能のうち、本パターンのエージェント監査設計に影響する可能性がある項目を以下に整理する。
+
+| 機能 | 概要 | 本パターンへの影響 |
+|------|------|------------------|
+| Private Network Gateway / Lakebase Private Link | サーバーレス・AI ワークロードから Lakebase へのプライベート接続 | エージェントが Lakebase にアクセスする場合、Private Link 経由のトラフィックが CloudTrail / VPC Flow Logs で可視化されるか確認が必要。突合ロジックのデータソースに VPC Flow Logs を追加する可能性がある |
+| Automatic Identity Management (AIM) for Entra ID — GA (AWS/GCP) | Databricks ワークスペース内の ID 管理自動化 | エージェントのサービスアカウントが AIM により自動プロビジョニングされる場合、本パターンの「サービスアカウント戦略」セクションで定義した命名規則・AD グループ設計との整合性を確認する必要がある |
+| Context-Based Ingress Policies | コンテキスト（デバイス、ネットワーク、ID 属性）に基づくアクセス制御 | エージェント実行環境のコンテキスト情報が Ingress Policy 評価対象になる場合、監査ログに拒否理由が記録される可能性がある。突合結果に Databricks 側のアクセス拒否イベントを含めることを検討 |
+
+**今後の確認事項**:
+
+- Private Link 経由のエージェントアクセスが Databricks 側の Unity Catalog 監査ログにどのように記録されるか（`service_account` フィールドとの対応）
+- AIM で自動生成されるサービスプリンシパルの命名パターンと、本パターンの FPolicy フィルタ設定（`%svc-agent-%`）との互換性
+- Context-Based Ingress Policies の拒否イベントを OTel スパンまたは Correlation Record に取り込む方法
+
+> **注記**: 上記は DAIS 2026 時点の公開情報に基づく検討事項であり、本パターンの既存設計（OTel × FPolicy 突合）を変更するものではない。Lakebase 連携が具体化した段階で、突合ロジックの拡張を検討する。
+
+---
+
 ## 関連ドキュメント
 
 - [FPolicy サーバー設計](../../shared/templates/fpolicy-server-fargate.yaml)
