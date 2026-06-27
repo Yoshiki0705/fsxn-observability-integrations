@@ -112,7 +112,7 @@ See [Vendor Comparison](vendor-comparison.md) for detailed cost tables per vendo
 **Free tier options for PoC**:
 - New Relic: 100 GB/month (best for PoC)
 - Grafana Cloud: 50 GB/month
-- Sumo Logic: 500 MB/day (~15 GB/month)
+- Sumo Logic: 1.25 credits/day (7-day retention)
 - Honeycomb: 20M events/month
 
 ## Approach Comparison

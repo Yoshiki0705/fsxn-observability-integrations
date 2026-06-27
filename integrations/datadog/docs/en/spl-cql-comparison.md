@@ -1,6 +1,6 @@
-# SPL vs CQL Query Comparison — FSxN Audit Logs
+# SPL vs CQL Query Comparison — FSx for ONTAP Audit Logs
 
-For SOC analysts working across Splunk and CrowdStrike LogScale, this table maps common FSxN audit log queries between SPL and CQL.
+For SOC analysts working across Splunk and CrowdStrike LogScale, this table maps common FSx for ONTAP audit log queries between SPL and CQL.
 
 ## Query Comparison Table
 
@@ -69,7 +69,7 @@ index=fsxn_audit sourcetype=fsxn:audit:xml
 
 ## Normalized Field Schema
 
-Both platforms use the same field names from the FSxN parser:
+Both platforms use the same field names from the FSx for ONTAP parser:
 
 | Field | Description | Example |
 |-------|-------------|---------|

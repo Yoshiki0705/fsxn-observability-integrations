@@ -1,4 +1,4 @@
-"""DynamoDB-based object processing ledger for FSx ONTAP audit log pipeline.
+"""DynamoDB-based object processing ledger for FSx for ONTAP audit log pipeline.
 
 Provides per-object processing state tracking, replacing the simple SSM
 high-watermark checkpoint for Level 3 (Production Baseline) deployments.

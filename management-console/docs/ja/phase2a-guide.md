@@ -1,4 +1,4 @@
-# FSxN Management Console Phase 2A ガイド
+# FSx for ONTAP Management Console Phase 2A ガイド
 
 Phase 2A は既存の Management Console（Phase 1）を拡張し、ARP ダッシュボード、スナップショットリストア、FlexClone 管理、マルチポーラーサポートを追加します。
 

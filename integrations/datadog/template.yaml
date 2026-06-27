@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: FSxN Datadog Integration - Serverless audit log shipping via S3 Access Point
+Description: FSx for ONTAP Datadog Integration - Serverless audit log shipping via S3 Access Point
 
 Parameters:
   FsxS3AccessPointArn:
@@ -43,7 +43,7 @@ Parameters:
     Default: 'rate(5 minutes)'
     Description: >-
       How often to invoke the audit log processor.
-      FSx ONTAP S3 APs do not support event notifications,
+      FSx for ONTAP S3 APs do not support event notifications,
       so Lambda is invoked on a schedule.
 
   LogLevel:
@@ -91,7 +91,7 @@ Parameters:
       - 'false'
     Description: >-
       Enable VPC configuration for Lambda.
-      Note: Internet-origin FSx ONTAP S3 APs timed out with only Gateway Endpoints in our testing.
+      Note: Internet-origin FSx for ONTAP S3 APs timed out with only Gateway Endpoints in our testing.
       If VpcEnabled=true, ensure NAT Gateway is available for S3 AP access.
 
   VpcSubnetIds:
@@ -232,7 +232,7 @@ Resources:
           Value: datadog
 
   # EventBridge Scheduler - Periodic audit log processing
-  # FSx ONTAP S3 APs do not support event notifications,
+  # FSx for ONTAP S3 APs do not support event notifications,
   # so Lambda is invoked on a schedule to check for new files.
   AuditSchedulerRole:
     Type: AWS::IAM::Role
@@ -258,7 +258,7 @@ Resources:
     Type: AWS::Scheduler::Schedule
     Properties:
       Name: !Sub '${AWS::StackName}-audit-processor'
-      Description: Periodically invoke Lambda to process new FSx ONTAP audit log files
+      Description: Periodically invoke Lambda to process new FSx for ONTAP audit log files
       ScheduleExpression: !Ref ScheduleRate
       FlexibleTimeWindow:
         Mode: 'OFF'
@@ -280,7 +280,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub '${AWS::StackName}-errors'
-      AlarmDescription: FSxN Datadog log shipper error rate exceeded threshold
+      AlarmDescription: FSx for ONTAP Datadog log shipper error rate exceeded threshold
       Namespace: AWS/Lambda
       MetricName: Errors
       Dimensions:
@@ -298,7 +298,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub '${AWS::StackName}-throttles'
-      AlarmDescription: FSxN Datadog log shipper throttling detected
+      AlarmDescription: FSx for ONTAP Datadog log shipper throttling detected
       Namespace: AWS/Lambda
       MetricName: Throttles
       Dimensions:

@@ -1,6 +1,6 @@
-# OpenTelemetry Collector Configuration — FSxN → Datadog Bridge
+# OpenTelemetry Collector Configuration — FSx for ONTAP → Datadog Bridge
 #
-# This config enables routing FSxN audit logs through OTel Collector to Datadog,
+# This config enables routing FSx for ONTAP audit logs through OTel Collector to Datadog,
 # adding trace_id context for cross-service correlation.
 #
 # Usage:

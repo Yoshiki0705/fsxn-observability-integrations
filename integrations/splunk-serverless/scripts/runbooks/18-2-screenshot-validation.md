@@ -67,7 +67,7 @@ Directory: docs/screenshots/splunk/
 |---|---------------------|------|
 | 1 | Lambda CloudWatch Logs | "Successfully shipped" を含むログ行とタイムスタンプ |
 | 2 | Splunk Search results | `index`, `sourcetype`, `host`, `source` フィールドが見えるログエントリ |
-| 3 | Splunk dashboard | FSxN 監査ログデータを表示する1つ以上のパネル |
+| 3 | Splunk dashboard | FSx for ONTAP 監査ログデータを表示する1つ以上のパネル |
 
 #### 4.2 命名規約
 

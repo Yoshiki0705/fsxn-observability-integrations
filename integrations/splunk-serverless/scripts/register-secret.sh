@@ -140,7 +140,7 @@ else
     log_info "Step 3: Creating new secret..."
     CREATE_OUTPUT=$(aws secretsmanager create-secret \
         --name "${SECRET_NAME}" \
-        --description "Splunk HEC Token for FSxN audit log integration" \
+        --description "Splunk HEC Token for FSx for ONTAP audit log integration" \
         --secret-string "${TOKEN}" \
         --region "${REGION}" \
         --output json)

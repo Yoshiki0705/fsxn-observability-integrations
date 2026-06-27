@@ -247,7 +247,7 @@ def _format_for_splunk(
 ) -> list[dict[str, Any]]:
     """Format logs for Splunk HEC /services/collector/event endpoint.
 
-    Converts parsed FSx ONTAP audit log entries into Splunk HEC JSON objects
+    Converts parsed FSx for ONTAP audit log entries into Splunk HEC JSON objects
     suitable for the /services/collector/event endpoint. Uses the SplunkHecEvent
     dataclass for type safety and consistent field mapping.
 

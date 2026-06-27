@@ -161,7 +161,7 @@ Splunk Search でイベントを展開し、以下のフィールドを確認:
 |---|---|---|---|
 | 1 | `splunk-cloudwatch-logs-<YYYYMMDD>.png` | Lambda CloudWatch Logs で "Successfully shipped" ログ行とタイムスタンプが表示されている | [ ] 500KB 以下、PNG 形式 |
 | 2 | `splunk-search-results-<YYYYMMDD>.png` | Splunk Search 結果で `index`, `sourcetype`, `host`, `source` フィールドが表示されている | [ ] 500KB 以下、PNG 形式 |
-| 3 | `splunk-dashboard-<YYYYMMDD>.png` | Splunk ダッシュボードで FSxN 監査ログデータを含むパネルが1つ以上表示されている | [ ] 500KB 以下、PNG 形式 |
+| 3 | `splunk-dashboard-<YYYYMMDD>.png` | Splunk ダッシュボードで FSx for ONTAP 監査ログデータを含むパネルが1つ以上表示されている | [ ] 500KB 以下、PNG 形式 |
 
 ![Lambda CloudWatch Logs](../screenshots/splunk/splunk-cloudwatch-logs-<YYYYMMDD>.png)
 

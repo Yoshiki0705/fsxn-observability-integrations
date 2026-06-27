@@ -73,7 +73,7 @@ validate_required() {
   fi
 }
 
-echo "=== FSxN Splunk Serverless Deployment ==="
+echo "=== FSx for ONTAP Splunk Serverless Deployment ==="
 echo "Region: ${AWS_REGION} | Stack prefix: ${STACK_PREFIX}"
 
 ERRORS=0

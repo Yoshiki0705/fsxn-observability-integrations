@@ -118,7 +118,7 @@ Lambda の IAM ロールには以下の権限が必要:
 | ボリューム ID | `fsvol-0a17e70de744e322f` |
 | ボリューム名 | `audit_logs_observability` |
 | Junction Path | `/audit_logs_observability` |
-| SVM | `svm-0abcdef123456789a` (FSxN_OnPre) |
+| SVM | `svm-0abcdef123456789a` (FSxN_OnPre) | <!-- allow:naming: SVM resource name -->
 | Access Point 名 | `fsxn-audit-observability` |
 | Access Point ARN | `arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-observability` |
 | Access Point Alias | `fsxn-audit-obser-cbsi8mwwgahuh7sans3bbtxijig4sapn1b-ext-s3alias` |

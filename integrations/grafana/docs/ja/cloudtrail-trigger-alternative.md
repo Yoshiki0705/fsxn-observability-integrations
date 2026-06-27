@@ -11,7 +11,7 @@
 3. CloudTrail は EventBridge への配信に 5-15 分のレイテンシーが追加される
 4. NetApp Workload Factory の Journal table 機能が既にこの CloudTrail パターンを使用しており、重複する必要がない
 
-## エビデンス: FSx S3 AP に対する CloudTrail サポート
+## エビデンス: FSx for ONTAP S3 AP に対する CloudTrail サポート
 
 ### AWS ドキュメント
 
@@ -144,7 +144,7 @@ Resources:
 |----------|-------------|---------|------|
 | EventBridge Scheduler（ポーリング） | ~$0.00（5分に1回の呼び出し） | 最大5分（設定可能） | 低 |
 | CloudTrail データイベント | $0.10/100K イベント + Trail ストレージ | 5-15分（CloudTrail 配信） | 中 |
-| S3 Event Notifications | FSx S3 AP では非対応 | — | — |
+| S3 Event Notifications | FSx for ONTAP S3 AP では非対応 | — | — |
 
 ## CloudTrail トリガーを使用すべき場合
 

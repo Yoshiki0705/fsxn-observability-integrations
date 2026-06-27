@@ -33,7 +33,7 @@ FPOLICY_EVENT_BUS="${FPOLICY_EVENT_BUS:-fsxn-fpolicy-events}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INTEGRATION_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "=== FSxN Honeycomb Deployment ==="
+echo "=== FSx for ONTAP Honeycomb Deployment ==="
 for var in HONEYCOMB_SECRET_ARN S3_ACCESS_POINT_ARN S3_BUCKET_NAME; do
   if [ -z "${!var:-}" ]; then echo "ERROR: $var not set"; exit 1; fi
 done

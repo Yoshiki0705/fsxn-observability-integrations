@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  DynamoDB object processing ledger for FSx ONTAP audit log pipeline.
+  DynamoDB object processing ledger for FSx for ONTAP audit log pipeline.
   Provides per-object state tracking, deduplication, and poison-pill detection.
   Deploy this for Level 3 (Production Baseline) readiness.
 
@@ -53,7 +53,7 @@ Resources:
       FilterPattern: '"POISON PILL"'
       MetricTransformations:
         - MetricName: !Sub fsxn-${VendorName}-poison-pills
-          MetricNamespace: Custom/FSxNPipeline
+          MetricNamespace: Custom/FSxONTAPPipeline
           MetricValue: '1'
           DefaultValue: 0
 
@@ -66,7 +66,7 @@ Resources:
         A file has been marked as a poison pill after repeated processing failures.
         Review the DynamoDB ledger and Lambda logs to investigate.
       MetricName: !Sub fsxn-${VendorName}-poison-pills
-      Namespace: Custom/FSxNPipeline
+      Namespace: Custom/FSxONTAPPipeline
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1

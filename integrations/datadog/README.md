@@ -83,14 +83,14 @@ aws cloudformation deploy \
 | Field extraction | ✅ | user, path, client_ip, event_type, result, svm, operation |
 | Log Pipeline (EventID→Operation) | ✅ | Category processor applied |
 | Monitors (mass delete, abnormal access, failure spike) | ✅ | 3 monitors active |
-| Dashboard | ✅ | FSx ONTAP Audit Log Overview |
+| Dashboard | ✅ | FSx for ONTAP Audit Log Overview |
 
 ### Screenshots
 
 | Screenshot | Description |
 |-----------|-------------|
-| ![Log Explorer](screenshots/datadog-log-explorer-fsxn-xml.png) | Log Explorer showing FSxN audit events with full field extraction |
-| ![Dashboard](screenshots/datadog-dashboard-fsxn-overview.png) | FSx ONTAP Audit Log Overview dashboard |
+| ![Log Explorer](screenshots/datadog-log-explorer-fsxn-xml.png) | Log Explorer showing FSx for ONTAP audit events with full field extraction |
+| ![Dashboard](screenshots/datadog-dashboard-fsxn-overview.png) | FSx for ONTAP Audit Log Overview dashboard |
 | ![Pipeline](screenshots/datadog-log-pipeline-config.png) | Log Pipeline configuration (EventID→Operation Name mapping) |
 | ![Monitors](screenshots/datadog-monitors-fsxn.png) | Security monitors for mass deletion, abnormal access, and access failures |
 
@@ -124,11 +124,11 @@ Pre-configured views for common investigation scenarios:
 
 | View Name | Query | Use Case |
 |-----------|-------|----------|
-| FSxN File Deletions | `source:fsxn @event_type:4660` | Track all file deletion events |
-| FSxN Access Failures | `source:fsxn @result:"Audit Failure"` | Permission denied / unauthorized access |
-| FSxN All Events | `source:fsxn` | Full audit log stream |
-| FSxN Sensitive Share Access | `source:fsxn (@path:*finance* OR @path:*hr* OR @path:*legal*)` | Access to sensitive file shares |
-| FSxN After-Hours Access | `source:fsxn` | Filter by time for off-hours monitoring |
+| FSx for ONTAP File Deletions | `source:fsxn @event_type:4660` | Track all file deletion events |
+| FSx for ONTAP Access Failures | `source:fsxn @result:"Audit Failure"` | Permission denied / unauthorized access |
+| FSx for ONTAP All Events | `source:fsxn` | Full audit log stream |
+| FSx for ONTAP Sensitive Share Access | `source:fsxn (@path:*finance* OR @path:*hr* OR @path:*legal*)` | Access to sensitive file shares |
+| FSx for ONTAP After-Hours Access | `source:fsxn` | Filter by time for off-hours monitoring |
 
 ![Saved Views](screenshots/datadog-saved-views.png)
 
@@ -185,7 +185,7 @@ PII auto-detection and redaction for audit log content. Protects against acciden
 
 ## Enhanced Dashboard (10 Widgets)
 
-The FSx ONTAP Audit Log Overview dashboard includes:
+The FSx for ONTAP Audit Log Overview dashboard includes:
 
 | Widget | Type | Purpose |
 |--------|------|---------|

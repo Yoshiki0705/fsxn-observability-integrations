@@ -6,7 +6,7 @@ This directory contains screenshots captured during E2E verification of the Graf
 
 | Filename | Description |
 |----------|-------------|
-| `explore-log-arrival.png` | Grafana Explore showing FSxN audit log arrival with timestamp and content fields |
+| `explore-log-arrival.png` | Grafana Explore showing FSx for ONTAP audit log arrival with timestamp and content fields |
 | `dashboard-overview.png` | Grafana dashboard with all 4 panels (log volume, operations breakdown, user activity, failure events) rendered with data |
 | `grafana-ems-events.png` | Grafana Explore showing EMS events (`{service_name="fsxn-ems"}`) with event_name and severity fields |
 | `grafana-fpolicy-events.png` | Grafana Explore showing FPolicy events (`{service_name="fsxn-fpolicy"}`) with operation and file_path fields |
@@ -23,7 +23,7 @@ This directory contains screenshots captured during E2E verification of the Graf
 
 ### `explore-log-arrival.png`
 
-**Purpose**: Verify that FSxN audit logs arrive in Grafana Cloud Loki and are queryable via Grafana Explore.
+**Purpose**: Verify that FSx for ONTAP audit logs arrive in Grafana Cloud Loki and are queryable via Grafana Explore.
 
 **Navigation Path**:
 
@@ -58,7 +58,7 @@ This directory contains screenshots captured during E2E verification of the Graf
 
 1. Log in to Grafana Cloud (`https://<instance>.grafana.net`)
 2. Click the **Dashboards** icon (four squares) in the left sidebar
-3. Navigate to the FSxN audit log dashboard (or create it following the setup guide)
+3. Navigate to the FSx for ONTAP audit log dashboard (or create it following the setup guide)
 4. Ensure the time range covers a period with data (e.g., "Last 1 hour")
 5. Verify all 4 panels are visible and rendering data:
    - **ログ量推移 (Log Volume)**: Time series panel showing `count_over_time({job="fsxn-audit"}[5m])`

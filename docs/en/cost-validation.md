@@ -31,7 +31,7 @@ This document tracks the comparison between estimated costs (from vendor READMEs
 
 | Vendor | Estimated Monthly Cost | Tier |
 |--------|----------------------|------|
-| Sumo Logic | $0 | Free (500 MB/day) |
+| Sumo Logic | $0 | Free (1.25 credits/day) |
 | Honeycomb | $0 | Free (20M events/month) |
 | New Relic | $0 | Free (100 GB/month) |
 | Datadog | ~$15 | Logs indexed (15-day retention) |

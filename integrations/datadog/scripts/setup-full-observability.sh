@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup-full-observability.sh — Deploy complete Datadog observability stack for FSxN
+# setup-full-observability.sh — Deploy complete Datadog observability stack for FSx for ONTAP
 # Creates: Log Pipeline, Security Monitors, Log-based Metrics, Sensitive Data Scanner, Dashboard widgets
 #
 # Prerequisites:
@@ -26,7 +26,7 @@ AWS_REGION="${AWS_REGION:-ap-northeast-1}"
 SLACK_CHANNEL="${DD_SLACK_CHANNEL:-#alerts}"
 
 echo "============================================================"
-echo "FSxN Datadog Full Observability Setup"
+echo "FSx for ONTAP Datadog Full Observability Setup"
 echo "============================================================"
 echo "Site:       ${DD_SITE}"
 echo "Region:     ${AWS_REGION}"
@@ -67,7 +67,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 PIPELINE_JSON=$(cat <<'EOF'
 {
-  "name": "FSxN ONTAP Audit Log Pipeline",
+  "name": "FSx for ONTAP ONTAP Audit Log Pipeline",
   "is_enabled": true,
   "filter": {"query": "source:fsxn"},
   "processors": [
@@ -143,9 +143,9 @@ http = urllib3.PoolManager()
 headers = {'Content-Type': 'application/json', 'DD-API-KEY': '${DD_API_KEY}', 'DD-APPLICATION-KEY': '${DD_APP_KEY}'}
 
 monitors = [
-    {'name': '[FSxN] Mass File Deletion Detected', 'query': 'logs(\"source:fsxn @event_type:4660\").index(\"*\").rollup(\"count\").by(\"@user\").last(\"5m\") > 50', 'thresholds': {'critical': 50, 'warning': 20}, 'tags': ['source:fsxn','team:storage','severity:high']},
-    {'name': '[FSxN] Abnormal Access Volume', 'query': 'logs(\"source:fsxn @result:\\\\\"Audit Success\\\\\"\").index(\"*\").rollup(\"count\").by(\"@user\").last(\"1h\") > 1000', 'thresholds': {'critical': 1000, 'warning': 500}, 'tags': ['source:fsxn','team:storage','severity:medium']},
-    {'name': '[FSxN] Access Failure Spike', 'query': 'logs(\"source:fsxn @result:\\\\\"Audit Failure\\\\\"\").index(\"*\").rollup(\"count\").by(\"@user\").last(\"15m\") > 10', 'thresholds': {'critical': 10, 'warning': 5}, 'tags': ['source:fsxn','team:storage','severity:medium']},
+    {'name': '[FSx-ONTAP] Mass File Deletion Detected', 'query': 'logs(\"source:fsxn @event_type:4660\").index(\"*\").rollup(\"count\").by(\"@user\").last(\"5m\") > 50', 'thresholds': {'critical': 50, 'warning': 20}, 'tags': ['source:fsxn','team:storage','severity:high']},
+    {'name': '[FSx-ONTAP] Abnormal Access Volume', 'query': 'logs(\"source:fsxn @result:\\\\\"Audit Success\\\\\"\").index(\"*\").rollup(\"count\").by(\"@user\").last(\"1h\") > 1000', 'thresholds': {'critical': 1000, 'warning': 500}, 'tags': ['source:fsxn','team:storage','severity:medium']},
+    {'name': '[FSx-ONTAP] Access Failure Spike', 'query': 'logs(\"source:fsxn @result:\\\\\"Audit Failure\\\\\"\").index(\"*\").rollup(\"count\").by(\"@user\").last(\"15m\") > 10', 'thresholds': {'critical': 10, 'warning': 5}, 'tags': ['source:fsxn','team:storage','severity:medium']},
 ]
 
 for m in monitors:

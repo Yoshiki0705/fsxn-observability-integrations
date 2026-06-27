@@ -1,4 +1,4 @@
-# FSxN Management Console セットアップガイド
+# FSx for ONTAP Management Console セットアップガイド
 
 Amazon FSx for NetApp ONTAP 向けセルフホスト管理コンソールのデプロイ手順書です。
 
@@ -225,7 +225,7 @@ aws cognito-idp admin-create-user \
 1. `https://<alb-dns>/app` にアクセス
 2. Cognito 認証後、ToolJet ダッシュボードが表示されることを確認
 3. ONTAP REST API データソースの接続テスト:
-   - Settings → Data Sources → FSxN ONTAP REST → Test Connection
+   - Settings → Data Sources → FSx for ONTAP ONTAP REST → Test Connection
 
 ### ECS タスク稼働確認
 

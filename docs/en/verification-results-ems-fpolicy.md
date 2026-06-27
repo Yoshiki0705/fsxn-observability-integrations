@@ -13,7 +13,7 @@
 |------|-------|
 | **AWS Region** | `ap-northeast-1` |
 | **FSx for ONTAP File System ID** | `fs-0123456789abcdef0` (SINGLE_AZ_1) |
-| **SVM Name** | `FPolicySMB` (svm-0123456789abcdef0), `FSxN_OnPre` (svm-0abcdef123456789a) |
+| **SVM Name** | `FPolicySMB` (svm-0123456789abcdef0), `FSxN_OnPre` (svm-0abcdef123456789a) | <!-- allow:naming: SVM resource name -->
 | **ONTAP Version** | `9.17.1P6` |
 
 ### CloudFormation Stack Names
@@ -132,7 +132,7 @@ aws logs filter-log-events \
 | Item | Details |
 |------|---------|
 | **Expected Result** | CloudWatch Logs contains EMS event reception log entries |
-| **Actual Result** | Log confirmed: `EMS event received: event_name=arw.volume.state severity=alert source_node=fsxn-node-01 svm=FPolicySMB timestamp=2026-05-17T07:20:00+09:00` and `EMS event received: event_name=wafl.quota.softlimit.exceeded severity=warning source_node=fsxn-node-01 svm=FSxN_OnPre timestamp=2026-05-17T07:21:00+09:00` |
+| **Actual Result** | Log confirmed: `EMS event received: event_name=arw.volume.state severity=alert source_node=fsxn-node-01 svm=FPolicySMB timestamp=2026-05-17T07:20:00+09:00` and `EMS event received: event_name=wafl.quota.softlimit.exceeded severity=warning source_node=fsxn-node-01 svm=FSxN_OnPre timestamp=2026-05-17T07:21:00+09:00` | <!-- allow:naming: SVM resource name -->
 | **Judgment** | ✅ PASS |
 
 ---
@@ -403,7 +403,7 @@ aws logs filter-log-events \
 ```bash
 curl -X POST \
   -H "Content-Type: application/json" \
-  -d '{"time":"2026-05-17T07:21:00+09:00","messageName":"wafl.quota.softlimit.exceeded","severity":"warning","node":"fsxn-node-01","svmName":"FSxN_OnPre","message":"Quota soft limit exceeded","parameters":{"volume_name":"vol_data","quota_target":"/vol/vol_data","used_bytes":"68157440","limit_bytes":"52428800"}}' \
+  -d '{"time":"2026-05-17T07:21:00+09:00","messageName":"wafl.quota.softlimit.exceeded","severity":"warning","node":"fsxn-node-01","svmName":"FSxN_OnPre","message":"Quota soft limit exceeded","parameters":{"volume_name":"vol_data","quota_target":"/vol/vol_data","used_bytes":"68157440","limit_bytes":"52428800"}}' \ <!-- allow:naming: SVM resource name -->
   https://<api-gateway-id>.execute-api.ap-northeast-1.amazonaws.com/prod/ems
 ```
 
@@ -437,7 +437,7 @@ aws logs filter-log-events \
 | Item | Details |
 |------|---------|
 | **Expected Result** | CloudWatch Logs contains INFO-level log with `event_name=wafl.quota.softlimit.exceeded`, `volume_name`, `quota_target`, `used_bytes`, `limit_bytes` |
-| **Actual Result** | CloudWatch Logs confirmed: `EMS event received: event_name=wafl.quota.softlimit.exceeded severity=warning source_node=fsxn-node-01 svm=FSxN_OnPre timestamp=2026-05-17T07:21:00+09:00` |
+| **Actual Result** | CloudWatch Logs confirmed: `EMS event received: event_name=wafl.quota.softlimit.exceeded severity=warning source_node=fsxn-node-01 svm=FSxN_OnPre timestamp=2026-05-17T07:21:00+09:00` | <!-- allow:naming: SVM resource name -->
 | **Judgment** | ✅ PASS |
 
 ---

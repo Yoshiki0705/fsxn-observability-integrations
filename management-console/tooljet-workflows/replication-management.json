@@ -1,11 +1,11 @@
 {
   "schemaVersion": "2.0",
   "name": "Replication Management",
-  "description": "FSx ONTAP SnapMirror relationship management with progress polling",
+  "description": "FSx for ONTAP SnapMirror relationship management with progress polling",
   "dataSources": [
     {
       "id": "ds_ontap_rest",
-      "name": "FSxN ONTAP REST",
+      "name": "FSx for ONTAP ONTAP REST",
       "kind": "restapi",
       "options": {
         "url": "{{globals.ontap_base_url}}",

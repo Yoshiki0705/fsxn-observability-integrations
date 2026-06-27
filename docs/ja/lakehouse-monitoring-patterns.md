@@ -12,7 +12,7 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │ メトリクスソース                                                      │
 ├──────────────┬──────────────┬──────────────┬────────────┬───────────┤
-│ CloudWatch   │ ONTAP REST   │ CloudTrail   │ Cost       │ FSx S3 AP │
+│ CloudWatch   │ ONTAP REST   │ CloudTrail   │ Cost       │ FSx for ONTAP S3 AP │
 │ メトリクス    │ API          │ データイベント │ Explorer   │ レイテンシー│
 │ (DataSync/   │ (FlexCache)  │ (異常検知)    │ (コスト)    │ (カスタム) │
 │  SnapMirror) │              │              │            │           │
@@ -70,7 +70,7 @@ http = urllib3.PoolManager()
 
 ONTAP_MGMT_ENDPOINT = os.environ["ONTAP_MGMT_ENDPOINT"]
 ONTAP_CREDENTIALS_SECRET_ARN = os.environ["ONTAP_CREDENTIALS_SECRET_ARN"]
-NAMESPACE = "FSxN/Lakehouse"
+NAMESPACE = "FSxONTAP/Lakehouse"
 
 
 def lambda_handler(event, context):
@@ -117,7 +117,7 @@ DataSyncLagAlarm:
   Properties:
     AlarmName: !Sub '${AWS::StackName}-datasync-lag'
     AlarmDescription: 'DataSync sync lag exceeds threshold — lakehouse data may be stale'
-    Namespace: FSxN/Lakehouse
+    Namespace: FSxONTAP/Lakehouse
     MetricName: DataSyncLagSeconds
     Statistic: Maximum
     Period: 300
@@ -132,7 +132,7 @@ SnapMirrorLagAlarm:
   Properties:
     AlarmName: !Sub '${AWS::StackName}-snapmirror-lag'
     AlarmDescription: 'SnapMirror lag exceeds threshold — replica may be stale'
-    Namespace: FSxN/Lakehouse
+    Namespace: FSxONTAP/Lakehouse
     MetricName: SnapMirrorLagSeconds
     Statistic: Maximum
     Period: 300
@@ -145,17 +145,17 @@ SnapMirrorLagAlarm:
 
 ---
 
-## パターン 2: FSx S3 AP レイテンシー監視 (p50/p99)
+## パターン 2: FSx for ONTAP S3 AP レイテンシー監視 (p50/p99)
 
 ### 課題
 
-FSx for ONTAP S3 Access Point の読み取りレイテンシーは、レイクハウスクエリのパフォーマンスに直接影響します。標準 S3 とは異なり、FSx S3 AP のレイテンシーはファイルシステムのプロビジョンドスループットと現在の負荷に依存します。
+FSx for ONTAP S3 Access Point の読み取りレイテンシーは、レイクハウスクエリのパフォーマンスに直接影響します。標準 S3 とは異なり、FSx for ONTAP S3 AP のレイテンシーはファイルシステムのプロビジョンドスループットと現在の負荷に依存します。
 
 ### アラーム閾値
 
 | メトリクス | 警告 | 重大 | 根拠 |
 |-----------|------|------|------|
-| S3APLatencyP50Ms | > 100ms | > 500ms | 通常の FSx S3 AP 読み取りは 20-80ms |
+| S3APLatencyP50Ms | > 100ms | > 500ms | 通常の FSx for ONTAP S3 AP 読み取りは 20-80ms |
 | S3APLatencyP99Ms | > 500ms | > 2000ms | テールレイテンシーはスループット飽和を示す |
 
 > **注意**: FSx ファイルシステムのプロビジョンドスループットティアに基づいてベースラインを設定してください。
@@ -174,7 +174,7 @@ s3_client = boto3.client("s3")
 
 S3_AP_ARN = os.environ["S3_ACCESS_POINT_ARN"]
 PROBE_KEY = os.environ.get("PROBE_OBJECT_KEY", ".latency-probe")
-NAMESPACE = "FSxN/Lakehouse"
+NAMESPACE = "FSxONTAP/Lakehouse"
 SAMPLE_COUNT = 10
 
 
@@ -324,7 +324,7 @@ def lambda_handler(event, context):
 
     # Publish metric
     cw_client.put_metric_data(
-        Namespace="FSxN/Lakehouse",
+        Namespace="FSxONTAP/Lakehouse",
         MetricData=[{"MetricName": "AccessAnomalyCount", "Value": len(anomalies), "Unit": "Count"}],
     )
 
@@ -386,7 +386,7 @@ def _collect_storage_costs():
             service = group["Keys"][0]
             cost = float(group["Metrics"]["UnblendedCost"]["Amount"])
             cw_client.put_metric_data(
-                Namespace="FSxN/Lakehouse",
+                Namespace="FSxONTAP/Lakehouse",
                 MetricData=[{
                     "MetricName": "DailyStorageCost",
                     "Value": cost,
@@ -401,7 +401,7 @@ def _collect_storage_costs():
 | パネル | メトリクス | 可視化 |
 |-------|--------|--------|
 | 日次ストレージコスト | `DailyStorageCost` (Service別) | 時系列 (FSx vs S3 vs DataSync) |
-| FSx S3 AP レイテンシー | `S3APLatencyP50Ms`, `S3APLatencyP99Ms` | 時系列 + 閾値アノテーション |
+| FSx for ONTAP S3 AP レイテンシー | `S3APLatencyP50Ms`, `S3APLatencyP99Ms` | 時系列 + 閾値アノテーション |
 | FlexCache ヒット率 | `FlexCacheHitRatePercent` | ゲージ + 70% 警告ライン |
 | 同期遅延 | `DataSyncLagSeconds`, `SnapMirrorLagSeconds` | 時系列 |
 | アクセス異常 | `AccessAnomalyCount` | 時系列（通常は 0） |
@@ -410,7 +410,7 @@ def _collect_storage_costs():
 
 ## ベンダー配信パス
 
-全パターンは CloudWatch カスタムメトリクス（`FSxN/Lakehouse` 名前空間）に発行します：
+全パターンは CloudWatch カスタムメトリクス（`FSxONTAP/Lakehouse` 名前空間）に発行します：
 
 | バックエンド | 統合方法 | セットアップ |
 |------------|---------|------------|
@@ -418,7 +418,7 @@ def _collect_storage_costs():
 | **Datadog** | AWS Integration（カスタム名前空間自動収集） | AWS Integration 有効化 |
 | **Splunk** | Splunk Add-on for AWS → CloudWatch 入力 | `aws_cloudwatch` 入力設定 |
 | **Elastic** | Metricbeat `aws` モジュール | `cloudwatch` metricset 設定 |
-| **OTel Collector** | `awscloudwatchreceiver` | `FSxN/Lakehouse` 名前空間をスクレイプ |
+| **OTel Collector** | `awscloudwatchreceiver` | `FSxONTAP/Lakehouse` 名前空間をスクレイプ |
 
 ---
 

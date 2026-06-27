@@ -103,7 +103,7 @@ Specific scenarios:
 - **JP region available**: Sumo Logic (JP), Elastic (Tokyo), Dynatrace (region-specific)
 - **Self-hosted option**: Elastic, Splunk (data stays in your VPC)
 - **US only**: Honeycomb
-- **Multi-region**: Datadog (US/EU), New Relic (US/EU), Grafana Cloud (US/EU/AU)
+- **Multi-region**: Datadog (US/EU/AP1-Tokyo), New Relic (US/EU, JP planned July 2026), Grafana Cloud (US/EU/AU)
 
 See the Data Residency Matrix for details.
 
@@ -118,7 +118,7 @@ See the Data Residency Matrix for details.
 2. **Vendor platform**: Varies (some have generous free tiers)
 
 Free tier options:
-- Sumo Logic: 500 MB/day (~15 GB/month free)
+- Sumo Logic: 1.25 credits/day free (7-day retention)
 - Honeycomb: 20M events/month free
 - New Relic: 100 GB/month free
 - Datadog: 14-day trial

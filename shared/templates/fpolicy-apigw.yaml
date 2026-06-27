@@ -71,7 +71,7 @@ Parameters:
 
   FsxnSvmSecurityGroupId:
     Type: AWS::EC2::SecurityGroup::Id
-    Description: Security Group ID of the FSxN SVM data LIFs
+    Description: Security Group ID of the FSx for ONTAP SVM data LIFs
 
   ContainerImage:
     Type: String
@@ -137,12 +137,12 @@ Parameters:
   FsxnMgmtIp:
     Type: String
     Default: ''
-    Description: FSxN management endpoint IP (for IP updater Lambda)
+    Description: FSx for ONTAP management endpoint IP (for IP updater Lambda)
 
   FsxnSvmUuid:
     Type: String
     Default: ''
-    Description: FSxN SVM UUID (for ONTAP REST API calls)
+    Description: FSx for ONTAP SVM UUID (for ONTAP REST API calls)
 
   FsxnEngineName:
     Type: String
@@ -265,14 +265,14 @@ Resources:
   FPolicyServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for FPolicy server - allows inbound TCP from FSxN
+      GroupDescription: Security group for FPolicy server - allows inbound TCP from FSx for ONTAP
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: !Ref FPolicyPort
           ToPort: !Ref FPolicyPort
           SourceSecurityGroupId: !Ref FsxnSvmSecurityGroupId
-          Description: FPolicy TCP from FSxN SVM data LIFs
+          Description: FPolicy TCP from FSx for ONTAP SVM data LIFs
       SecurityGroupEgress:
         - IpProtocol: tcp
           FromPort: 443

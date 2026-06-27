@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Management Console - Network Stack (Stack 1 of 5)
+  FSx for ONTAP Management Console - Network Stack (Stack 1 of 5)
   Creates NAT Gateway, VPC Interface Endpoints, S3 Gateway Endpoint (conditional),
   and Security Groups for the management console components.
   Deploy this FIRST before other management console stacks.
@@ -15,7 +15,7 @@ Metadata:
           - PrivateSubnetIds
           - PublicSubnetIds
       - Label:
-          default: FSx ONTAP Configuration
+          default: FSx for ONTAP Configuration
         Parameters:
           - OntapManagementEndpoint
       - Label:
@@ -30,7 +30,7 @@ Metadata:
       PublicSubnetIds:
         default: Public Subnet IDs (2+ AZs)
       OntapManagementEndpoint:
-        default: FSx ONTAP Management Endpoint
+        default: FSx for ONTAP Management Endpoint
       CreateS3Endpoint:
         default: Create S3 Gateway Endpoint
 
@@ -55,7 +55,7 @@ Parameters:
   OntapManagementEndpoint:
     Type: String
     Description: >
-      FSx ONTAP management endpoint IP address or DNS name.
+      FSx for ONTAP management endpoint IP address or DNS name.
       Stored in stack outputs for downstream stacks to reference.
     AllowedPattern: '^[a-zA-Z0-9._-]+$'
 
@@ -396,7 +396,7 @@ Outputs:
       Name: !Sub '${AWS::StackName}-PrivateRouteTableId'
 
   OntapManagementEndpoint:
-    Description: FSx ONTAP management endpoint (pass-through for downstream stacks)
+    Description: FSx for ONTAP management endpoint (pass-through for downstream stacks)
     Value: !Ref OntapManagementEndpoint
     Export:
       Name: !Sub '${AWS::StackName}-OntapManagementEndpoint'

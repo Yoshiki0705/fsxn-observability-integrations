@@ -323,7 +323,7 @@ CloudWatch monitors **volume-level** capacity only (not per-Qtree).
 ```bash
 # Create CloudWatch alarm
 aws cloudwatch put-metric-alarm \
-  --alarm-name "FSxN-Volume-Capacity-Warning" \
+  --alarm-name "FSx-ONTAP-Volume-Capacity-Warning" \
   --metric-name "StorageCapacityUtilization" \
   --namespace "AWS/FSx" \
   --statistic Average \
@@ -347,7 +347,7 @@ FSx for ONTAP automatically publishes some EMS events as CloudWatch Events.
 ```json
 {
   "source": ["aws.fsx"],
-  "detail-type": ["FSx ONTAP EMS Event"],
+  "detail-type": ["FSx for ONTAP EMS Event"],
   "detail": {
     "event-name": ["wafl.quota.softlimit.exceeded"]
   }
@@ -357,12 +357,12 @@ FSx for ONTAP automatically publishes some EMS events as CloudWatch Events.
 ```bash
 # Create EventBridge rule
 aws events put-rule \
-  --name "FSxN-Quota-Alert" \
-  --event-pattern '{"source":["aws.fsx"],"detail-type":["FSx ONTAP EMS Event"],"detail":{"event-name":["wafl.quota.softlimit.exceeded","wafl.quota.hardlimit.exceeded"]}}'
+  --name "FSx-ONTAP-Quota-Alert" \
+  --event-pattern '{"source":["aws.fsx"],"detail-type":["FSx for ONTAP EMS Event"],"detail":{"event-name":["wafl.quota.softlimit.exceeded","wafl.quota.hardlimit.exceeded"]}}'
 
 # Add SNS target
 aws events put-targets \
-  --rule "FSxN-Quota-Alert" \
+  --rule "FSx-ONTAP-Quota-Alert" \
   --targets "Id"="1","Arn"="arn:aws:sns:ap-northeast-1:123456789012:fsxn-quota-alerts"
 ```
 

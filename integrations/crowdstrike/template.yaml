@@ -1,12 +1,12 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN CrowdStrike Falcon LogScale Integration - Audit log shipping via HEC.
+  FSx for ONTAP CrowdStrike Falcon LogScale Integration - Audit log shipping via HEC.
   Uses LogScale's Splunk HEC-compatible endpoint (/api/v1/ingest/hec).
 
 Parameters:
   FsxS3AccessPointArn:
     Type: String
-    Description: ARN of the S3 Access Point for FSx ONTAP audit logs
+    Description: ARN of the S3 Access Point for FSx for ONTAP audit logs
     AllowedPattern: 'arn:aws:s3:[a-z0-9-]+:\d{12}:accesspoint/.+'
 
   LogScaleIngestTokenSecretArn:
@@ -202,7 +202,7 @@ Resources:
       AlarmName: !Sub '${AWS::StackName}-hec-failure'
       AlarmDescription: HEC delivery failures detected. Check Lambda logs and LogScale endpoint availability.
       MetricName: HecFailure
-      Namespace: FSxN/CrowdStrike/Pipeline
+      Namespace: FSxONTAP/CrowdStrike/Pipeline
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1
@@ -218,7 +218,7 @@ Resources:
       AlarmName: !Sub '${AWS::StackName}-delivery-latency'
       AlarmDescription: Pipeline delivery latency exceeds 60 seconds. Check S3 AP throughput and LogScale endpoint.
       MetricName: DeliveryLatencyMs
-      Namespace: FSxN/CrowdStrike/Pipeline
+      Namespace: FSxONTAP/CrowdStrike/Pipeline
       Statistic: Maximum
       Period: 300
       EvaluationPeriods: 2
@@ -241,8 +241,8 @@ Resources:
               "properties": {
                 "title": "Events Parsed vs Sent",
                 "metrics": [
-                  ["FSxN/CrowdStrike/Pipeline", "EventsParsed", "FunctionName", "${LogShipperFunction}"],
-                  ["FSxN/CrowdStrike/Pipeline", "EventsSent", "FunctionName", "${LogShipperFunction}"]
+                  ["FSxONTAP/CrowdStrike/Pipeline", "EventsParsed", "FunctionName", "${LogShipperFunction}"],
+                  ["FSxONTAP/CrowdStrike/Pipeline", "EventsSent", "FunctionName", "${LogShipperFunction}"]
                 ],
                 "period": 300, "stat": "Sum", "region": "${AWS::Region}"
               }
@@ -253,8 +253,8 @@ Resources:
               "properties": {
                 "title": "HEC Success / Failure",
                 "metrics": [
-                  ["FSxN/CrowdStrike/Pipeline", "HecSuccess", "FunctionName", "${LogShipperFunction}"],
-                  ["FSxN/CrowdStrike/Pipeline", "HecFailure", "FunctionName", "${LogShipperFunction}"]
+                  ["FSxONTAP/CrowdStrike/Pipeline", "HecSuccess", "FunctionName", "${LogShipperFunction}"],
+                  ["FSxONTAP/CrowdStrike/Pipeline", "HecFailure", "FunctionName", "${LogShipperFunction}"]
                 ],
                 "period": 300, "stat": "Sum", "region": "${AWS::Region}"
               }
@@ -265,7 +265,7 @@ Resources:
               "properties": {
                 "title": "Delivery Latency (ms)",
                 "metrics": [
-                  ["FSxN/CrowdStrike/Pipeline", "DeliveryLatencyMs", "FunctionName", "${LogShipperFunction}"]
+                  ["FSxONTAP/CrowdStrike/Pipeline", "DeliveryLatencyMs", "FunctionName", "${LogShipperFunction}"]
                 ],
                 "period": 300, "stat": "Average", "region": "${AWS::Region}"
               }
@@ -287,8 +287,8 @@ Resources:
               "properties": {
                 "title": "Files Scanned / Processed",
                 "metrics": [
-                  ["FSxN/CrowdStrike/Pipeline", "FilesScanned", "FunctionName", "${LogShipperFunction}"],
-                  ["FSxN/CrowdStrike/Pipeline", "FilesProcessed", "FunctionName", "${LogShipperFunction}"]
+                  ["FSxONTAP/CrowdStrike/Pipeline", "FilesScanned", "FunctionName", "${LogShipperFunction}"],
+                  ["FSxONTAP/CrowdStrike/Pipeline", "FilesProcessed", "FunctionName", "${LogShipperFunction}"]
                 ],
                 "period": 300, "stat": "Sum", "region": "${AWS::Region}"
               }

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# FSxN Observability Integration - Deployment Script
+# FSx for ONTAP Observability Integration - Deployment Script
 # Usage: ./deploy.sh <vendor> <stack-name> [--region <region>]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

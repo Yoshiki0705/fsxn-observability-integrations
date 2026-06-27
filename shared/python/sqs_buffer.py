@@ -1,4 +1,4 @@
-"""SQS buffering utilities for FSx ONTAP observability pipeline.
+"""SQS buffering utilities for FSx for ONTAP observability pipeline.
 
 Provides two components:
 1. SQSProducer: Used by the poller Lambda to send file keys to the buffer queue

@@ -158,7 +158,7 @@ Retrieves and parses audit logs, then ships to vendor APIs.
 For high-volume logs, deliver to vendors via Firehose.
 
 ```
-FSx S3 AP → Lambda (Transform) → Kinesis Data Firehose → Vendor API
+FSx for ONTAP S3 AP → Lambda (Transform) → Kinesis Data Firehose → Vendor API
 ```
 
 - **Benefits**: Automatic buffering, retry, scaling

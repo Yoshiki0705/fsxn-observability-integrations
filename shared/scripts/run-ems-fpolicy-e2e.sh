@@ -63,7 +63,7 @@ Options:
   --region          AWS region (default: ap-northeast-1 or \$AWS_DEFAULT_REGION)
   --stack-ems       CloudFormation stack name for EMS Webhook
   --stack-fpolicy   CloudFormation stack name for FPolicy APIGW
-  --svm-name        FSx ONTAP SVM name
+  --svm-name        FSx for ONTAP SVM name
   --output          Output directory for results (default: ./e2e-results)
   --help            Show this help message and exit
 

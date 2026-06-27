@@ -1,0 +1,194 @@
+name: Agent Output Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.md'
+      - '**.yaml'
+      - '**.yml'
+      - '**.py'
+      - '**.sql'
+      - '**.json'
+      - '**.sh'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**.md'
+      - '**.yaml'
+      - '**.yml'
+      - '**.py'
+      - '**.sql'
+      - '**.json'
+      - '**.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agent-output-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Determine changed files
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            BASE="${{ github.event.before }}"
+          else
+            BASE=""
+          fi
+
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            # workflow_dispatch or missing base — use all tracked files
+            CHANGED_MD=$(git ls-files -- '*.md' | grep -vE '^(\.github/|AGENTS\.md|CONTRIBUTING|\.kiro/)' || true)
+            CHANGED_TEXT=$(git ls-files -- '*.md' '*.yaml' '*.yml' '*.py' '*.sql' '*.json' '*.sh' | grep -vE '^(\.github/|AGENTS\.md|CONTRIBUTING|\.kiro/)' || true)
+          else
+            ALL_CHANGED=$(git diff --name-only --diff-filter=ACMR "$BASE" HEAD || true)
+            CHANGED_MD=$(echo "$ALL_CHANGED" | grep -E '\.md$' | grep -vE '^(\.github/|AGENTS\.md|CONTRIBUTING|\.kiro/)' || true)
+            CHANGED_TEXT=$(echo "$ALL_CHANGED" | grep -E '\.(md|yaml|yml|py|sql|json|sh)$' | grep -vE '^(\.github/|AGENTS\.md|CONTRIBUTING|\.kiro/)' || true)
+          fi
+
+          # Write to files for subsequent steps
+          echo "$CHANGED_MD" > /tmp/changed_md.txt
+          echo "$CHANGED_TEXT" > /tmp/changed_text.txt
+
+          MD_COUNT=$(echo "$CHANGED_MD" | grep -c '[^[:space:]]' || true)
+          TEXT_COUNT=$(echo "$CHANGED_TEXT" | grep -c '[^[:space:]]' || true)
+          echo "md_count=$MD_COUNT" >> "$GITHUB_OUTPUT"
+          echo "text_count=$TEXT_COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: "Check: Naming standards (changed .md only)"
+        if: steps.changed.outputs.md_count != '0'
+        run: |
+          FILES=$(cat /tmp/changed_md.txt | tr '\n' '\0' | xargs -0 -I{} echo "{}")
+          ERRORS=0
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            [ ! -f "$f" ] && continue
+            # Exclude lines containing http (external URLs) or allow:naming comment
+            HITS=$(grep -nE '\bFSxN\b|FSx ONTAP|FSx S3 AP' "$f" | grep -v 'http' | grep -v 'allow:naming' || true)
+            if [ -n "$HITS" ]; then
+              echo "::error file=$f::Naming violation found (use 'FSx for ONTAP' instead)"
+              echo "$HITS" | while IFS= read -r line; do echo "  $f:$(echo "$line" | cut -d: -f1)"; done
+              ERRORS=$((ERRORS + 1))
+            fi
+          done < /tmp/changed_md.txt
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "::error::$ERRORS file(s) with naming violations. Use 'FSx for ONTAP' (not FSxN/FSx ONTAP/FSx S3 AP)."
+            exit 1
+          fi
+          echo "✅ Naming check passed"
+
+      - name: "Check: Forbidden tools (changed .md only)"
+        if: steps.changed.outputs.md_count != '0'
+        run: |
+          ERRORS=0
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            [ ! -f "$f" ] && continue
+            HITS=$(grep -nE 'Workload Factory|NetApp Console|BlueXP' "$f" | grep -v 'allow:naming' || true)
+            if [ -n "$HITS" ]; then
+              echo "::error file=$f::Forbidden tool reference found"
+              echo "$HITS" | while IFS= read -r line; do echo "  $f:$(echo "$line" | cut -d: -f1)"; done
+              ERRORS=$((ERRORS + 1))
+            fi
+          done < /tmp/changed_md.txt
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "::error::$ERRORS file(s) reference forbidden tools (Workload Factory/NetApp Console/BlueXP)."
+            exit 1
+          fi
+          echo "✅ Forbidden tools check passed"
+
+      - name: "Check: Vendor neutrality (changed .md only)"
+        if: steps.changed.outputs.md_count != '0'
+        run: |
+          ERRORS=0
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            [ ! -f "$f" ] && continue
+            HITS=$(grep -nE '最強|game-changer|ゲームチェンジャー|競合ツール|優位性|より優れ|is better than|is superior to' "$f" || true)
+            if [ -n "$HITS" ]; then
+              echo "::error file=$f::Vendor neutrality violation found"
+              echo "$HITS" | while IFS= read -r line; do echo "  $f:$(echo "$line" | cut -d: -f1)"; done
+              ERRORS=$((ERRORS + 1))
+            fi
+          done < /tmp/changed_md.txt
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "::error::$ERRORS file(s) with vendor neutrality violations."
+            exit 1
+          fi
+          echo "✅ Vendor neutrality check passed"
+
+      - name: "Check: Leak detection (changed text files)"
+        if: steps.changed.outputs.text_count != '0'
+        env:
+          PROJECT_CONTEXT_NAMES: ${{ secrets.PROJECT_CONTEXT_NAMES }}
+        run: |
+          PATTERN='DB-I-[0-9]+'
+          if [ -n "$PROJECT_CONTEXT_NAMES" ]; then
+            PATTERN="$PROJECT_CONTEXT_NAMES|$PATTERN"
+          fi
+
+          ERRORS=0
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            [ ! -f "$f" ] && continue
+            HITS=$(grep -nE "$PATTERN" "$f" || true)
+            if [ -n "$HITS" ]; then
+              # Output file:line only — never echo matched content
+              echo "::error file=$f::Potential leak detected"
+              echo "$HITS" | cut -d: -f1,2 | while IFS= read -r loc; do echo "  $f:$loc"; done
+              ERRORS=$((ERRORS + 1))
+            fi
+          done < /tmp/changed_text.txt
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "::error::$ERRORS file(s) with potential leaks (personal names / internal IDs). See output above (file:line only)."
+            exit 1
+          fi
+          echo "✅ Leak detection passed"
+
+      - name: "Warning: JA/EN parity (changed ja docs)"
+        if: steps.changed.outputs.md_count != '0'
+        run: |
+          WARNINGS=0
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            [ ! -f "$f" ] && continue
+            # Only check docs in ja/ directories
+            if echo "$f" | grep -qE '/ja/'; then
+              EN_FILE=$(echo "$f" | sed 's|/ja/|/en/|')
+              if [ -f "$EN_FILE" ]; then
+                JA_SECTIONS=$(grep -c '^## ' "$f" || true)
+                EN_SECTIONS=$(grep -c '^## ' "$EN_FILE" || true)
+                if [ "$JA_SECTIONS" != "$EN_SECTIONS" ]; then
+                  echo "::warning file=$f::JA/EN section count mismatch: ja=$JA_SECTIONS en=$EN_SECTIONS ($EN_FILE)"
+                  WARNINGS=$((WARNINGS + 1))
+                fi
+              fi
+            fi
+            # Also check en/ → ja/ direction
+            if echo "$f" | grep -qE '/en/'; then
+              JA_FILE=$(echo "$f" | sed 's|/en/|/ja/|')
+              if [ -f "$JA_FILE" ]; then
+                EN_SECTIONS=$(grep -c '^## ' "$f" || true)
+                JA_SECTIONS=$(grep -c '^## ' "$JA_FILE" || true)
+                if [ "$JA_SECTIONS" != "$EN_SECTIONS" ]; then
+                  echo "::warning file=$f::JA/EN section count mismatch: en=$EN_SECTIONS ja=$JA_SECTIONS ($JA_FILE)"
+                  WARNINGS=$((WARNINGS + 1))
+                fi
+              fi
+            fi
+          done < /tmp/changed_md.txt
+          if [ "$WARNINGS" -gt 0 ]; then
+            echo "⚠️  $WARNINGS JA/EN parity warnings (non-blocking)"
+          else
+            echo "✅ JA/EN parity check passed"
+          fi

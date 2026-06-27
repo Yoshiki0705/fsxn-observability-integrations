@@ -65,7 +65,7 @@ create_monitor() {
 echo "Creating monitors..."
 
 create_monitor "Failed Access Spike" '{
-  "name": "[FSxN] Failed Access Spike (>10 in 5min)",
+  "name": "[FSx-ONTAP] Failed Access Spike (>10 in 5min)",
   "type": "log alert",
   "query": "logs(\"source:fsxn @attributes.result:Failure\").index(\"*\").rollup(\"count\").last(\"5m\") > 10",
   "message": "More than 10 failed access attempts detected on FSx for ONTAP in the last 5 minutes.\n\nThis may indicate:\n- Brute-force access attempts\n- Permission misconfiguration\n- Unauthorized access attempts\n\n@slack-security-alerts",
@@ -80,7 +80,7 @@ create_monitor "Failed Access Spike" '{
 
 # Monitor 2: Pipeline Lambda Errors
 create_monitor "Pipeline Lambda Errors" '{
-  "name": "[FSxN] Pipeline Lambda Errors Detected",
+  "name": "[FSx-ONTAP] Pipeline Lambda Errors Detected",
   "type": "metric alert",
   "query": "sum(last_5m):sum:aws.lambda.errors{functionname:fsxn-*}.as_count() > 0",
   "message": "Lambda errors detected in the FSx for ONTAP log shipping pipeline.\n\nCheck CloudWatch Logs for the affected function.\nDLQ may contain failed events for replay.\n\n@slack-ops-alerts",
@@ -95,7 +95,7 @@ create_monitor "Pipeline Lambda Errors" '{
 
 # Monitor 3: DLQ Messages
 create_monitor "DLQ Messages Appearing" '{
-  "name": "[FSxN] Dead Letter Queue Messages Detected",
+  "name": "[FSx-ONTAP] Dead Letter Queue Messages Detected",
   "type": "metric alert",
   "query": "avg(last_5m):avg:aws.sqs.approximate_number_of_messages_visible{queuename:fsxn-*-dlq} > 0",
   "message": "Messages detected in the FSx for ONTAP DLQ.\n\nThis means log delivery failed and events are queued for replay.\nFollow the DLQ replay runbook to reprocess failed events.\n\n@slack-ops-alerts",

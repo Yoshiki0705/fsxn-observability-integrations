@@ -448,3 +448,21 @@ FirehoseDeliveryStream:
 - The OTel Collector may need to parse Firehose-formatted payloads
 - Datadog and Splunk are available as native Firehose destinations (no OTel Collector needed)
 - Firehose minimum buffer interval is 60 seconds — use direct send when real-time delivery is required
+
+
+---
+
+## Additional Backend: Snowflake (Experimental)
+
+Snowflake can receive OTLP data via its [OpenFlow ListenOTLP processor](https://docs.snowflake.com/en/user-guide/data-integration/openflow/processors/listenotlp) or community receivers such as [snowflake-opentelemetry-receiver](https://github.com/KellerKev/snowflake-opentelemetry-receiver). This enables SQL-based security analytics on FSx for ONTAP audit logs within an existing Snowflake data lakehouse.
+
+```yaml
+# Example: OTel Collector exporter for Snowflake (community path)
+exporters:
+  otlphttp/snowflake:
+    endpoint: https://<account>.snowflakecomputing.com/v1/otlp
+    headers:
+      Authorization: "Bearer ${env:SNOWFLAKE_TOKEN}"
+```
+
+> **Status**: Not yet verified in this project. The Snowflake OTLP ingestion path is evolving. Validate endpoint configuration, authentication, and Event Table schema with your Snowflake environment before production use. See also [Bindplane Snowflake destination](https://docs.bindplane.com/integrations/destinations/snowflake) for a managed alternative.

@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Elastic FPolicy Integration - Lambda function for receiving
+  FSx for ONTAP Elastic FPolicy Integration - Lambda function for receiving
   FPolicy file operation events from EventBridge and forwarding to Elasticsearch.
   Prerequisite: Deploy shared/templates/fpolicy-apigw.yaml first.
 

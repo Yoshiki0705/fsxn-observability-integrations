@@ -36,7 +36,7 @@ AUTH_MODE = os.environ.get("AUTH_MODE", "bearer")  # "bearer" or "basic"
 MAX_RETRIES = 3
 BASE_INTERVAL = 2  # seconds
 
-# OTLP field mapping: FSx ONTAP field → OTLP attribute key
+# OTLP field mapping: FSx for ONTAP field → OTLP attribute key
 FIELD_MAPPING = {
     "EventID": "event.type",
     "UserName": "user.name",
@@ -75,7 +75,7 @@ _api_key_cache: Optional[str] = None
 
 
 def determine_severity(result: Optional[str]) -> tuple[int, str]:
-    """Determine OTLP severity from FSx ONTAP Result field.
+    """Determine OTLP severity from FSx for ONTAP Result field.
 
     Args:
         result: The Result field value from an audit log record.
@@ -121,9 +121,9 @@ def timestamp_to_unix_nano(timestamp: Optional[str]) -> str:
 
 
 def map_log_record(log: dict[str, Any]) -> dict[str, Any]:
-    """Map a single FSx ONTAP audit log to an OTLP logRecord.
+    """Map a single FSx for ONTAP audit log to an OTLP logRecord.
 
-    Applies field mapping from FSx ONTAP fields to OTLP attributes.
+    Applies field mapping from FSx for ONTAP fields to OTLP attributes.
     Absent or empty source fields are omitted from the attributes array.
 
     Args:
@@ -176,7 +176,7 @@ def build_otlp_payload(
     scope metadata, and mapped log records.
 
     Args:
-        logs: List of parsed FSx ONTAP audit log dicts.
+        logs: List of parsed FSx for ONTAP audit log dicts.
         service_name: Value for the service.name resource attribute.
         source_key: S3 object key (for traceability, not included in payload).
 
@@ -319,7 +319,7 @@ def _parse_json_logs(data: str) -> list[dict[str, Any]]:
 
 
 def _parse_audit_logs(data: bytes, key: str) -> list[dict[str, Any]]:
-    """Parse FSx ONTAP audit logs based on file extension.
+    """Parse FSx for ONTAP audit logs based on file extension.
 
     Args:
         data: Raw file content.

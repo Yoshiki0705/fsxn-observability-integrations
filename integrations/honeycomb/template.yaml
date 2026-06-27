@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: FSxN Honeycomb Integration - Audit log shipping via Events Batch API
+Description: FSx for ONTAP Honeycomb Integration - Audit log shipping via Events Batch API
 
 Parameters:
   S3AccessPointArn:

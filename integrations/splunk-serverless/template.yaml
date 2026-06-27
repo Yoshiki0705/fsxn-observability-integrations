@@ -1,12 +1,12 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Splunk Serverless Integration - Audit log shipping via HEC.
+  FSx for ONTAP Splunk Serverless Integration - Audit log shipping via HEC.
   Serverless alternative to EC2-based syslog-ng + Universal Forwarder.
 
 Parameters:
   S3AccessPointArn:
     Type: String
-    Description: ARN of the S3 Access Point for FSx ONTAP audit logs
+    Description: ARN of the S3 Access Point for FSx for ONTAP audit logs
     AllowedPattern: 'arn:aws:s3:[a-z0-9-]+:\d{12}:accesspoint/.+'
 
   SplunkHecTokenSecretArn:
@@ -347,4 +347,4 @@ Outputs:
     Value: !GetAtt EmsErrorAlarm.Arn
   ArchitectureNote:
     Description: Serverless alternative to EC2-based syslog-ng + Universal Forwarder
-    Value: 'FSx ONTAP -> S3 AP -> EventBridge -> Lambda -> Splunk HEC'
+    Value: 'FSx for ONTAP -> S3 AP -> EventBridge -> Lambda -> Splunk HEC'

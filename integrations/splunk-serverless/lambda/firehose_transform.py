@@ -31,7 +31,7 @@ logger.setLevel(getattr(logging, LOG_LEVEL))
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Firehose transformation handler.
 
-    Converts each record from FSx ONTAP audit log format to Splunk HEC
+    Converts each record from FSx for ONTAP audit log format to Splunk HEC
     event JSON. Records that cannot be parsed or transformed are marked
     as ProcessingFailed and will be routed to the S3 backup bucket by
     Firehose.

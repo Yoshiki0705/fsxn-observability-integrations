@@ -175,7 +175,7 @@ FSx for ONTAP S3 Access Points は S3 イベント通知をサポートしない
 大量ログの場合、Firehose 経由で直接ベンダーへ配信します。
 
 ```
-FSx S3 AP → Lambda (変換) → Kinesis Data Firehose → ベンダー API
+FSx for ONTAP S3 AP → Lambda (変換) → Kinesis Data Firehose → ベンダー API
 ```
 
 - **利点**: 自動バッファリング、リトライ、スケーリング

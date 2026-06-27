@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Honeycomb EMS Integration - Lambda function for receiving
+  FSx for ONTAP Honeycomb EMS Integration - Lambda function for receiving
   ONTAP EMS webhook events and forwarding to Honeycomb Events API.
   Deploy this stack first, then deploy shared/templates/ems-webhook-apigw.yaml
   with the Lambda ARN from this stack's output.

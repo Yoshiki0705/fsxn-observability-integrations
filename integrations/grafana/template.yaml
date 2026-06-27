@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: FSxN Grafana Cloud Integration - Audit log shipping to Loki
+Description: FSx for ONTAP Grafana Cloud Integration - Audit log shipping to Loki
 
 Parameters:
   S3AccessPointArn:

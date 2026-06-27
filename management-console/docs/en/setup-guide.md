@@ -1,6 +1,6 @@
-# FSxN Management Console — Setup Guide
+# FSx for ONTAP Management Console — Setup Guide
 
-This guide covers the deployment, configuration, and maintenance of the FSxN Management Console. The console provides a self-hosted observability and management solution for Amazon FSx for NetApp ONTAP, combining Harvest metrics collection with a ToolJet-based management UI.
+This guide covers the deployment, configuration, and maintenance of the FSx for ONTAP Management Console. The console provides a self-hosted observability and management solution for Amazon FSx for NetApp ONTAP, combining Harvest metrics collection with a ToolJet-based management UI.
 
 ## Table of Contents
 
@@ -53,7 +53,7 @@ Create the secret:
 ```bash
 aws secretsmanager create-secret \
   --name fsxn-mgmt-ontap-credentials \
-  --description "ONTAP admin credentials for FSxN Management Console" \
+  --description "ONTAP admin credentials for FSx for ONTAP Management Console" \
   --secret-string '{"username":"fsxadmin","password":"<your-password>"}'
 ```
 

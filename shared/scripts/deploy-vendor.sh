@@ -111,7 +111,7 @@ if [ -z "$VENDOR_NAME" ]; then
   VENDOR_NAME="${STACK_PREFIX#fsxn-}"
 fi
 
-echo "=== FSxN ${VENDOR_NAME} Integration Deployment ==="
+echo "=== FSx for ONTAP ${VENDOR_NAME} Integration Deployment ==="
 echo "Region: ${AWS_REGION}"
 echo "Stack prefix: ${STACK_PREFIX}"
 echo "Endpoint: ${VENDOR_ENDPOINT}"

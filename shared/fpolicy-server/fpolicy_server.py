@@ -637,7 +637,7 @@ class FPolicyServer:
         """CloudWatch メトリクスを出力する."""
         try:
             self.cw_client.put_metric_data(
-                Namespace="FSxN-S3AP-Patterns",
+                Namespace="FSx-ONTAP-S3AP-Patterns",
                 MetricData=[
                     {
                         "MetricName": metric_name,

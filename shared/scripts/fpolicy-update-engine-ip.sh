@@ -23,7 +23,7 @@ set -euo pipefail
 AWS_REGION="${AWS_REGION:-ap-northeast-1}"
 ECS_CLUSTER="${ECS_CLUSTER:-fsxn-fpolicy-server-cluster}"
 ECS_SERVICE="${ECS_SERVICE:-fsxn-fpolicy-server-service}"
-ONTAP_MGMT_IP="${ONTAP_MGMT_IP:?ERROR: Set ONTAP_MGMT_IP to your FSx ONTAP management endpoint IP}"
+ONTAP_MGMT_IP="${ONTAP_MGMT_IP:?ERROR: Set ONTAP_MGMT_IP to your FSx for ONTAP management endpoint IP}"
 ONTAP_SECRET_ID="${ONTAP_SECRET_ID:-fsx-ontap-fsxadmin-credentials}"
 SVM_UUID="${SVM_UUID:?ERROR: Set SVM_UUID to your SVM UUID (from ONTAP REST API /api/svm/svms)}"
 ENGINE_NAME="${ENGINE_NAME:-fpolicy_aws_engine}"

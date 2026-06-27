@@ -6,7 +6,7 @@
 
 ## Overview
 
-Ships Amazon FSx for NetApp ONTAP audit logs to Sumo Logic via HTTP Source. Sumo Logic's free tier (500 MB/day) makes it accessible for initial validation and small-scale deployments.
+Ships Amazon FSx for NetApp ONTAP audit logs to Sumo Logic via HTTP Source. Sumo Logic's free tier (1.25 credits/day under Flex model) makes it accessible for initial validation and small-scale deployments.
 
 **PoC time estimate**: ~30 minutes from deploy to first queryable log in Sumo Logic.
 
@@ -123,18 +123,18 @@ Lambda sends the following metadata headers with each request:
 - Max 1MB per request (newline-delimited JSON)
 - HTTP Source URL contains embedded auth token — rotate by creating a new source
 - No built-in Firehose support — Lambda direct delivery only
-- Sumo Logic Free Tier: 500 MB/day ingestion limit
+- Sumo Logic Free Tier: 1.25 credits/day (logs, metrics, traces combined), 7-day retention
 - **Data residency**: Sumo Logic deployments are region-specific (US, EU, AU, JP, etc.). Select the deployment matching your data residency requirements. Evaluate cross-border data transfer with your compliance team.
 
 ## Cost Estimate
 
 | Monthly Log Volume | Daily Average | Sumo Logic Tier |
 |-------------------|---------------|-----------------|
-| 1 GB | ~33 MB/day | Free (500 MB/day) |
+| 1 GB | ~33 MB/day | Free (1.25 credits/day) |
 | 10 GB | ~333 MB/day | Free |
 | 15+ GB | 500+ MB/day | Paid tier required |
 
-> Sumo Logic Free Tier includes 500 MB/day with 7-day retention. Professional tier starts at $108/month for 1 GB/day.
+> Sumo Logic Free Tier provides 1.25 credits/day (Cloud Flex Credits model) with 7-day log retention and up to 3 users. Credits cover logs, metrics, and traces in any combination.
 
 ## Related Documents
 

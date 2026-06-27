@@ -72,7 +72,7 @@ validate_required() {
   fi
 }
 
-echo "=== FSxN New Relic Integration Deployment ==="
+echo "=== FSx for ONTAP New Relic Integration Deployment ==="
 echo "Region: ${AWS_REGION} | Stack prefix: ${STACK_PREFIX} | NR Region: ${NR_REGION}"
 
 ERRORS=0

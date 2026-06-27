@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# FSxN Management Console — Cleanup Script
+# FSx for ONTAP Management Console — Cleanup Script
 #
 # Deletes all 5 CloudFormation stacks in reverse dependency order:
 #   monitoring → console → observability → auth → network
@@ -43,7 +43,7 @@ while [[ $# -gt 0 ]]; do
       cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Delete all FSxN Management Console CloudFormation stacks in reverse
+Delete all FSx for ONTAP Management Console CloudFormation stacks in reverse
 dependency order (monitoring → console → observability → auth → network).
 
 Options:
@@ -52,7 +52,7 @@ Options:
 
 Environment variables:
   AWS_REGION                AWS region (default: ap-northeast-1)
-  FSXN_SECURITY_GROUP_ID   FSx ONTAP file system security group ID (auto-removes access rules before deletion)
+  FSXN_SECURITY_GROUP_ID   FSx for ONTAP file system security group ID (auto-removes access rules before deletion)
 
 Deletion order:
   1. ${STACK_PREFIX}-monitoring     (CloudWatch alarms, dashboard, SNS)
@@ -81,7 +81,7 @@ done
 
 # --- Confirmation -----------------------------------------------------------
 
-echo "=== FSxN Management Console Cleanup ==="
+echo "=== FSx for ONTAP Management Console Cleanup ==="
 echo ""
 echo "Region: ${AWS_REGION}"
 echo "Stack prefix: ${STACK_PREFIX}"
@@ -103,9 +103,9 @@ if [ "$SKIP_CONFIRM" != true ]; then
   echo ""
 fi
 
-# Remove FSx ONTAP SG rules before stack deletion (prevents DELETE_FAILED)
+# Remove FSx for ONTAP SG rules before stack deletion (prevents DELETE_FAILED)
 if [[ -n "${FSXN_SECURITY_GROUP_ID:-}" ]]; then
-  echo "  Removing FSx ONTAP SG rules..."
+  echo "  Removing FSx for ONTAP SG rules..."
   # Get all task SG IDs from the network stack (if it exists)
   for sg_output in HarvestTaskSgId ToolJetTaskSgId; do
     SG_ID=$(aws cloudformation describe-stacks \

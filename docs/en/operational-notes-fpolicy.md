@@ -24,7 +24,7 @@ ONTAP FPolicy → TCP:9898 → ECS Fargate → SQS (FPolicy_Q) → Bridge Lambda
 | VPC | `vpc-0123456789abcdef0` |
 | Subnet | `subnet-xxxxxxxxxxxxxxxx1` (private) |
 | FPolicy Server SG | `sg-xxxxxxxxxxxxxxxxx` (TCP 9898 inbound) |
-| FSxN SVM SG | `sg-0123456789abcdef0` |
+| FSx for ONTAP SVM SG | `sg-0123456789abcdef0` |
 | SVM | `FPolicySMB` (svm-0123456789abcdef0) |
 | SVM UUID | `<svm-uuid>` |
 | SVM Management IP | `10.0.x.x` |

@@ -1,6 +1,6 @@
-# SPL vs CQL クエリ対比表 — FSxN 監査ログ
+# SPL vs CQL クエリ対比表 — FSx for ONTAP 監査ログ
 
-Splunk と CrowdStrike LogScale の両方を使用する SOC アナリスト向けに、FSxN 監査ログの一般的なクエリを SPL と CQL で対比します。
+Splunk と CrowdStrike LogScale の両方を使用する SOC アナリスト向けに、FSx for ONTAP 監査ログの一般的なクエリを SPL と CQL で対比します。
 
 ## クエリ対比表
 
@@ -69,7 +69,7 @@ index=fsxn_audit sourcetype=fsxn:audit:xml
 
 ## 正規化フィールドスキーマ
 
-両プラットフォームとも FSxN パーサーからの同じフィールド名を使用:
+両プラットフォームとも FSx for ONTAP パーサーからの同じフィールド名を使用:
 
 | フィールド | 説明 | 例 |
 |-----------|------|-----|

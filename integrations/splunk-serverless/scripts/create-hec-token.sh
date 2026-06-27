@@ -74,7 +74,7 @@ show_manual_steps() {
     echo ""
     echo "     aws secretsmanager create-secret \\"
     echo "       --name \"splunk/fsxn-hec-token\" \\"
-    echo "       --description \"Splunk HEC Token for FSxN audit log integration\" \\"
+    echo "       --description \"Splunk HEC Token for FSx for ONTAP audit log integration\" \\"
     echo "       --secret-string \"<YOUR_HEC_TOKEN>\" \\"
     echo "       --region ap-northeast-1"
     echo ""

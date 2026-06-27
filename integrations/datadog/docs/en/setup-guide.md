@@ -26,7 +26,7 @@ Setup guide for the serverless integration that ships Amazon FSx for NetApp ONTA
 ```bash
 aws secretsmanager create-secret \
   --name "datadog/fsxn-api-key" \
-  --description "Datadog API Key for FSxN audit log integration" \
+  --description "Datadog API Key for FSx for ONTAP audit log integration" \
   --secret-string '{"api_key":"YOUR_DATADOG_API_KEY"}' \
   --region ap-northeast-1
 ```

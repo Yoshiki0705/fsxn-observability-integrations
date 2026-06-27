@@ -1,7 +1,7 @@
-"""S3 Copy Lambda for FSxN Management Console.
+"""S3 Copy Lambda for FSx for ONTAP Management Console.
 
-Copies files from FSx ONTAP S3 Access Point to a standard S3 bucket
-and generates presigned URLs for download. FSx ONTAP S3 APs do not
+Copies files from FSx for ONTAP S3 Access Point to a standard S3 bucket
+and generates presigned URLs for download. FSx for ONTAP S3 APs do not
 support presigned URLs directly, so the copy-to-bucket pattern is required.
 
 Environment Variables:
@@ -242,9 +242,9 @@ def generate_presigned_url(temp_key: str) -> str:
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Lambda entry point for S3 copy and presigned URL generation.
 
-    Copies a file from FSx ONTAP S3 Access Point to a standard S3 bucket
+    Copies a file from FSx for ONTAP S3 Access Point to a standard S3 bucket
     and returns a presigned URL for download. This is required because
-    FSx ONTAP S3 APs do not support presigned URLs directly.
+    FSx for ONTAP S3 APs do not support presigned URLs directly.
 
     Args:
         event: Lambda event with fields:

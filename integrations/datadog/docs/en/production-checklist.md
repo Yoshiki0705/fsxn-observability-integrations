@@ -1,6 +1,6 @@
 # Datadog Integration — Production Deployment Checklist
 
-Use this checklist before promoting the FSxN Datadog integration from PoC to production.
+Use this checklist before promoting the FSx for ONTAP Datadog integration from PoC to production.
 
 ## Pre-Deployment
 

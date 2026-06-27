@@ -16,15 +16,15 @@ apiVersion: 1
 
 groups:
   - orgId: 1
-    name: FSxN Security Alerts
-    folder: FSxN Alerts
+    name: FSx for ONTAP Security Alerts
+    folder: FSx for ONTAP Alerts
     interval: 1m
     rules:
       # --- Ransomware Detection Alert ---
       # Fires when ONTAP Anti-Ransomware Protection (ARP) detects a volume
       # state change, indicating potential ransomware activity.
       - uid: fsxn-ransomware-detection
-        title: "FSxN: Ransomware Activity Detected (ARP)"
+        title: "FSx for ONTAP: Ransomware Activity Detected (ARP)"
         condition: C
         data:
           - refId: A
@@ -76,7 +76,7 @@ groups:
       # Fires when a WAFL quota soft limit is exceeded, indicating a user
       # or qtree is approaching their storage allocation.
       - uid: fsxn-quota-warning
-        title: "FSxN: Storage Quota Soft Limit Exceeded"
+        title: "FSx for ONTAP: Storage Quota Soft Limit Exceeded"
         condition: C
         data:
           - refId: A
@@ -127,7 +127,7 @@ groups:
       # Fires when more than 10 failed access attempts occur within 5 minutes,
       # indicating potential unauthorized access or misconfiguration.
       - uid: fsxn-failed-access-spike
-        title: "FSxN: Failed Access Spike (>10 in 5min)"
+        title: "FSx for ONTAP: Failed Access Spike (>10 in 5min)"
         condition: C
         data:
           - refId: A

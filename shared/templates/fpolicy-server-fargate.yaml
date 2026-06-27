@@ -12,11 +12,11 @@ Parameters:
 
   SubnetIds:
     Type: List<AWS::EC2::Subnet::Id>
-    Description: Private subnets for Fargate task (same subnet as FSx ONTAP SVM data LIF recommended)
+    Description: Private subnets for Fargate task (same subnet as FSx for ONTAP SVM data LIF recommended)
 
   FsxnSvmSecurityGroupId:
     Type: AWS::EC2::SecurityGroup::Id
-    Description: Security Group ID of the FSx ONTAP SVM (used as inbound source)
+    Description: Security Group ID of the FSx for ONTAP SVM (used as inbound source)
 
   ContainerImage:
     Type: String
@@ -91,14 +91,14 @@ Resources:
   FPolicyServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: FPolicy Server - allows inbound TCP from FSx ONTAP SVM
+      GroupDescription: FPolicy Server - allows inbound TCP from FSx for ONTAP SVM
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: !Ref FPolicyPort
           ToPort: !Ref FPolicyPort
           SourceSecurityGroupId: !Ref FsxnSvmSecurityGroupId
-          Description: FPolicy TCP from FSx ONTAP SVM
+          Description: FPolicy TCP from FSx for ONTAP SVM
       SecurityGroupEgress:
         - IpProtocol: tcp
           FromPort: 443

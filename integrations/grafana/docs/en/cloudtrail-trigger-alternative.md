@@ -11,7 +11,7 @@ However, the polling pattern (EventBridge Scheduler + checkpoint) remains the **
 3. CloudTrail adds 5-15 minutes of delivery latency to EventBridge anyway
 4. NetApp Workload Factory's Journal table feature already uses this CloudTrail pattern — no need to duplicate it
 
-## Evidence: CloudTrail Support for FSx S3 AP
+## Evidence: CloudTrail Support for FSx for ONTAP S3 AP
 
 ### AWS Documentation
 
@@ -144,7 +144,7 @@ Resources:
 |----------|-------------|---------|------------|
 | EventBridge Scheduler (polling) | ~$0.00 (1 invocation/5min) | Up to 5 min (configurable) | Low |
 | CloudTrail data events | $0.10/100K events + trail storage | 5-15 min (CloudTrail delivery) | Medium |
-| S3 Event Notifications | Not supported on FSx S3 AP | — | — |
+| S3 Event Notifications | Not supported on FSx for ONTAP S3 AP | — | — |
 
 ## When to Use CloudTrail Trigger
 
