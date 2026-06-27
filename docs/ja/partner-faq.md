@@ -103,7 +103,7 @@ NFS/SMB データパスへの変更なし、本番ワークロードへのパフ
 - **JP リージョンあり**: Sumo Logic (JP)、Elastic (東京)、Dynatrace（リージョン固有）
 - **セルフホストオプション**: Elastic、Splunk（データが VPC 内に留まる）
 - **US のみ**: Honeycomb
-- **マルチリージョン**: Datadog (US/EU)、New Relic (US/EU)、Grafana Cloud (US/EU/AU)
+- **マルチリージョン**: Datadog (US/EU/AP1-東京)、New Relic (US/EU、JP 2026年7月予定)、Grafana Cloud (US/EU/AU)
 
 詳細はデータレジデンシーマトリクスを参照してください。
 
@@ -118,7 +118,7 @@ NFS/SMB データパスへの変更なし、本番ワークロードへのパフ
 2. **ベンダープラットフォーム**: ベンダーにより異なる（寛大な無料枠があるものも）
 
 無料枠オプション：
-- Sumo Logic: 500 MB/日（約 15 GB/月無料）
+- Sumo Logic: 1.25 credits/日（7 日保持、無料）
 - Honeycomb: 2000 万イベント/月無料
 - New Relic: 100 GB/月無料
 - Datadog: 14 日間トライアル

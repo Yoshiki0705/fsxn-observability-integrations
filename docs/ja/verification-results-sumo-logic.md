@@ -49,7 +49,7 @@
 
 - **作成方法**: Google OAuth + 手動フォーム送信
 - **リージョン**: APAC: Tokyo (JP)
-- **プラン**: 30日間トライアル（Free Tier: 500 MB/day）
+- **プラン**: Free Tier（Cloud Flex Credits: 1.25 credits/日、7 日保持）
 - **URL**: https://service.jp.sumologic.com
 
 ---

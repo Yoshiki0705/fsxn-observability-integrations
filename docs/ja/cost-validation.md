@@ -31,7 +31,7 @@
 
 | ベンダー | 月額見積もり | プラン |
 |--------|----------------------|------|
-| Sumo Logic | $0 | Free（500 MB/日） |
+| Sumo Logic | $0 | Free（1.25 credits/日） |
 | Honeycomb | $0 | Free（20M イベント/月） |
 | New Relic | $0 | Free（100 GB/月） |
 | Datadog | ~$15 | Logs indexed（15 日保持） |
