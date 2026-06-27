@@ -55,7 +55,7 @@ audit_log_list = st.lists(audit_log_fields, min_size=1, max_size=50)
 class TestProperty1OtlpStructuralCompleteness:
     """Property 1: OTLP payload structural completeness.
 
-    For any list of valid FSx ONTAP audit log records (1 or more),
+    For any list of valid FSx for ONTAP audit log records (1 or more),
     building the OTLP payload SHALL produce a JSON structure where:
     (a) resourceLogs is a non-empty array,
     (b) each resourceLogs entry contains resource.attributes with keys
@@ -117,7 +117,7 @@ class TestProperty1OtlpStructuralCompleteness:
 class TestProperty2FieldMappingCorrectness:
     """Property 2: Field mapping correctness.
 
-    For any FSx ONTAP audit log record where a mapped field is present
+    For any FSx for ONTAP audit log record where a mapped field is present
     and non-empty, the corresponding OTLP attribute SHALL appear with
     the same string value. For absent/empty fields, the attribute SHALL
     NOT appear.

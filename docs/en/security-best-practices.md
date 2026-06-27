@@ -1,4 +1,4 @@
-# Security Best Practices for FSxN Observability Integrations
+# Security Best Practices for FSx for ONTAP Observability Integrations
 
 ## Overview
 

@@ -1,4 +1,4 @@
-# FSxN Grafana Alerting Rules
+# FSx for ONTAP Grafana Alerting Rules
 
 ## Overview
 
@@ -22,7 +22,7 @@ bash integrations/grafana/scripts/create-alerts.sh
 |---------|-------|-----------|
 | `noDataState` | OK | Absence of matching events is normal operation |
 | `execErrState` | Error | Query execution errors need operator attention |
-| Folder | FSxN Alerts | Dedicated folder for FSxN rules |
+| Folder | FSx for ONTAP Alerts | Dedicated folder for FSx for ONTAP rules |
 | Evaluation interval | 1 minute | Balance between detection speed and query load |
 
 ## What Is NOT Provisioned

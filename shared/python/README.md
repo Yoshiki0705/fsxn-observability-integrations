@@ -35,7 +35,7 @@ def lambda_handler(event, context):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | POWERTOOLS_SERVICE_NAME | fsxn-observability | Service name in logs and traces |
-| POWERTOOLS_METRICS_NAMESPACE | FSxNObservability | CloudWatch Metrics namespace |
+| POWERTOOLS_METRICS_NAMESPACE | FSxONTAPObservability | CloudWatch Metrics namespace |
 | POWERTOOLS_LOG_LEVEL | INFO | Minimum log level |
 
 ### idempotency.py

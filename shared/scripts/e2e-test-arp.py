@@ -7,11 +7,11 @@ from FSx for ONTAP through API Gateway to the EMS Receiver Lambda function.
 
 Prerequisites:
     - AWS credentials configured with CloudWatch Logs read access
-    - FSx ONTAP with ARP enabled on the target volume
+    - FSx for ONTAP with ARP enabled on the target volume
     - EMS Webhook stack deployed (shared/templates/ems-webhook-apigw.yaml)
     - EMS Receiver Lambda function deployed and connected to the API Gateway
 
-ONTAP CLI command to trigger ARP event (run manually via SSH to FSx ONTAP):
+ONTAP CLI command to trigger ARP event (run manually via SSH to FSx for ONTAP):
     security anti-ransomware volume attack simulate -vserver <svm> -volume <vol>
 
 Usage:
@@ -70,18 +70,18 @@ Verify management IP beforehand:
     parser.add_argument(
         "--svm-name",
         required=True,
-        help="FSx ONTAP SVM name (e.g., svm-prod-01)",
+        help="FSx for ONTAP SVM name (e.g., svm-prod-01)",
     )
     parser.add_argument(
         "--volume-name",
         required=True,
-        help="FSx ONTAP volume name where ARP is enabled (e.g., vol1)",
+        help="FSx for ONTAP volume name where ARP is enabled (e.g., vol1)",
     )
     parser.add_argument(
         "--management-ip",
         required=True,
         help=(
-            "FSx ONTAP management IP address "
+            "FSx for ONTAP management IP address "
             "(from: network interface show -vserver <svm_name> -role management)"
         ),
     )
@@ -191,13 +191,13 @@ def verify_source_ip(
     """Verify that the source IP in API Gateway access logs matches the management IP.
 
     Searches the API Gateway access log for the request that delivered the ARP event
-    and checks that the source IP matches the FSx ONTAP management IP.
+    and checks that the source IP matches the FSx for ONTAP management IP.
 
     Args:
         client: boto3 CloudWatch Logs client.
         log_group: CloudWatch Logs log group name (API Gateway access log group).
         start_time_ms: Start time in milliseconds since epoch.
-        management_ip: Expected FSx ONTAP management IP address.
+        management_ip: Expected FSx for ONTAP management IP address.
 
     Returns:
         True if source IP matches management IP, False otherwise.
@@ -241,8 +241,8 @@ def output_diagnostics(
         client: boto3 CloudWatch Logs client.
         log_group: CloudWatch Logs log group name.
         start_time_ms: Start time in milliseconds since epoch.
-        svm_name: FSx ONTAP SVM name.
-        volume_name: FSx ONTAP volume name.
+        svm_name: FSx for ONTAP SVM name.
+        volume_name: FSx for ONTAP volume name.
     """
     print("\n" + "=" * 70)
     print("DIAGNOSTICS — ARP Event Not Received Within Timeout")
@@ -270,7 +270,7 @@ def output_diagnostics(
         print(f"  ERROR fetching logs: {e}")
 
     # ONTAP EMS log diagnostic commands
-    print("\n[2] ONTAP EMS Log — Run these commands via SSH to FSx ONTAP CLI:")
+    print("\n[2] ONTAP EMS Log — Run these commands via SSH to FSx for ONTAP CLI:")
     print("-" * 50)
     print(f"  event log show -vserver {svm_name} -event arw.volume.state*")
     print(f"  event log show -vserver {svm_name} -time >30m")

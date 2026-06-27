@@ -51,7 +51,7 @@ Store the obtained Instance ID and API Key in AWS Secrets Manager.
 ```bash
 aws secretsmanager create-secret \
   --name "grafana/fsxn-loki-credentials" \
-  --description "Grafana Cloud Loki credentials for FSxN audit log integration" \
+  --description "Grafana Cloud Loki credentials for FSx for ONTAP audit log integration" \
   --secret-string '{"instance_id":"YOUR_INSTANCE_ID","api_key":"YOUR_API_KEY"}' \
   --region ap-northeast-1
 ```
@@ -571,8 +571,8 @@ The overall layout of the dashboard with all 4 panels:
 ### Saving and Sharing the Dashboard
 
 1. Click **Save dashboard** (💾 icon) in the upper right corner
-2. Enter the dashboard name: `FSxN Audit Log Overview`
-3. Select a folder (e.g., `FSxN Monitoring`)
+2. Enter the dashboard name: `FSx for ONTAP Audit Log Overview`
+3. Select a folder (e.g., `FSx for ONTAP Monitoring`)
 4. Click **Save**
 
 > **Export**: You can also export the dashboard JSON model and import it into other Grafana instances. Copy from **Dashboard settings** → **JSON Model**.

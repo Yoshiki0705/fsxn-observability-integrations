@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN FPolicy Pipeline - Prerequisites
+  FSx for ONTAP FPolicy Pipeline - Prerequisites
   Creates ECR repository and Secrets Manager secret for the FPolicy pipeline.
   Deploy this BEFORE the fpolicy-server-fargate.yaml and template-ems-fpolicy.yaml stacks.
 

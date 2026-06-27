@@ -1,6 +1,6 @@
 # Datadog 統合 — 本番デプロイチェックリスト
 
-FSxN Datadog 統合を PoC から本番に昇格する前に使用するチェックリストです。
+FSx for ONTAP Datadog 統合を PoC から本番に昇格する前に使用するチェックリストです。
 
 ## デプロイ前
 

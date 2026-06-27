@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: VPC Endpoints for FSxN Observability Integration
+Description: VPC Endpoints for FSx for ONTAP Observability Integration
 
 Parameters:
   VpcId:

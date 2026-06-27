@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: FSxN OTel Collector - EMS Webhook Lambda (API Gateway → Lambda → OTLP)
+Description: FSx for ONTAP OTel Collector - EMS Webhook Lambda (API Gateway → Lambda → OTLP)
 
 Parameters:
   OtlpEndpoint:

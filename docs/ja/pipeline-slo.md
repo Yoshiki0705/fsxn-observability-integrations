@@ -62,7 +62,7 @@ CheckpointStalenessAlarm:
   Properties:
     AlarmName: !Sub "${AWS::StackName}-checkpoint-stale"
     MetricName: ParameterStoreAge
-    Namespace: Custom/FSxNPipeline
+    Namespace: Custom/FSxONTAPPipeline
     Statistic: Maximum
     Period: 300
     EvaluationPeriods: 3

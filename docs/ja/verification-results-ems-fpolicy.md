@@ -13,7 +13,7 @@
 |------|-----|
 | **AWS リージョン** | `ap-northeast-1` |
 | **FSx for ONTAP ファイルシステム ID** | `fs-0123456789abcdef0` (SINGLE_AZ_1) |
-| **SVM 名** | `FPolicySMB` (svm-0123456789abcdef0), `FSxN_OnPre` (svm-0abcdef123456789a) |
+| **SVM 名** | `FPolicySMB` (svm-0123456789abcdef0), `FSxN_OnPre` (svm-0abcdef123456789a) | <!-- allow:naming: SVM resource name -->
 | **ONTAP バージョン** | `9.17.1P6` |
 
 ### CloudFormation スタック名
@@ -132,7 +132,7 @@ aws logs filter-log-events \
 | 項目 | 内容 |
 |------|------|
 | **期待結果** | CloudWatch Logs に EMS イベント受信ログが記録される |
-| **実際の結果** | ログ確認: `EMS event received: event_name=arw.volume.state severity=alert source_node=fsxn-node-01 svm=FPolicySMB timestamp=2026-05-17T07:20:00+09:00` および `EMS event received: event_name=wafl.quota.softlimit.exceeded severity=warning source_node=fsxn-node-01 svm=FSxN_OnPre timestamp=2026-05-17T07:21:00+09:00` |
+| **実際の結果** | ログ確認: `EMS event received: event_name=arw.volume.state severity=alert source_node=fsxn-node-01 svm=FPolicySMB timestamp=2026-05-17T07:20:00+09:00` および `EMS event received: event_name=wafl.quota.softlimit.exceeded severity=warning source_node=fsxn-node-01 svm=FSxN_OnPre timestamp=2026-05-17T07:21:00+09:00` | <!-- allow:naming: SVM resource name -->
 | **判定** | ✅ PASS |
 
 ---
@@ -403,7 +403,7 @@ aws logs filter-log-events \
 ```bash
 curl -X POST \
   -H "Content-Type: application/json" \
-  -d '{"time":"2026-05-17T07:21:00+09:00","messageName":"wafl.quota.softlimit.exceeded","severity":"warning","node":"fsxn-node-01","svmName":"FSxN_OnPre","message":"Quota soft limit exceeded","parameters":{"volume_name":"vol_data","quota_target":"/vol/vol_data","used_bytes":"68157440","limit_bytes":"52428800"}}' \
+  -d '{"time":"2026-05-17T07:21:00+09:00","messageName":"wafl.quota.softlimit.exceeded","severity":"warning","node":"fsxn-node-01","svmName":"FSxN_OnPre","message":"Quota soft limit exceeded","parameters":{"volume_name":"vol_data","quota_target":"/vol/vol_data","used_bytes":"68157440","limit_bytes":"52428800"}}' \ <!-- allow:naming: SVM resource name -->
   https://<api-gateway-id>.execute-api.ap-northeast-1.amazonaws.com/prod/ems
 ```
 
@@ -437,7 +437,7 @@ aws logs filter-log-events \
 | 項目 | 内容 |
 |------|------|
 | **期待結果** | CloudWatch Logs に `event_name=wafl.quota.softlimit.exceeded`、`volume_name`、`quota_target`、`used_bytes`、`limit_bytes` を含む INFO レベルのログが記録される |
-| **実際の結果** | CloudWatch Logs 確認: `EMS event received: event_name=wafl.quota.softlimit.exceeded severity=warning source_node=fsxn-node-01 svm=FSxN_OnPre timestamp=2026-05-17T07:21:00+09:00` |
+| **実際の結果** | CloudWatch Logs 確認: `EMS event received: event_name=wafl.quota.softlimit.exceeded severity=warning source_node=fsxn-node-01 svm=FSxN_OnPre timestamp=2026-05-17T07:21:00+09:00` | <!-- allow:naming: SVM resource name -->
 | **判定** | ✅ PASS |
 
 ---

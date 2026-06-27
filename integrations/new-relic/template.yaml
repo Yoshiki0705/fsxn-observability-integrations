@@ -1,10 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: FSxN New Relic Integration - Serverless audit log shipping via S3 Access Point
+Description: FSx for ONTAP New Relic Integration - Serverless audit log shipping via S3 Access Point
 
 Parameters:
   S3AccessPointArn:
     Type: String
-    Description: ARN of the S3 Access Point for FSx ONTAP audit logs
+    Description: ARN of the S3 Access Point for FSx for ONTAP audit logs
     AllowedPattern: 'arn:aws:s3:[a-z0-9-]+:\d{12}:accesspoint/.+'
 
   NewRelicLicenseKeySecretArn:
@@ -128,7 +128,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub '${AWS::StackName}-s3-event'
-      Description: Trigger Lambda on new FSx ONTAP audit log objects
+      Description: Trigger Lambda on new FSx for ONTAP audit log objects
       State: ENABLED
       EventPattern:
         source: [aws.s3]

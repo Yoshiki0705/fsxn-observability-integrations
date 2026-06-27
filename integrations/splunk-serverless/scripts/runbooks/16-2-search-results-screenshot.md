@@ -2,13 +2,13 @@
 
 ## 概要
 
-Splunk Search で FSxN 監査ログの検索結果を撮影し、E2E 検証エビデンスとして保存する手順書。
+Splunk Search で FSx for ONTAP 監査ログの検索結果を撮影し、E2E 検証エビデンスとして保存する手順書。
 
 ## 前提条件
 
 - Splunk Web にログイン済み
 - Lambda テストイベント送信済み（Task 15.2 完了）
-- FSxN 監査ログが Splunk に到着済み（Task 15.3 完了）
+- FSx for ONTAP 監査ログが Splunk に到着済み（Task 15.3 完了）
 - スクリーンショットツール
 
 ## 手順

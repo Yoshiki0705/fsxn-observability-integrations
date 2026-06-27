@@ -1,3 +1,3 @@
-# FSx ONTAP Log Parser dependencies
+# FSx for ONTAP Log Parser dependencies
 # No external dependencies for basic parsing
 # Optional: python-evtx for full EVTX support

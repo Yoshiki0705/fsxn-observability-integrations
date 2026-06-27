@@ -1,7 +1,7 @@
 """Unit tests for Firehose transformation Lambda handler.
 
 Tests the firehose_transform.lambda_handler function which converts
-FSx ONTAP audit log records from Firehose into Splunk HEC event JSON format.
+FSx for ONTAP audit log records from Firehose into Splunk HEC event JSON format.
 """
 
 import base64

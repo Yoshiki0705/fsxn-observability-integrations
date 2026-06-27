@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: FSxN OTel Collector - FPolicy Lambda (EventBridge → Lambda → OTLP)
+Description: FSx for ONTAP OTel Collector - FPolicy Lambda (EventBridge → Lambda → OTLP)
 
 Parameters:
   OtlpEndpoint:

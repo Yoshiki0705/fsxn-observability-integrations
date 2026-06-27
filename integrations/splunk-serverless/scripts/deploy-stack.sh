@@ -40,7 +40,7 @@ Deploy the Splunk Serverless Integration CloudFormation stack.
 Required Options:
   --hec-endpoint    Splunk HEC endpoint URL (e.g., https://splunk.example.com:8088)
   --secret-arn      ARN of the Secrets Manager secret containing the HEC token
-  --s3-ap-arn       ARN of the S3 Access Point for FSx ONTAP audit logs
+  --s3-ap-arn       ARN of the S3 Access Point for FSx for ONTAP audit logs
   --bucket-name     S3 bucket name for event notification
   --ems-api-key-arn ARN of the Secrets Manager secret containing the EMS webhook API key
 

@@ -89,7 +89,7 @@ validate_required() {
   fi
 }
 
-echo "=== FSxN Grafana Cloud Integration Deployment ==="
+echo "=== FSx for ONTAP Grafana Cloud Integration Deployment ==="
 echo "Region: ${AWS_REGION}"
 echo "Stack prefix: ${STACK_PREFIX}"
 echo ""

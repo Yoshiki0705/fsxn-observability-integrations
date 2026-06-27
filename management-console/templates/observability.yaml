@@ -1,10 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Management Console - Observability Stack (Stack 3 of 5)
+  FSx for ONTAP Management Console - Observability Stack (Stack 3 of 5)
   Creates AMP workspace, AMG workspace, ECS Cluster, Harvest + ADOT sidecar
   ECS service, IAM roles, and CloudWatch Log Groups.
   Depends on: fsxn-mgmt-network (Stack 1), fsxn-mgmt-auth (Stack 2).
-  Phase 2A: Multi-poller support for monitoring multiple FSx ONTAP file systems.
+  Phase 2A: Multi-poller support for monitoring multiple FSx for ONTAP file systems.
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -15,7 +15,7 @@ Metadata:
           - PrivateSubnetIds
           - HarvestTaskSgId
       - Label:
-          default: FSx ONTAP Configuration
+          default: FSx for ONTAP Configuration
         Parameters:
           - OntapManagementEndpoints
           - OntapCredentialsSecretArns
@@ -38,7 +38,7 @@ Metadata:
       HarvestTaskSgId:
         default: Harvest Task Security Group ID
       OntapManagementEndpoints:
-        default: FSx ONTAP Management Endpoints (comma-separated)
+        default: FSx for ONTAP Management Endpoints (comma-separated)
       OntapCredentialsSecretArns:
         default: ONTAP Credentials Secret ARNs (comma-separated)
       CognitoUserPoolArn:
@@ -65,7 +65,7 @@ Parameters:
   OntapManagementEndpoints:
     Type: String
     Description: >
-      Comma-separated list of FSx ONTAP management endpoint IP addresses or DNS names (1-10).
+      Comma-separated list of FSx for ONTAP management endpoint IP addresses or DNS names (1-10).
       Single endpoint is treated as a list of one for backward compatibility.
     AllowedPattern: '^[a-zA-Z0-9._,-]+$'
 
@@ -163,7 +163,7 @@ Resources:
     Type: AWS::Grafana::Workspace
     Properties:
       Name: fsxn-mgmt-grafana
-      Description: FSxN Management Console - Grafana dashboards for ONTAP metrics
+      Description: FSx for ONTAP Management Console - Grafana dashboards for ONTAP metrics
       AccountAccessType: CURRENT_ACCOUNT
       AuthenticationProviders:
         - SAML

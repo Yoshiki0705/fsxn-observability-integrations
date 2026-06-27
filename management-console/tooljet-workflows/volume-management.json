@@ -1,11 +1,11 @@
 {
   "schemaVersion": "2.0",
   "name": "Volume Management",
-  "description": "FSx ONTAP Volume CRUD operations (create, list, resize, delete with confirmation)",
+  "description": "FSx for ONTAP Volume CRUD operations (create, list, resize, delete with confirmation)",
   "dataSources": [
     {
       "id": "ds_ontap_rest",
-      "name": "FSxN ONTAP REST",
+      "name": "FSx for ONTAP ONTAP REST",
       "kind": "restapi",
       "options": {
         "url": "{{globals.ontap_base_url}}",

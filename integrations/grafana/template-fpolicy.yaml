@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Grafana Cloud FPolicy Integration - Lambda function for receiving
+  FSx for ONTAP Grafana Cloud FPolicy Integration - Lambda function for receiving
   FPolicy file operation events from EventBridge and forwarding to
   Grafana Cloud Loki via OTLP Gateway or Loki Push API.
   Prerequisite: Deploy shared/templates/fpolicy-apigw.yaml first

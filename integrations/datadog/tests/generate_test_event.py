@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate test audit log data with current timestamps.
 
-Creates a JSON file with FSx ONTAP audit log entries using the current
+Creates a JSON file with FSx for ONTAP audit log entries using the current
 timestamp, suitable for Lambda invocation testing where Datadog requires
 recent timestamps for log indexing.
 

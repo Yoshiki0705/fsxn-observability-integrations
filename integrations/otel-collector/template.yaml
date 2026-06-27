@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
-  FSxN OTel Collector Unified Integration - Audit log, EMS, and FPolicy
+  FSx for ONTAP OTel Collector Unified Integration - Audit log, EMS, and FPolicy
   shipping via OTLP/HTTP. Single stack for all three Lambda functions.
   Stack name: fsxn-otel-integration
 
@@ -25,7 +25,7 @@ Parameters:
   S3BucketName:
     Type: String
     Description: >-
-      Name of the S3 bucket containing FSx ONTAP audit log files.
+      Name of the S3 bucket containing FSx for ONTAP audit log files.
       Used for EventBridge trigger and S3 Access Point creation.
     AllowedPattern: '[a-z0-9][a-z0-9.-]*[a-z0-9]'
 

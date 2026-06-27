@@ -505,7 +505,7 @@ main() {
 
   for category in $CATEGORIES; do
     local folder_title
-    folder_title="FSxN - $(echo "$category" | sed 's/_/ /g' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2)}1')"
+    folder_title="FSx for ONTAP - $(echo "$category" | sed 's/_/ /g' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2)}1')"
 
     if [[ "$dry_run" == "false" ]]; then
       local fid

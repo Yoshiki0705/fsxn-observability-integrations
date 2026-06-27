@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: FSxN Sumo Logic Integration - Audit log shipping via HTTP Source
+Description: FSx for ONTAP Sumo Logic Integration - Audit log shipping via HTTP Source
 
 Parameters:
   S3AccessPointArn:

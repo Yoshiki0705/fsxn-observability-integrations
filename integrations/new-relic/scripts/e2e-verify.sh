@@ -7,7 +7,7 @@
 # Prerequisites:
 #   - New Relic account (Free Tier: 100 GB/month)
 #   - AWS CLI configured
-#   - FSx ONTAP S3 Access Point with audit logs
+#   - FSx for ONTAP S3 Access Point with audit logs
 #
 # Usage:
 #   export NR_LICENSE_KEY="your-40-char-license-key"

@@ -22,8 +22,8 @@ The following 3 PNG screenshots are required to complete E2E verification:
 ### 3. Splunk Dashboard
 
 - **Filename**: `splunk-dashboard-<YYYYMMDD>.png`
-- **Content**: Splunk dashboard visualization showing at least one panel with FSxN audit log data
-- **Purpose**: Demonstrates operational visibility into FSxN audit events via Splunk
+- **Content**: Splunk dashboard visualization showing at least one panel with FSx for ONTAP audit log data
+- **Purpose**: Demonstrates operational visibility into FSx for ONTAP audit events via Splunk
 
 ## Naming Convention
 

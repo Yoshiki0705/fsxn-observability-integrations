@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# FSxN Observability Integration - Test Runner
+# FSx for ONTAP Observability Integration - Test Runner
 # Usage: ./test.sh [vendor] [--unit|--integration|--all]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

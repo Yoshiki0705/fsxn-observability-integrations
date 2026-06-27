@@ -1,6 +1,6 @@
 # ローカル開発・UI/UX 検証ガイド
 
-FSxN Management Console の UI/UX をローカル環境で検証するための手順書です。
+FSx for ONTAP Management Console の UI/UX をローカル環境で検証するための手順書です。
 
 ## 目次
 
@@ -98,7 +98,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:3001
 ### アプリケーション作成
 
 1. ダッシュボードから「New Application」をクリック
-2. アプリ名を「FSxN Management Console」に変更
+2. アプリ名を「FSx for ONTAP Management Console」に変更
 
 ![Appsmith ダッシュボード](../images/appsmith-dashboard.png)
 

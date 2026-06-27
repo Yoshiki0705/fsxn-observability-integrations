@@ -1,7 +1,7 @@
 #!/bin/bash
 # Provision FSx for ONTAP Alerting Rules via Grafana HTTP API
 #
-# Creates a "FSxN Alerts" folder and provisions three alert rules:
+# Creates a "FSx for ONTAP Alerts" folder and provisions three alert rules:
 #   1. Ransomware Detection (ARP volume state change)
 #   2. Quota Warning (WAFL soft limit exceeded)
 #   3. Failed Access Spike (>10 failures in 5 minutes)
@@ -44,13 +44,13 @@ echo "Grafana URL: ${GRAFANA_URL}"
 echo "Datasource UID: ${LOKI_DATASOURCE_UID}"
 echo ""
 
-# --- Step 1: Create or find the "FSxN Alerts" folder ---
-echo "Step 1: Creating alert folder 'FSxN Alerts'..."
+# --- Step 1: Create or find the "FSx for ONTAP Alerts" folder ---
+echo "Step 1: Creating alert folder 'FSx for ONTAP Alerts'..."
 
 FOLDER_PAYLOAD=$(cat << 'EOF'
 {
   "uid": "fsxn-alerts",
-  "title": "FSxN Alerts"
+  "title": "FSx for ONTAP Alerts"
 }
 EOF
 )
@@ -81,12 +81,12 @@ echo "Step 2: Provisioning alert rules..."
 # Build the alert rule group payload
 RULES_PAYLOAD=$(cat << EOF
 {
-  "name": "FSxN Security Alerts",
+  "name": "FSx for ONTAP Security Alerts",
   "interval": "1m",
   "rules": [
     {
       "uid": "fsxn-ransomware-detection",
-      "title": "FSxN: Ransomware Activity Detected (ARP)",
+      "title": "FSx for ONTAP: Ransomware Activity Detected (ARP)",
       "condition": "C",
       "data": [
         {
@@ -138,7 +138,7 @@ RULES_PAYLOAD=$(cat << EOF
     },
     {
       "uid": "fsxn-quota-warning",
-      "title": "FSxN: Storage Quota Soft Limit Exceeded",
+      "title": "FSx for ONTAP: Storage Quota Soft Limit Exceeded",
       "condition": "C",
       "data": [
         {
@@ -189,7 +189,7 @@ RULES_PAYLOAD=$(cat << EOF
     },
     {
       "uid": "fsxn-failed-access-spike",
-      "title": "FSxN: Failed Access Spike (>10 in 5min)",
+      "title": "FSx for ONTAP: Failed Access Spike (>10 in 5min)",
       "condition": "C",
       "data": [
         {
@@ -244,7 +244,7 @@ EOF
 )
 
 RULES_RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -X PUT "${GRAFANA_URL}/api/v1/provisioning/folder/${FOLDER_UID}/rule-groups/FSxN%20Security%20Alerts" \
+  -X PUT "${GRAFANA_URL}/api/v1/provisioning/folder/${FOLDER_UID}/rule-groups/FSx for ONTAP%20Security%20Alerts" \
   -H "Authorization: Bearer ${GRAFANA_SA_TOKEN}" \
   -H "Content-Type: application/json" \
   -H "X-Disable-Provenance: true" \
@@ -257,14 +257,14 @@ echo ""
 if [ "$RULES_HTTP" = "200" ] || [ "$RULES_HTTP" = "201" ] || [ "$RULES_HTTP" = "202" ]; then
   echo "=== Alert Rules Provisioned Successfully ==="
   echo ""
-  echo "Rules created in folder 'FSxN Alerts':"
-  echo "  1. FSxN: Ransomware Activity Detected (ARP)  [severity: critical]"
+  echo "Rules created in folder 'FSx for ONTAP Alerts':"
+  echo "  1. FSx for ONTAP: Ransomware Activity Detected (ARP)  [severity: critical]"
   echo "     Query: {service_name=\"fsxn-ems\"} | json | event_name=\"arw.volume.state\""
   echo ""
-  echo "  2. FSxN: Storage Quota Soft Limit Exceeded    [severity: warning]"
+  echo "  2. FSx for ONTAP: Storage Quota Soft Limit Exceeded    [severity: warning]"
   echo "     Query: {service_name=\"fsxn-ems\"} | json | event_name=\"wafl.quota.softlimit.exceeded\""
   echo ""
-  echo "  3. FSxN: Failed Access Spike (>10 in 5min)   [severity: warning]"
+  echo "  3. FSx for ONTAP: Failed Access Spike (>10 in 5min)   [severity: warning]"
   echo "     Query: {service_name=\"fsxn-audit\"} | json | Result=\"Failure\""
   echo ""
   echo "View alerts: ${GRAFANA_URL}/alerting/list"

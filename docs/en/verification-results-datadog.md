@@ -517,9 +517,9 @@ python3 shared/scripts/test-xml-e2e.py --vendor datadog
 
 | Monitor ID | Name | Type | Threshold | Severity |
 |-----------|------|------|-----------|----------|
-| 13360510 | [FSxN] Mass File Deletion Detected | Log Alert | >50 deletes/5min per user | Critical |
-| 13360511 | [FSxN] Abnormal Access Volume | Log Alert | >1000 accesses/1h per user | High |
-| 13360512 | [FSxN] Access Failure Spike | Log Alert | >10 failures/15min per user | Medium |
+| 13360510 | [FSx-ONTAP] Mass File Deletion Detected | Log Alert | >50 deletes/5min per user | Critical |
+| 13360511 | [FSx-ONTAP] Abnormal Access Volume | Log Alert | >1000 accesses/1h per user | High |
+| 13360512 | [FSx-ONTAP] Access Failure Spike | Log Alert | >10 failures/15min per user | Medium |
 
 Each monitor includes:
 - Investigation steps in the notification message
@@ -534,7 +534,7 @@ Each monitor includes:
 ### Step P4: Dashboard Verification (Paid Plan)
 
 - **Result**: ✅ Success
-- **Dashboard Name**: FSx ONTAP Audit Log Overview
+- **Dashboard Name**: FSx for ONTAP Audit Log Overview
 - **Dashboard ID**: ggx-7ad-6e4
 - **Status**: Active, receiving data
 

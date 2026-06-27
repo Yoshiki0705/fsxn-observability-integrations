@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Management Console - Console Stack (Stack 4 of 5)
+  FSx for ONTAP Management Console - Console Stack (Stack 4 of 5)
   Creates ALB, ToolJet ECS service, RDS PostgreSQL, S3 Copy Lambda,
   temp S3 bucket, and supporting IAM roles.
   Depends on: fsxn-mgmt-network (Stack 1), fsxn-mgmt-auth (Stack 2),
@@ -29,7 +29,7 @@ Metadata:
           - CognitoAppClientId
           - CognitoDomain
       - Label:
-          default: FSx ONTAP Configuration
+          default: FSx for ONTAP Configuration
         Parameters:
           - OntapManagementEndpoints
           - OntapCredentialsSecretArns
@@ -142,7 +142,7 @@ Parameters:
   OntapManagementEndpoints:
     Type: String
     Description: >
-      Comma-separated list of FSx ONTAP management endpoints (1-10).
+      Comma-separated list of FSx for ONTAP management endpoints (1-10).
       Each endpoint corresponds positionally to a secret ARN in OntapCredentialsSecretArns.
 
   OntapCredentialsSecretArns:
@@ -154,7 +154,7 @@ Parameters:
   S3AccessPointArn:
     Type: String
     Description: >
-      ARN of the FSx ONTAP S3 Access Point for file browsing.
+      ARN of the FSx for ONTAP S3 Access Point for file browsing.
     AllowedPattern: '^arn:aws:s3:[a-z0-9-]+:[0-9]{12}:accesspoint/[a-z0-9-]+$'
 
   ToolJetImageTag:

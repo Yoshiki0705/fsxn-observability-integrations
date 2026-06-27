@@ -1,4 +1,4 @@
-"""FSx ONTAP audit log parser.
+"""FSx for ONTAP audit log parser.
 
 Supports EVTX (Windows Event Log), XML, and JSON log formats.
 ONTAP audit logs are created via `vserver audit create -format {evtx|xml}`.

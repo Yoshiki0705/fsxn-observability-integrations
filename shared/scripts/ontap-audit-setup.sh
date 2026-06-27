@@ -2,13 +2,13 @@
 set -euo pipefail
 
 # ============================================================
-# FSx ONTAP Audit Logging Setup Script
+# FSx for ONTAP Audit Logging Setup Script
 # ============================================================
-# This script connects to FSx ONTAP via SSH and configures
+# This script connects to FSx for ONTAP via SSH and configures
 # audit logging on the specified SVM.
 #
 # Prerequisites:
-#   - SSH access to FSx ONTAP management endpoint
+#   - SSH access to FSx for ONTAP management endpoint
 #   - ONTAP admin credentials
 #   - Audit volume available on the SVM
 #   - FSx for ONTAP S3 Access Point attached to the audit volume
@@ -39,10 +39,10 @@ usage() {
   cat <<EOF
 Usage: $0 [OPTIONS]
 
-Configure FSx ONTAP audit logging on a Storage Virtual Machine (SVM).
+Configure FSx for ONTAP audit logging on a Storage Virtual Machine (SVM).
 
 Required:
-  --endpoint <ip>       FSx ONTAP management endpoint IP address
+  --endpoint <ip>       FSx for ONTAP management endpoint IP address
   --svm <name>          Storage Virtual Machine name
 
 Optional:
@@ -89,7 +89,7 @@ if [[ "$FORMAT" != "evtx" && "$FORMAT" != "xml" ]]; then
 fi
 
 echo -e "${GREEN}============================================================${NC}"
-echo -e "${GREEN} FSx ONTAP Audit Logging Configuration${NC}"
+echo -e "${GREEN} FSx for ONTAP Audit Logging Configuration${NC}"
 echo -e "${GREEN}============================================================${NC}"
 echo ""
 echo "  Endpoint:    $ENDPOINT"
@@ -138,7 +138,7 @@ if [[ "$DRY_RUN" == true ]]; then
 fi
 
 # Execute commands via SSH
-echo -e "${YELLOW}Connecting to FSx ONTAP management endpoint...${NC}"
+echo -e "${YELLOW}Connecting to FSx for ONTAP management endpoint...${NC}"
 echo ""
 
 # Build SSH command sequence
@@ -152,7 +152,7 @@ done
 echo -e "${YELLOW}Executing ONTAP CLI commands...${NC}"
 echo ""
 
-# Note: FSx ONTAP uses the 'admin' user by default
+# Note: FSx for ONTAP uses the 'admin' user by default
 # The SSH connection may require the fsxadmin password
 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "admin@${ENDPOINT}" <<EOF
 ${SSH_COMMANDS}

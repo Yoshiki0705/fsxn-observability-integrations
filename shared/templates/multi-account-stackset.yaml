@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  Multi-account deployment for FSx ONTAP observability pipeline using
+  Multi-account deployment for FSx for ONTAP observability pipeline using
   AWS CloudFormation StackSets. Deploy from the management account to
   provision audit log pipelines across member accounts in an AWS Organization.
 

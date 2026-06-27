@@ -1,4 +1,4 @@
-# FSxN Management Console — Partner Brief
+# FSx for ONTAP Management Console — Partner Brief
 
 ## Customer Challenge
 

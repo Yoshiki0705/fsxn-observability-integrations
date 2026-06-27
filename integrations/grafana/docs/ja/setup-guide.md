@@ -51,7 +51,7 @@ Grafana Cloud コンソールから Loki の認証情報を取得します。
 ```bash
 aws secretsmanager create-secret \
   --name "grafana/fsxn-loki-credentials" \
-  --description "Grafana Cloud Loki credentials for FSxN audit log integration" \
+  --description "Grafana Cloud Loki credentials for FSx for ONTAP audit log integration" \
   --secret-string '{"instance_id":"YOUR_INSTANCE_ID","api_key":"YOUR_API_KEY"}' \
   --region ap-northeast-1
 ```
@@ -571,8 +571,8 @@ count_over_time({job="fsxn-audit"} | json | Result="Failure" [5m])
 ### ダッシュボードの保存と共有
 
 1. 画面右上の **Save dashboard**（💾アイコン）をクリック
-2. ダッシュボード名を入力: `FSxN Audit Log Overview`
-3. フォルダを選択（例: `FSxN Monitoring`）
+2. ダッシュボード名を入力: `FSx for ONTAP Audit Log Overview`
+3. フォルダを選択（例: `FSx for ONTAP Monitoring`）
 4. **Save** をクリック
 
 > **エクスポート**: ダッシュボードの JSON モデルをエクスポートして、他の Grafana インスタンスにインポートすることも可能です。**Dashboard settings** → **JSON Model** からコピーできます。

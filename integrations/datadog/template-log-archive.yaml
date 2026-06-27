@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  Datadog Log Archive — S3 bucket + IAM role for FSxN audit log archival.
+  Datadog Log Archive — S3 bucket + IAM role for FSx for ONTAP audit log archival.
   Enables Datadog Log Rehydration for compliance investigations.
 
 Parameters:

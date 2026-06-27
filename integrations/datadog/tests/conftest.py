@@ -68,7 +68,7 @@ def sample_eventbridge_event():
 
 @pytest.fixture
 def sample_json_audit_logs():
-    """Sample FSx ONTAP audit logs in JSON format."""
+    """Sample FSx for ONTAP audit logs in JSON format."""
     logs = [
         {
             "timestamp": "2026-01-15T12:00:01Z",

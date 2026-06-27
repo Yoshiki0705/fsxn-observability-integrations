@@ -68,7 +68,7 @@ _format_for_new_relic = _import_format_function()
 
 
 # ---------------------------------------------------------------------------
-# Hypothesis strategy for FSxN audit log entries
+# Hypothesis strategy for FSx for ONTAP audit log entries
 # ---------------------------------------------------------------------------
 
 # Strategy for optional string fields (may or may not be present)
@@ -84,7 +84,7 @@ _optional_text = st.one_of(
     ),
 )
 
-# Strategy for generating a random FSxN audit log entry
+# Strategy for generating a random FSx for ONTAP audit log entry
 _fsxn_audit_log_entry_strategy = st.fixed_dictionaries(
     {},
     optional={
@@ -125,7 +125,7 @@ def test_log_attribute_formatting_completeness(
 ) -> None:
     """Property 6: Log attribute formatting completeness.
 
-    For any valid FSxN audit log entry (a JSON object with any combination of
+    For any valid FSx for ONTAP audit log entry (a JSON object with any combination of
     EventID, SVMName, UserName, ClientIP, Operation, ObjectName, Result fields),
     the _format_for_new_relic function SHALL produce an output where:
     - attributes.source equals "fsxn-ontap"

@@ -144,7 +144,7 @@ def _emit_pipeline_metrics(
         "_aws": {
             "Timestamp": int(time.time() * 1000),
             "CloudWatchMetrics": [{
-                "Namespace": "FSxN/CrowdStrike/Pipeline",
+                "Namespace": "FSxONTAP/CrowdStrike/Pipeline",
                 "Dimensions": [["FunctionName"]],
                 "Metrics": [
                     {"Name": "FilesScanned", "Unit": "Count"},
@@ -192,7 +192,7 @@ def _extract_s3_records(event: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def _parse_audit_logs(data: bytes, key: str) -> list[dict[str, Any]]:
-    """Parse FSx ONTAP audit logs (XML, JSON, or EVTX)."""
+    """Parse FSx for ONTAP audit logs (XML, JSON, or EVTX)."""
     if key.endswith(".xml") or (not key.endswith(".evtx") and data.strip()[:5] == b"<?xml"):
         return _parse_xml(data.decode("utf-8", errors="replace"))
     elif key.endswith(".json") or key.endswith(".json.gz"):

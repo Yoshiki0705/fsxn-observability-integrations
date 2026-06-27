@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Dynatrace EMS Integration - Lambda function for receiving
+  FSx for ONTAP Dynatrace EMS Integration - Lambda function for receiving
   ONTAP EMS webhook events and forwarding to Dynatrace Log Ingest API v2.
   Deploy this stack first, then deploy shared/templates/ems-webhook-apigw.yaml
   with the Lambda ARN from this stack's output.

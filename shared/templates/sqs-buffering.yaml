@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  SQS buffering layer for FSx ONTAP observability pipeline.
+  SQS buffering layer for FSx for ONTAP observability pipeline.
   Adds backpressure handling between the audit log poller and vendor delivery.
   Deploy this for Level 3+ (Production Baseline) when direct Lambda-to-vendor
   delivery needs stronger reliability guarantees.

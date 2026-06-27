@@ -456,7 +456,7 @@ step7_generate_results() {
 
 main() {
   echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
-  echo -e "${BOLD}║   Datadog E2E Verification — FSxN Observability         ║${NC}"
+  echo -e "${BOLD}║   Datadog E2E Verification — FSx for ONTAP Observability         ║${NC}"
   echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
   echo ""
   info_msg "Stack:      $STACK_NAME"

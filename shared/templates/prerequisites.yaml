@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Observability Integration - Prerequisites Stack
+  FSx for ONTAP Observability Integration - Prerequisites Stack
   Creates EventBridge Scheduler, IAM roles, and shared resources for audit log processing.
   The audit log source is an FSx for ONTAP S3 Access Point (created separately via FSx console/CLI).
   Deploy this BEFORE any vendor integration stack.
@@ -123,6 +123,6 @@ Outputs:
   NextSteps:
     Description: After deploying this stack
     Value: >
-      1. Ensure FSx ONTAP audit logging is enabled: vserver audit create -vserver <svm> -destination /audit_log -format evtx
+      1. Ensure FSx for ONTAP audit logging is enabled: vserver audit create -vserver <svm> -destination /audit_log -format evtx
       2. Ensure the FSx for ONTAP S3 Access Point is attached to the audit volume
       3. Deploy a vendor integration stack with FsxS3AccessPointArn parameter

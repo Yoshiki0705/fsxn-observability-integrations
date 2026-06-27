@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: FSxN EMS Webhook - REST API Gateway with Lambda integration for ONTAP EMS event reception
+Description: FSx for ONTAP EMS Webhook - REST API Gateway with Lambda integration for ONTAP EMS event reception
 
 # DEPLOYMENT NOTE:
 # This template creates named IAM roles (RoleName property), so deployment

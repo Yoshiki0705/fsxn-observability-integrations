@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: FSxN Dynatrace Integration - Audit log shipping via Log Ingest API v2
+Description: FSx for ONTAP Dynatrace Integration - Audit log shipping via Log Ingest API v2
 
 Parameters:
   S3AccessPointArn:

@@ -1,4 +1,4 @@
-"""Dashboard Importer Lambda for FSxN Management Console.
+"""Dashboard Importer Lambda for FSx for ONTAP Management Console.
 
 CloudFormation Custom Resource handler that imports Grafana dashboards
 into Amazon Managed Grafana (AMG) via the HTTP API. Configures an AMP

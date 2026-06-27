@@ -448,3 +448,21 @@ FirehoseDeliveryStream:
 - OTel Collector 側で Firehose 形式のパースが必要な場合があります
 - Datadog と Splunk は Firehose のネイティブ宛先として利用可能（OTel Collector 不要）
 - Firehose の最小バッファ間隔は 60 秒のため、リアルタイム性が必要な場合は直接送信を推奨
+
+
+---
+
+## 追加バックエンド: Snowflake（実験的）
+
+Snowflake は [OpenFlow ListenOTLP プロセッサ](https://docs.snowflake.com/en/user-guide/data-integration/openflow/processors/listenotlp) やコミュニティレシーバー（[snowflake-opentelemetry-receiver](https://github.com/KellerKev/snowflake-opentelemetry-receiver)）を通じて OTLP データを受信できます。既存の Snowflake データレイクハウス内で FSx for ONTAP 監査ログの SQL ベースセキュリティ分析が可能になります。
+
+```yaml
+# 例: OTel Collector Snowflake exporter（コミュニティパス）
+exporters:
+  otlphttp/snowflake:
+    endpoint: https://<account>.snowflakecomputing.com/v1/otlp
+    headers:
+      Authorization: "Bearer ${env:SNOWFLAKE_TOKEN}"
+```
+
+> **ステータス**: 本プロジェクトでは未検証です。Snowflake の OTLP 取り込みパスは進化中です。本番利用前にエンドポイント構成、認証、Event Table スキーマをお使いの Snowflake 環境で検証してください。マネージドな代替手段として [Bindplane Snowflake destination](https://docs.bindplane.com/integrations/destinations/snowflake) も参照ください。

@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Dynatrace FPolicy Integration - Lambda function for receiving
+  FSx for ONTAP Dynatrace FPolicy Integration - Lambda function for receiving
   FPolicy file operation events from EventBridge and forwarding to Dynatrace.
   Prerequisite: Deploy shared/templates/fpolicy-apigw.yaml first.
 

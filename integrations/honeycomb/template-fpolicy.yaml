@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Honeycomb FPolicy Integration - Lambda function for receiving
+  FSx for ONTAP Honeycomb FPolicy Integration - Lambda function for receiving
   FPolicy file operation events from EventBridge and forwarding to Honeycomb.
   Prerequisite: Deploy shared/templates/fpolicy-apigw.yaml first.
 

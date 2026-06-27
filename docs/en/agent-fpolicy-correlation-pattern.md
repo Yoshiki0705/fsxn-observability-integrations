@@ -198,7 +198,7 @@ Service account design for agent access to FSx for ONTAP. Directly impacts corre
 | Per session | `svc-agent-sess-{session_id}` | Highest | High | High-security environments |
 | Shared account | `svc-agent-common` | Low | Low | PoC only |
 
-**Recommendation**: Per-agent-type service accounts. Place them in an Active Directory group `AG-FSxN-Agents` and explicitly include them in FPolicy monitoring scope.
+**Recommendation**: Per-agent-type service accounts. Place them in an Active Directory group `AG-FSx-ONTAP-Agents` and explicitly include them in FPolicy monitoring scope.
 
 ---
 
@@ -385,16 +385,21 @@ The following Databricks Platform Security features announced at DAIS 2026 (2026
 | Feature | Summary | Impact on This Pattern |
 |---------|---------|----------------------|
 | Private Network Gateway / Lakebase Private Link | Private connectivity from serverless/AI workloads to Lakebase | If agents access Lakebase, verify that Private Link traffic is visible in CloudTrail / VPC Flow Logs. May require adding VPC Flow Logs as a data source for correlation logic |
-| Automatic Identity Management (AIM) for Entra ID — GA (AWS/GCP) | Automated identity management within Databricks workspaces | If agent service accounts are auto-provisioned by AIM, verify compatibility with the naming conventions and AD group design defined in this pattern's "Service Account Strategy" section |
+| Automatic Identity Management (AIM) for Entra ID — GA (AWS/GCP) | Automated user/group sync between Entra ID and Databricks | Agent service account group memberships may be automatically synced to the Databricks workspace. Verify compatibility with the AD group design and FPolicy filters defined in this pattern's "Service Account Strategy" section |
 | Context-Based Ingress Policies | Access control based on context (device, network, identity attributes) | If agent execution environment context is evaluated by Ingress Policies, denial reasons may be recorded in audit logs. Consider including Databricks-side access denial events in correlation results |
+
+**Region constraint**:
+
+> ⚠️ Lakebase is **not available in ap-northeast-1 (Tokyo)** as of 2026-06-18. Since this project's FSx for ONTAP environment is deployed in the Tokyo region, Lakebase Private Link validation will be deferred until the service becomes available in this region. Tokyo region GA timeline is unknown.
 
 **Open items to verify**:
 
-- How agent access via Private Link is recorded in Databricks Unity Catalog audit logs (mapping to the `service_account` field)
-- Naming patterns for service principals auto-created by AIM and compatibility with this pattern's FPolicy filter configuration (`%svc-agent-%`)
+- Once Lakebase becomes available in ap-northeast-1, how agent access via Private Link is recorded in Databricks Unity Catalog audit logs (mapping to the `service_account` field)
+- When group memberships are auto-synced by AIM, verification methods to confirm that ONTAP SVM AD group resolution results for agent service principals align with the Databricks side
+- Naming patterns for service principals auto-created/synced by AIM and compatibility with this pattern's FPolicy filter configuration (`%svc-agent-%`)
 - Methods to incorporate Context-Based Ingress Policy denial events into OTel spans or Correlation Records
 
-> **Note**: The above are considerations based on publicly available DAIS 2026 information and do not change this pattern's existing design (OTel × FPolicy correlation). Correlation logic extensions will be evaluated when Lakebase integration becomes concrete.
+> **Note**: The above are considerations based on publicly available DAIS 2026 information and do not change this pattern's existing design (OTel × FPolicy correlation). Correlation logic extensions will be evaluated when Lakebase becomes available in the Tokyo region and integration becomes concrete.
 
 ---
 

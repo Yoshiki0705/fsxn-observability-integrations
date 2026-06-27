@@ -1,4 +1,4 @@
-# ADOT Collector Configuration for FSxN Management Console
+# ADOT Collector Configuration for FSx for ONTAP Management Console
 #
 # This configuration runs as a sidecar container alongside the Harvest collector
 # in the same ECS Fargate task. It scrapes Harvest's Prometheus metrics endpoint

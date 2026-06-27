@@ -249,7 +249,7 @@ ssh admin@<management-ip> "volume mount -vserver <svm-name> -volume <clone-name>
 
 ```json
 {
-  "name": "FSxN ARP Ransomware Detection Alert",
+  "name": "FSx-ONTAP ARP Ransomware Detection Alert",
   "type": "log alert",
   "query": "source:fsxn-ems @attributes.event_name:arw.volume.state @attributes.severity:alert",
   "message": "🚨 ONTAP ARP detected suspicious activity\n\nVolume: {{@attributes.parameters.volume_name}}\nState: {{@attributes.parameters.state}}\nSeverity: {{@attributes.severity}}\n\nVerify the alert and follow the incident response guide.\nResponse guide: docs/en/arp-incident-response-guide.md",

@@ -643,7 +643,7 @@ EOF
 
 main() {
   echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
-  echo -e "${BOLD}║   New Relic E2E Verification — FSxN Observability       ║${NC}"
+  echo -e "${BOLD}║   New Relic E2E Verification — FSx for ONTAP Observability       ║${NC}"
   echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
   echo ""
   info_msg "Stack:      $STACK_NAME"
