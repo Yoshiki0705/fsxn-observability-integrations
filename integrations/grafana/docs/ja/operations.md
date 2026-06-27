@@ -25,7 +25,7 @@ cloudwatch = boto3.client("cloudwatch")
 
 def emit_metric(name: str, value: float, unit: str = "Count") -> None:
     cloudwatch.put_metric_data(
-        Namespace="FSxN/Grafana",
+        Namespace="FSxONTAP/Grafana",
         MetricData=[{
             "MetricName": name,
             "Value": value,

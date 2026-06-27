@@ -1,4 +1,4 @@
-"""Shared idempotency utilities for FSx ONTAP Lambda handlers.
+"""Shared idempotency utilities for FSx for ONTAP Lambda handlers.
 
 Provides a lightweight idempotency layer using DynamoDB for idempotent
 object processing and duplicate suppression of audit log files. This is

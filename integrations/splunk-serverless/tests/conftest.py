@@ -3,7 +3,7 @@
 Provides fixtures for:
 - Environment variables (SPLUNK_HEC_ENDPOINT, API_KEY_SECRET_ARN, S3_ACCESS_POINT_ARN)
 - Sample S3 events conforming to S3 event notification structure
-- Sample FSx ONTAP audit log entries
+- Sample FSx for ONTAP audit log entries
 - Sample EMS event payloads
 - Mocked boto3 clients (S3, Secrets Manager)
 - Mocked urllib3 PoolManager
@@ -150,7 +150,7 @@ def sample_multi_record_s3_event() -> dict[str, Any]:
 
 @pytest.fixture
 def sample_audit_logs() -> str:
-    """Sample FSx ONTAP audit logs as newline-delimited JSON.
+    """Sample FSx for ONTAP audit logs as newline-delimited JSON.
 
     Contains representative audit log entries with EventID, SVMName,
     UserName, Operation, ObjectName, Result, and timestamp fields.

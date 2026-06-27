@@ -52,7 +52,7 @@ Store the HEC token securely in AWS Secrets Manager:
 ```bash
 aws secretsmanager create-secret \
   --name "splunk/fsxn-hec-token" \
-  --description "Splunk HEC Token for FSxN audit log integration" \
+  --description "Splunk HEC Token for FSx for ONTAP audit log integration" \
   --secret-string "YOUR_HEC_TOKEN" \
   --region ap-northeast-1
 ```
@@ -217,7 +217,7 @@ Capture the following screenshots and save them to `docs/screenshots/splunk/`:
 
 - Lambda CloudWatch Logs (showing `Successfully shipped`)
 - Splunk Search results (SPL query, result count, expanded event)
-- Splunk dashboard (panel displaying FSxN audit log data)
+- Splunk dashboard (panel displaying FSx for ONTAP audit log data)
 
 ![Splunk Search Results](../../../../docs/screenshots/splunk/splunk-search-results-20260101.png)
 

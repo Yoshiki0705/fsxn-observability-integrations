@@ -1,6 +1,6 @@
 # Local Development & UI/UX Verification Guide
 
-Step-by-step instructions for verifying the FSxN Management Console UI/UX in a local environment.
+Step-by-step instructions for verifying the FSx for ONTAP Management Console UI/UX in a local environment.
 
 ## Table of Contents
 
@@ -98,7 +98,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:3001
 ### Creating an Application
 
 1. Click "New Application" from the dashboard
-2. Rename the app to "FSxN Management Console"
+2. Rename the app to "FSx for ONTAP Management Console"
 
 ![Appsmith dashboard](../images/appsmith-dashboard.png)
 

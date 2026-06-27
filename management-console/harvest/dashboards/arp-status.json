@@ -414,7 +414,7 @@
           "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(ontap_volume_anti_ransomware_state, datacenter)",
-        "description": "Select FSx ONTAP file system (cluster/datacenter)",
+        "description": "Select FSx for ONTAP file system (cluster/datacenter)",
         "hide": 0,
         "includeAll": true,
         "label": "Datacenter",
@@ -448,7 +448,7 @@
     ]
   },
   "timezone": "",
-  "title": "FSxN ARP Status",
+  "title": "FSx-ONTAP ARP Status",
   "uid": "fsxn-arp-status",
   "version": 1,
   "weekStart": "",

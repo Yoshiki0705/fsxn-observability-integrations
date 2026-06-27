@@ -112,7 +112,7 @@ FSx for ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Vendo
 **PoC 向け無料枠オプション**:
 - New Relic: 100 GB/月（PoC に最適）
 - Grafana Cloud: 50 GB/月
-- Sumo Logic: 500 MB/日（~15 GB/月）
+- Sumo Logic: 1.25 credits/日（7 日保持）
 - Honeycomb: 20M イベント/月
 
 ## アプローチ比較

@@ -1,4 +1,4 @@
-# FSxN Management Console
+# FSx for ONTAP Management Console
 
 🌐 [日本語](#概要) | [English](#overview) | [セットアップガイド / Setup Guide](docs/ja/setup-guide.md)
 

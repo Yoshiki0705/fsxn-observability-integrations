@@ -12,7 +12,7 @@ This document defines five operational monitoring patterns for FSx for ONTAP env
 ┌─────────────────────────────────────────────────────────────────────┐
 │ Metric Sources                                                       │
 ├──────────────┬──────────────┬──────────────┬────────────┬───────────┤
-│ CloudWatch   │ ONTAP REST   │ CloudTrail   │ Cost       │ FSx S3 AP │
+│ CloudWatch   │ ONTAP REST   │ CloudTrail   │ Cost       │ FSx for ONTAP S3 AP │
 │ Metrics      │ API          │ Data Events  │ Explorer   │ Latency   │
 │ (DataSync/   │ (FlexCache)  │ (Anomaly)    │ (Cost)     │ (Custom)  │
 │  SnapMirror) │              │              │            │           │
@@ -63,7 +63,7 @@ http = urllib3.PoolManager()
 
 ONTAP_MGMT_ENDPOINT = os.environ["ONTAP_MGMT_ENDPOINT"]
 ONTAP_CREDENTIALS_SECRET_ARN = os.environ["ONTAP_CREDENTIALS_SECRET_ARN"]
-NAMESPACE = "FSxN/Lakehouse"
+NAMESPACE = "FSxONTAP/Lakehouse"
 
 
 def lambda_handler(event, context):
@@ -110,7 +110,7 @@ DataSyncLagAlarm:
   Properties:
     AlarmName: !Sub '${AWS::StackName}-datasync-lag'
     AlarmDescription: 'DataSync sync lag exceeds threshold — lakehouse data may be stale'
-    Namespace: FSxN/Lakehouse
+    Namespace: FSxONTAP/Lakehouse
     MetricName: DataSyncLagSeconds
     Statistic: Maximum
     Period: 300
@@ -125,7 +125,7 @@ SnapMirrorLagAlarm:
   Properties:
     AlarmName: !Sub '${AWS::StackName}-snapmirror-lag'
     AlarmDescription: 'SnapMirror lag exceeds threshold — replica may be stale'
-    Namespace: FSxN/Lakehouse
+    Namespace: FSxONTAP/Lakehouse
     MetricName: SnapMirrorLagSeconds
     Statistic: Maximum
     Period: 300
@@ -138,11 +138,11 @@ SnapMirrorLagAlarm:
 
 ---
 
-## Pattern 2: FSx S3 AP Latency Monitoring (p50/p99)
+## Pattern 2: FSx for ONTAP S3 AP Latency Monitoring (p50/p99)
 
 ### Problem
 
-FSx for ONTAP S3 Access Point read latency directly impacts lakehouse query performance. Unlike standard S3, FSx S3 AP latency depends on the file system's provisioned throughput and current load.
+FSx for ONTAP S3 Access Point read latency directly impacts lakehouse query performance. Unlike standard S3, FSx for ONTAP S3 AP latency depends on the file system's provisioned throughput and current load.
 
 ### Implementation
 
@@ -158,7 +158,7 @@ s3_client = boto3.client("s3")
 
 S3_AP_ARN = os.environ["S3_ACCESS_POINT_ARN"]
 PROBE_KEY = os.environ.get("PROBE_OBJECT_KEY", ".latency-probe")
-NAMESPACE = "FSxN/Lakehouse"
+NAMESPACE = "FSxONTAP/Lakehouse"
 SAMPLE_COUNT = 10
 
 
@@ -199,7 +199,7 @@ def lambda_handler(event, context):
 
 | Metric | Warning | Critical | Rationale |
 |--------|---------|----------|-----------|
-| S3APLatencyP50Ms | > 100ms | > 500ms | Normal FSx S3 AP reads are 20-80ms |
+| S3APLatencyP50Ms | > 100ms | > 500ms | Normal FSx for ONTAP S3 AP reads are 20-80ms |
 | S3APLatencyP99Ms | > 500ms | > 2000ms | Tail latency indicates throughput saturation |
 
 > **Note**: Baseline these thresholds against your FSx file system's provisioned throughput tier. Higher throughput tiers will have lower baseline latency.
@@ -303,7 +303,7 @@ def lambda_handler(event, context):
 
     # Publish metric
     cw_client.put_metric_data(
-        Namespace="FSxN/Lakehouse",
+        Namespace="FSxONTAP/Lakehouse",
         MetricData=[{"MetricName": "AccessAnomalyCount", "Value": len(anomalies), "Unit": "Count"}],
     )
 
@@ -365,7 +365,7 @@ def _collect_storage_costs():
             service = group["Keys"][0]
             cost = float(group["Metrics"]["UnblendedCost"]["Amount"])
             cw_client.put_metric_data(
-                Namespace="FSxN/Lakehouse",
+                Namespace="FSxONTAP/Lakehouse",
                 MetricData=[{
                     "MetricName": "DailyStorageCost",
                     "Value": cost,
@@ -380,7 +380,7 @@ def _collect_storage_costs():
 | Panel | Metric | Visualization |
 |-------|--------|---------------|
 | Daily Storage Cost | `DailyStorageCost` by Service | Time series (FSx vs S3 vs DataSync) |
-| FSx S3 AP Latency | `S3APLatencyP50Ms`, `S3APLatencyP99Ms` | Time series with threshold annotations |
+| FSx for ONTAP S3 AP Latency | `S3APLatencyP50Ms`, `S3APLatencyP99Ms` | Time series with threshold annotations |
 | FlexCache Hit Rate | `FlexCacheHitRatePercent` | Gauge with 70% warning line |
 | Sync Lag | `DataSyncLagSeconds`, `SnapMirrorLagSeconds` | Time series |
 | Access Anomalies | `AccessAnomalyCount` | Time series (should be 0 normally) |
@@ -389,7 +389,7 @@ def _collect_storage_costs():
 
 ## Vendor Delivery Paths
 
-All patterns publish to CloudWatch Custom Metrics (`FSxN/Lakehouse` namespace):
+All patterns publish to CloudWatch Custom Metrics (`FSxONTAP/Lakehouse` namespace):
 
 | Backend | Integration Method | Setup |
 |---------|-------------------|-------|
@@ -397,7 +397,7 @@ All patterns publish to CloudWatch Custom Metrics (`FSxN/Lakehouse` namespace):
 | **Datadog** | AWS Integration (auto-collects custom namespaces) | Enable AWS Integration |
 | **Splunk** | Splunk Add-on for AWS → CloudWatch inputs | Configure `aws_cloudwatch` input |
 | **Elastic** | Metricbeat `aws` module | Configure `cloudwatch` metricset |
-| **OTel Collector** | `awscloudwatchreceiver` | Scrape `FSxN/Lakehouse` namespace |
+| **OTel Collector** | `awscloudwatchreceiver` | Scrape `FSxONTAP/Lakehouse` namespace |
 
 ---
 

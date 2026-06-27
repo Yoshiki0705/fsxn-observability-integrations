@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
-  FSxN Datadog EMS & FPolicy Integration - Serverless event shipping
+  FSx for ONTAP Datadog EMS & FPolicy Integration - Serverless event shipping
   for ONTAP EMS webhook events and FPolicy file operation events.
   Stack name pattern: fsxn-datadog-ems-fpolicy
 

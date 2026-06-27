@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Observability - FSx ONTAP Audit Logging Configuration via SSM Automation.
+  FSx for ONTAP Observability - FSx for ONTAP Audit Logging Configuration via SSM Automation.
   Enables audit logging on an existing FSx for ONTAP file system and configures
   log delivery to the specified S3 bucket.
   NOTE: This template uses SSM Run Command to execute ONTAP CLI commands.
@@ -53,7 +53,7 @@ Parameters:
   ManagementEndpointIp:
     Type: String
     Description: >
-      FSx ONTAP management endpoint IP address.
+      FSx for ONTAP management endpoint IP address.
       Found in FSx console under file system details.
     AllowedPattern: '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
 
@@ -103,7 +103,7 @@ Resources:
                   - !Sub 'arn:aws:s3:::${AuditLogBucketName}/*'
 
   # ============================================================
-  # SSM Document: Configure FSx ONTAP Audit Logging
+  # SSM Document: Configure FSx for ONTAP Audit Logging
   # ============================================================
   ConfigureAuditDocument:
     Type: AWS::SSM::Document
@@ -113,7 +113,7 @@ Resources:
       DocumentFormat: YAML
       Content:
         schemaVersion: '0.3'
-        description: Configure FSx ONTAP audit logging via ONTAP REST API
+        description: Configure FSx for ONTAP audit logging via ONTAP REST API
         parameters:
           FileSystemId:
             type: String
@@ -147,7 +147,7 @@ Resources:
                 Type: String
 
   # ============================================================
-  # Custom Resource: Verify FSx ONTAP connectivity
+  # Custom Resource: Verify FSx for ONTAP connectivity
   # ============================================================
   ConnectivityCheck:
     Type: AWS::CloudFormation::WaitConditionHandle
@@ -161,7 +161,7 @@ Outputs:
     Description: ONTAP CLI commands to enable audit logging (run via SSH or System Manager)
     Value: !Sub |
       # ============================================================
-      # FSx ONTAP Audit Logging Configuration Commands
+      # FSx for ONTAP Audit Logging Configuration Commands
       # Run these via SSH to the FSx management endpoint or via
       # ONTAP System Manager
       # ============================================================
@@ -189,7 +189,7 @@ Outputs:
       # Option C: Use FSx automatic backups + S3 export
 
   S3DeliveryConfig:
-    Description: S3 delivery configuration for FSx ONTAP audit logs
+    Description: S3 delivery configuration for FSx for ONTAP audit logs
     Value: !Sub |
       Bucket: ${AuditLogBucketName}
       Prefix: ${AuditLogPrefix}/${SvmName}/
@@ -200,9 +200,9 @@ Outputs:
     Value: !Ref ConfigureAuditDocument
 
   ManagementEndpoint:
-    Description: FSx ONTAP management endpoint for SSH access
+    Description: FSx for ONTAP management endpoint for SSH access
     Value: !Ref ManagementEndpointIp
 
   SshCommand:
-    Description: SSH command to connect to FSx ONTAP management endpoint
+    Description: SSH command to connect to FSx for ONTAP management endpoint
     Value: !Sub 'ssh admin@${ManagementEndpointIp}'

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Base IAM Roles for FSxN Observability Lambda Functions
+Description: Base IAM Roles for FSx for ONTAP Observability Lambda Functions
 
 Parameters:
   S3AccessPointArn:

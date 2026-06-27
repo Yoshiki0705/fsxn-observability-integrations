@@ -2,7 +2,7 @@
 # NetApp Harvest Configuration for FSx for ONTAP
 # =============================================================================
 #
-# This configuration defines how Harvest collects metrics from FSx ONTAP
+# This configuration defines how Harvest collects metrics from FSx for ONTAP
 # and exports them for Prometheus scraping (by ADOT sidecar → AMP).
 #
 # Deployment context:
@@ -12,13 +12,13 @@
 #
 # References:
 #   - Harvest docs: https://netapp.github.io/harvest/
-#   - FSx ONTAP REST API: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/
+#   - FSx for ONTAP REST API: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # Pollers: Define ONTAP cluster connections
 # -----------------------------------------------------------------------------
-# Each poller represents one FSx ONTAP file system to monitor.
+# Each poller represents one FSx for ONTAP file system to monitor.
 # The Harvest container connects to the ONTAP management endpoint (port 443)
 # using REST API to collect performance and configuration metrics.
 Pollers:
@@ -27,7 +27,7 @@ Pollers:
     # Used for filtering in Grafana dashboards when monitoring multiple clusters.
     datacenter: aws
 
-    # FSx ONTAP management endpoint (DNS name or IP address).
+    # FSx for ONTAP management endpoint (DNS name or IP address).
     # Injected as environment variable by ECS task definition.
     # Example: fs-0123456789abcdef0.fsx.ap-northeast-1.amazonaws.com
     addr: ${ONTAP_MGMT_ENDPOINT}
@@ -35,7 +35,7 @@ Pollers:
     # Authentication style: basic_auth uses username/password from credentials file.
     auth_style: basic_auth
 
-    # Required for FSx ONTAP: self-signed certificate + IP-based connection.
+    # Required for FSx for ONTAP: self-signed certificate + IP-based connection.
     # Without this, TLS verification fails because the certificate CN/SAN
     # does not match the management endpoint IP address.
     use_insecure_tls: true
@@ -65,7 +65,7 @@ Pollers:
 
     # Polling schedule: how frequently Harvest queries ONTAP for new data.
     # 60 seconds balances metric freshness with ONTAP API load.
-    # FSx ONTAP management endpoint handles this polling rate without issues.
+    # FSx for ONTAP management endpoint handles this polling rate without issues.
     schedule:
       - data: 60s
 
@@ -82,7 +82,7 @@ Exporters:
     # Port range for the Prometheus metrics HTTP endpoint.
     # Harvest binds to the first available port in this range.
     # The ADOT sidecar scrapes localhost:12990 for metrics.
-    # Range allows multiple pollers if monitoring multiple FSx ONTAP systems.
+    # Range allows multiple pollers if monitoring multiple FSx for ONTAP systems.
     port_range: 12990-12999
 
 # -----------------------------------------------------------------------------
@@ -91,7 +91,7 @@ Exporters:
 # These settings apply to all pollers unless overridden at the poller level.
 Defaults:
   # Use ONTAP REST API (not legacy ZAPI) for all data collection.
-  # FSx ONTAP fully supports REST API and this is the recommended approach.
+  # FSx for ONTAP fully supports REST API and this is the recommended approach.
   use_insecure_tls: true
 
   # Collectors to load by default for all pollers.

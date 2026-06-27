@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Splunk Firehose Integration - High-throughput audit log delivery via
+  FSx for ONTAP Splunk Firehose Integration - High-throughput audit log delivery via
   Kinesis Data Firehose with built-in Splunk destination. Alternative path
   for sustained throughput above 1000 events/second.
 
@@ -278,4 +278,4 @@ Outputs:
 
   ArchitectureNote:
     Description: High-throughput alternative to direct Lambda-to-HEC delivery
-    Value: 'FSx ONTAP -> S3 -> Firehose -> Lambda Transform -> Splunk HEC (S3 backup for failures)'
+    Value: 'FSx for ONTAP -> S3 -> Firehose -> Lambda Transform -> Splunk HEC (S3 backup for failures)'

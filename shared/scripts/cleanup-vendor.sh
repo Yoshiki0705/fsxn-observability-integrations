@@ -154,7 +154,7 @@ fi
 
 # --- Confirmation -----------------------------------------------------------
 
-echo "=== FSxN ${VENDOR_NAME} Integration Cleanup ==="
+echo "=== FSx for ONTAP ${VENDOR_NAME} Integration Cleanup ==="
 echo ""
 echo "Region: ${AWS_REGION}"
 echo "Stack prefix: ${STACK_PREFIX}"

@@ -100,7 +100,7 @@ FSx for ONTAP EMS → CloudWatch Events → EventBridge Rule → Lambda → Vend
 ```json
 {
   "source": ["aws.fsx"],
-  "detail-type": ["FSx ONTAP EMS Event"],
+  "detail-type": ["FSx for ONTAP EMS Event"],
   "detail": {
     "event-name": ["arw.volume.state", "wafl.quota.softlimit.exceeded"]
   }

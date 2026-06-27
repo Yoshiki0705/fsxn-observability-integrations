@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: FSxN Elastic Integration - Audit log shipping via Bulk API
+Description: FSx for ONTAP Elastic Integration - Audit log shipping via Bulk API
 
 Parameters:
   S3AccessPointArn:

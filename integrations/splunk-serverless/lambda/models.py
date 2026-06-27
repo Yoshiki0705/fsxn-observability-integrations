@@ -94,7 +94,7 @@ class FirehoseTransformResult:
     """Firehose transformation output record.
 
     Represents the result of transforming a single Kinesis Data Firehose
-    record from FSx ONTAP audit log format to Splunk HEC event JSON.
+    record from FSx for ONTAP audit log format to Splunk HEC event JSON.
 
     Attributes:
         recordId: Unique identifier for the Firehose record.

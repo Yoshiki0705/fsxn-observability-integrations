@@ -71,7 +71,7 @@ def sample_eventbridge_event():
 
 @pytest.fixture
 def sample_audit_logs():
-    """Sample FSx ONTAP audit logs as list of dicts."""
+    """Sample FSx for ONTAP audit logs as list of dicts."""
     return [
         {
             "Timestamp": "2026-01-15T12:00:01Z",
@@ -108,7 +108,7 @@ def sample_audit_logs():
 
 @pytest.fixture
 def sample_json_audit_logs(sample_audit_logs):
-    """Sample FSx ONTAP audit logs as newline-delimited JSON string."""
+    """Sample FSx for ONTAP audit logs as newline-delimited JSON string."""
     return "\n".join(json.dumps(log) for log in sample_audit_logs)
 
 

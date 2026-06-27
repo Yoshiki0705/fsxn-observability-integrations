@@ -32,7 +32,7 @@ FPOLICY_EVENT_BUS="${FPOLICY_EVENT_BUS:-fsxn-fpolicy-events}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INTEGRATION_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "=== FSxN Dynatrace Deployment ==="
+echo "=== FSx for ONTAP Dynatrace Deployment ==="
 for var in DT_SECRET_ARN S3_ACCESS_POINT_ARN S3_BUCKET_NAME; do
   if [ -z "${!var:-}" ]; then echo "ERROR: $var not set"; exit 1; fi
 done

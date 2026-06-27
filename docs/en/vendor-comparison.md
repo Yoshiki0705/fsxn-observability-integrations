@@ -23,7 +23,7 @@ Estimated monthly costs for the **observability platform ingestion** (excludes A
 |--------|-----------|-----------|------------|-------------|---------------|
 | New Relic | 100 GB/month | $0 | $0 | $0 | Per-GB beyond free tier ($0.35/GB) |
 | Grafana Cloud | 50 GB/month | $0 | $0 | ~$40 | Per-GB beyond free tier ($0.50/GB) |
-| Sumo Logic | 500 MB/day (~15 GB/month) | $0 | $0 | ~$300 | Per-GB/day tier-based |
+| Sumo Logic | 1.25 credits/day (~20 credits/month) | $0 | $0 | ~$300 | Credit-based (Flex) |
 | Honeycomb | 20M events/month | $0 | $0 | ~$100 | Per-event based |
 | Datadog | None (trial only) | ~$10 | ~$100 | ~$1,000 | $0.10/GB ingested + retention |
 | Splunk | None (license-based) | License-dependent | License-dependent | License-dependent | Daily indexing volume license |
@@ -48,9 +48,9 @@ Estimated monthly costs for the **observability platform ingestion** (excludes A
 ## Selection Guide
 
 ### Cost-Focused
-- **New Relic**: Most generous free tier (100 GB/month)
+- **New Relic**: Largest free tier (100 GB/month, permanent)
 - **Grafana Cloud**: Good free tier (50 GB/month) + OSS ecosystem
-- **Sumo Logic**: Free tier available (500 MB/day)
+- **Sumo Logic**: Free tier available (1.25 credits/day (Flex model))
 - **Elastic**: Self-hosted option (no ingestion cost)
 
 ### Existing Environment Integration
@@ -122,7 +122,7 @@ The CrowdStrike Falcon **EDR trial** includes read-only access to the Next-Gen S
 | Splunk | Docker local (Enterprise trial) | $0 |
 | Elastic | Cloud trial (14-day) | $0 |
 | Dynatrace | Free tier (15-day trial) | $0 |
-| Sumo Logic | Free tier (500 MB/day) | $0 |
+| Sumo Logic | Free tier (1.25 credits/day (Flex model)) | $0 |
 | Honeycomb | Free tier (20M events/month) | $0 |
 | CrowdStrike | HEC protocol verified via Splunk | $0 |
 | OTel Collector | Self-hosted (Docker Compose) | $0 |

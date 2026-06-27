@@ -16,7 +16,7 @@ receivers:
         method: GET
     collection_interval: 60s
     tls:
-      insecure_skip_verify: true  # FSx ONTAP uses self-signed certs
+      insecure_skip_verify: true  # FSx for ONTAP uses self-signed certs
     auth:
       authenticator: basicauth/ontap
 

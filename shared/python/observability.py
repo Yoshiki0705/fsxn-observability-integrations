@@ -1,4 +1,4 @@
-"""Shared observability utilities for FSx ONTAP Lambda handlers.
+"""Shared observability utilities for FSx for ONTAP Lambda handlers.
 
 Provides standardized structured logging, custom metrics, and distributed
 tracing using AWS Lambda Powertools. All Lambda handlers in this project
@@ -20,7 +20,7 @@ Dependencies:
 
 Environment Variables (set in CloudFormation):
     POWERTOOLS_SERVICE_NAME: Service name for structured logs (e.g., "fsxn-datadog-shipper")
-    POWERTOOLS_METRICS_NAMESPACE: CloudWatch namespace (default: "FSxNObservability")
+    POWERTOOLS_METRICS_NAMESPACE: CloudWatch namespace (default: "FSxONTAPObservability")
     POWERTOOLS_LOG_LEVEL: Log level (default: "INFO")
     POWERTOOLS_TRACER_CAPTURE_RESPONSE: Whether to capture response in traces (default: "false")
 """
@@ -42,7 +42,7 @@ logger = Logger(
 )
 
 metrics = Metrics(
-    namespace=os.environ.get("POWERTOOLS_METRICS_NAMESPACE", "FSxNObservability"),
+    namespace=os.environ.get("POWERTOOLS_METRICS_NAMESPACE", "FSxONTAPObservability"),
 )
 
 tracer = Tracer(

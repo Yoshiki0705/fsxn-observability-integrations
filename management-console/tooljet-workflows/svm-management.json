@@ -1,11 +1,11 @@
 {
   "schemaVersion": "2.0",
   "name": "SVM Management",
-  "description": "FSx ONTAP SVM list and configuration management",
+  "description": "FSx for ONTAP SVM list and configuration management",
   "dataSources": [
     {
       "id": "ds_ontap_rest",
-      "name": "FSxN ONTAP REST",
+      "name": "FSx for ONTAP ONTAP REST",
       "kind": "restapi",
       "options": {
         "url": "{{globals.ontap_base_url}}",

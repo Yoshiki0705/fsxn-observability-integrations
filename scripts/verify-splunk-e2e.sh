@@ -587,7 +587,7 @@ step9_generate_results() {
 
 main() {
   echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
-  echo -e "${BOLD}║   Splunk E2E Verification — FSxN Observability          ║${NC}"
+  echo -e "${BOLD}║   Splunk E2E Verification — FSx for ONTAP Observability          ║${NC}"
   echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
   echo ""
   info_msg "Stack:      $STACK_NAME"

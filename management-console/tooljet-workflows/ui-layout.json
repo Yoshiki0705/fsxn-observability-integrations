@@ -1,6 +1,6 @@
 {
   "_schema": "tooljet-ui-layout/v1",
-  "description": "FSxN Management Console UI layout configuration for ToolJet",
+  "description": "FSx for ONTAP Management Console UI layout configuration for ToolJet",
   "version": "1.0.0",
   "theme": {
     "colorScheme": "light",
@@ -102,7 +102,7 @@
       "position": "header-right",
       "type": "dropdown",
       "dataSource": "env:ONTAP_MGMT_ENDPOINTS",
-      "labelFormat": "FSx ONTAP: {{endpoint}}",
+      "labelFormat": "FSx for ONTAP: {{endpoint}}",
       "onSelect": {
         "updateGlobals": ["ontap_base_url", "ontap_username", "ontap_password"],
         "refreshCurrentView": true,

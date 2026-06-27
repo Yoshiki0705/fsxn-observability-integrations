@@ -1,10 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: S3 Access Point for FSx ONTAP Audit Logs
+Description: S3 Access Point for FSx for ONTAP Audit Logs
 
 Parameters:
   BucketName:
     Type: String
-    Description: Name of the S3 bucket containing FSx ONTAP audit logs
+    Description: Name of the S3 bucket containing FSx for ONTAP audit logs
 
   AccessPointName:
     Type: String

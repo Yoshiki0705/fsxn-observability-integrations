@@ -75,7 +75,7 @@ done
 
 After importing, configure the ONTAP REST API data source:
 
-1. Go to **Data Sources** → **FSxN ONTAP REST**
+1. Go to **Data Sources** → **FSx for ONTAP ONTAP REST**
 2. Set the base URL to your FSx for ONTAP management endpoint
 3. Configure Basic Auth with credentials from Secrets Manager
 4. Test the connection

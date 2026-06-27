@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# FSxN Management Console - Deployment Script
+# FSx for ONTAP Management Console - Deployment Script
 # Orchestrates 5 CloudFormation stacks in dependency order:
 #   1. network → 2. auth → 3. observability → 4. console → 5. monitoring
 #
@@ -28,17 +28,17 @@ usage() {
   cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Deploy the FSxN Management Console (5 CloudFormation stacks).
+Deploy the FSx for ONTAP Management Console (5 CloudFormation stacks).
 
 Required environment variables:
   VPC_ID                        Target VPC ID (e.g., vpc-0123456789abcdef0)
   PRIVATE_SUBNET_IDS            Comma-separated private subnet IDs (min 2 AZs)
   PUBLIC_SUBNET_IDS             Comma-separated public subnet IDs (min 2 AZs)
-  ONTAP_MGMT_ENDPOINTS          Comma-separated FSx ONTAP management endpoints (1-10)
+  ONTAP_MGMT_ENDPOINTS          Comma-separated FSx for ONTAP management endpoints (1-10)
   ONTAP_CREDENTIALS_SECRET_ARNS Comma-separated Secrets Manager ARNs (positional match to endpoints)
 
 Backward-compatible aliases (auto-converted to plural form):
-  ONTAP_MGMT_ENDPOINT           Single FSx ONTAP management endpoint (legacy)
+  ONTAP_MGMT_ENDPOINT           Single FSx for ONTAP management endpoint (legacy)
   ONTAP_CREDENTIALS_SECRET_ARN  Single Secrets Manager ARN (legacy)
 
 Optional environment variables:
@@ -47,13 +47,13 @@ Optional environment variables:
   SESSION_DURATION_HOURS      1-12 (default: 8)
   HARVEST_IMAGE_TAG           Harvest container image tag (default: latest)
   TOOLJET_IMAGE_TAG           ToolJet container image tag (default: latest)
-  S3_ACCESS_POINT_ARN         FSx ONTAP S3 Access Point ARN
+  S3_ACCESS_POINT_ARN         FSx for ONTAP S3 Access Point ARN
   CERTIFICATE_ARN             ACM certificate ARN for ALB HTTPS
   CUSTOM_DOMAIN_NAME          Custom domain for the console (e.g., console.example.com)
   HOSTED_ZONE_ID              Route 53 Hosted Zone ID for the custom domain
   ADMIN_EMAIL                 Email of the initial admin user (added to fsxn-admins group)
   ALERT_SNS_TOPIC_ARN         Existing SNS topic ARN for alarms (optional)
-  FSXN_SECURITY_GROUP_ID      FSx ONTAP file system security group ID (for auto-adding access rules)
+  FSXN_SECURITY_GROUP_ID      FSx for ONTAP file system security group ID (for auto-adding access rules)
   AWS_REGION                  AWS region (default: from aws configure or ap-northeast-1)
   STACK_PREFIX                Stack name prefix (default: fsxn-mgmt)
 
@@ -169,7 +169,7 @@ validate_env() {
     exit 1
   fi
 
-  log_info "Validated ${#EP_ARRAY[@]} FSx ONTAP endpoint(s) with matching credentials"
+  log_info "Validated ${#EP_ARRAY[@]} FSx for ONTAP endpoint(s) with matching credentials"
 
   # -------------------------------------------------------------------------
   # Custom domain validation: if CUSTOM_DOMAIN_NAME is set, require related vars
@@ -341,7 +341,7 @@ main() {
   validate_env
 
   echo ""
-  echo "🚀 FSxN Management Console Deployment"
+  echo "🚀 FSx for ONTAP Management Console Deployment"
   echo "   Region: ${AWS_REGION}"
   echo "   Stack prefix: ${STACK_PREFIX}"
   echo "   VPC: ${VPC_ID}"
@@ -372,15 +372,15 @@ main() {
   log_info "  AlbSG: ${ALB_SG}"
   log_info "  LambdaSG: ${LAMBDA_SG}"
 
-  # Add Harvest task SG to FSx ONTAP security group (if specified)
+  # Add Harvest task SG to FSx for ONTAP security group (if specified)
   if [[ -n "${FSXN_SECURITY_GROUP_ID:-}" ]]; then
-    log_info "Adding Harvest task SG to FSx ONTAP security group..."
+    log_info "Adding Harvest task SG to FSx for ONTAP security group..."
     aws ec2 authorize-security-group-ingress \
       --group-id "${FSXN_SECURITY_GROUP_ID}" \
       --protocol tcp --port 443 \
       --source-group "${HARVEST_TASK_SG}" \
       --region "${AWS_REGION}" 2>/dev/null || log_info "Rule already exists (idempotent)"
-    log_success "FSx ONTAP SG rule added: ${FSXN_SECURITY_GROUP_ID} ← ${HARVEST_TASK_SG}:443"
+    log_success "FSx for ONTAP SG rule added: ${FSXN_SECURITY_GROUP_ID} ← ${HARVEST_TASK_SG}:443"
   fi
 
   # =========================================================================
@@ -461,7 +461,7 @@ main() {
     else
       AMG_API_KEY_SECRET_ARN=$(aws secretsmanager create-secret \
         --name "${AMG_API_KEY_SECRET_NAME}" \
-        --description "AMG API key for FSxN Management Console dashboard import" \
+        --description "AMG API key for FSx for ONTAP Management Console dashboard import" \
         --secret-string "PLACEHOLDER_UPDATE_WITH_REAL_AMG_API_KEY" \
         --region "${AWS_REGION}" \
         --query "ARN" --output text)
@@ -574,7 +574,7 @@ main() {
   # =========================================================================
   echo ""
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "🎉 FSxN Management Console deployed successfully!"
+  echo "🎉 FSx for ONTAP Management Console deployed successfully!"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo ""
   echo "Access the console:"

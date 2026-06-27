@@ -179,7 +179,7 @@ aws cloudformation deploy \
 
 | パラメータ | 値 | 説明 |
 |-----------|---|------|
-| `FsxS3AccessPointArn` | `arn:aws:s3:ap-northeast-1:<account>:accesspoint/<name>` | FSx ONTAP S3 AP の ARN |
+| `FsxS3AccessPointArn` | `arn:aws:s3:ap-northeast-1:<account>:accesspoint/<name>` | FSx for ONTAP S3 AP の ARN |
 | `LogScaleIngestTokenSecretArn` | `arn:aws:secretsmanager:...` | Step 2 で作成した Secret ARN |
 | `LogScaleUrl` | `https://cloud.us.humio.com` | LogScale のベース URL |
 | `ScheduleInterval` | `rate(5 minutes)` | ポーリング間隔 |

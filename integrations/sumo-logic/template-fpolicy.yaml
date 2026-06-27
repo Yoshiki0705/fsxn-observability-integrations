@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Sumo Logic FPolicy Integration - Lambda function for receiving
+  FSx for ONTAP Sumo Logic FPolicy Integration - Lambda function for receiving
   FPolicy file operation events from EventBridge and forwarding to Sumo Logic.
   Prerequisite: Deploy shared/templates/fpolicy-apigw.yaml first.
 

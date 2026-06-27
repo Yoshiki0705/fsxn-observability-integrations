@@ -170,8 +170,8 @@ SELECT message, source, operation, svm, user, result FROM Log WHERE source='fsxn
 
 - **結果**: ✅ PASS
 
-- **Alert Policy 名**: FSxN Audit Alerts（NerdGraph API 経由で作成）
-- **Alert Condition 名**: FSxN Failed Access Spike
+- **Alert Policy 名**: FSx for ONTAP Audit Alerts（NerdGraph API 経由で作成）
+- **Alert Condition 名**: FSx for ONTAP Failed Access Spike
 
 #### Alert Condition 設定詳細
 
@@ -191,14 +191,14 @@ NerdGraph API 経由で作成（New Relic UI の Alert Condition 作成画面が
 ```graphql
 mutation {
   alertsPolicyCreate(accountId: ****4184, policy: {
-    name: "FSxN Audit Alerts",
+    name: "FSx for ONTAP Audit Alerts",
     incidentPreference: PER_CONDITION
   }) { id }
 }
 
 mutation {
   alertsNrqlConditionStaticCreate(accountId: ****4184, policyId: <policy_id>, condition: {
-    name: "FSxN Failed Access Spike",
+    name: "FSx for ONTAP Failed Access Spike",
     nrql: {query: "SELECT count(*) FROM Log WHERE source = 'fsxn-ontap' AND result = 'Failure'"},
     terms: [{threshold: 1, thresholdOccurrences: AT_LEAST_ONCE, thresholdDuration: 300, operator: ABOVE, priority: CRITICAL}]
   }) { id }
@@ -251,7 +251,7 @@ mutation {
 
 | # | ファイル名 | 内容 | 検証ステップ |
 |---|-----------|------|-------------|
-| 1 | `logs-ui-arrival.png` | New Relic Logs UI — FSxN 監査ログエントリ表示 | ステップ 3 |
+| 1 | `logs-ui-arrival.png` | New Relic Logs UI — FSx for ONTAP 監査ログエントリ表示 | ステップ 3 |
 | 2 | `nrql-query-result.png` | Query Builder — NRQL クエリテキストと結果表示 | ステップ 4 |
 | 3 | `alert-condition-config.png` | Alert Condition 設定画面（NRQL + 閾値表示） | ステップ 5 |
 | 4 | `alert-policy-overview.png` | Alert Policy 概要（条件一覧表示） | ステップ 5 |

@@ -91,7 +91,7 @@ def sample_dashboard_json():
     """Create a sample Grafana dashboard JSON."""
     return {
         "uid": "fsxn-overview",
-        "title": "FSxN Overview",
+        "title": "FSx for ONTAP Overview",
         "panels": [
             {"id": 1, "title": "IOPS", "type": "graph"},
             {"id": 2, "title": "Throughput", "type": "graph"},
@@ -134,9 +134,9 @@ class TestSuccessfulImport:
 
         # Mock S3 get_object for each dashboard
         dashboard_jsons = [
-            {"uid": "fsxn-overview", "title": "FSxN Overview", "panels": []},
-            {"uid": "fsxn-volumes", "title": "FSxN Volumes", "panels": []},
-            {"uid": "fsxn-performance", "title": "FSxN Performance", "panels": []},
+            {"uid": "fsxn-overview", "title": "FSx for ONTAP Overview", "panels": []},
+            {"uid": "fsxn-volumes", "title": "FSx for ONTAP Volumes", "panels": []},
+            {"uid": "fsxn-performance", "title": "FSx for ONTAP Performance", "panels": []},
         ]
         handler._s3_client.get_object.side_effect = [
             {"Body": MagicMock(read=MagicMock(return_value=json.dumps(d).encode()))}
@@ -194,7 +194,7 @@ class TestRateLimitRetry:
             "Body": MagicMock(
                 read=MagicMock(
                     return_value=json.dumps(
-                        {"uid": "fsxn-overview", "title": "FSxN Overview", "panels": []}
+                        {"uid": "fsxn-overview", "title": "FSx for ONTAP Overview", "panels": []}
                     ).encode()
                 )
             )
@@ -320,7 +320,7 @@ class TestAmgApiError:
             "Body": MagicMock(
                 read=MagicMock(
                     return_value=json.dumps(
-                        {"uid": "fsxn-overview", "title": "FSxN Overview", "panels": []}
+                        {"uid": "fsxn-overview", "title": "FSx for ONTAP Overview", "panels": []}
                     ).encode()
                 )
             )
@@ -390,7 +390,7 @@ class TestIdempotentReimport:
             "Body": MagicMock(
                 read=MagicMock(
                     return_value=json.dumps(
-                        {"uid": "fsxn-overview", "id": 42, "title": "FSxN Overview", "panels": []}
+                        {"uid": "fsxn-overview", "id": 42, "title": "FSx for ONTAP Overview", "panels": []}
                     ).encode()
                 )
             )
@@ -544,7 +544,7 @@ class TestPartialFailure:
                 "Body": MagicMock(
                     read=MagicMock(
                         return_value=json.dumps(
-                            {"uid": "fsxn-overview", "title": "FSxN Overview", "panels": []}
+                            {"uid": "fsxn-overview", "title": "FSx for ONTAP Overview", "panels": []}
                         ).encode()
                     )
                 )
@@ -560,7 +560,7 @@ class TestPartialFailure:
                 "Body": MagicMock(
                     read=MagicMock(
                         return_value=json.dumps(
-                            {"uid": "fsxn-performance", "title": "FSxN Performance", "panels": []}
+                            {"uid": "fsxn-performance", "title": "FSx for ONTAP Performance", "panels": []}
                         ).encode()
                     )
                 )

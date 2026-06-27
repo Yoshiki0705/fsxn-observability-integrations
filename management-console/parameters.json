@@ -1,5 +1,5 @@
 {
-  "_description": "Shared CloudFormation parameters for FSxN Management Console stacks. All 5 stacks reference a subset of these parameters.",
+  "_description": "Shared CloudFormation parameters for FSx for ONTAP Management Console stacks. All 5 stacks reference a subset of these parameters.",
   "parameters": {
     "VpcId": {
       "type": "AWS::EC2::VPC::Id",
@@ -32,7 +32,7 @@
     },
     "OntapManagementEndpoint": {
       "type": "String",
-      "description": "FSx ONTAP management endpoint IP address or DNS name. Used by Harvest and ToolJet for REST API access on port 443.",
+      "description": "FSx for ONTAP management endpoint IP address or DNS name. Used by Harvest and ToolJet for REST API access on port 443.",
       "required": true,
       "usedBy": ["network", "observability", "console"],
       "constraints": {
@@ -102,12 +102,12 @@
     },
     "S3AccessPointArn": {
       "type": "String",
-      "description": "ARN of the FSx ONTAP S3 Access Point for file browsing. Used by S3 Copy Lambda for file download operations.",
+      "description": "ARN of the FSx for ONTAP S3 Access Point for file browsing. Used by S3 Copy Lambda for file download operations.",
       "required": true,
       "usedBy": ["console"],
       "constraints": {
         "allowedPattern": "^arn:aws:s3:[a-z0-9-]+:[0-9]{12}:accesspoint/[a-z0-9-]+$",
-        "note": "FSx ONTAP S3 APs do not support presigned URLs — copy-to-bucket pattern required"
+        "note": "FSx for ONTAP S3 APs do not support presigned URLs — copy-to-bucket pattern required"
       }
     },
     "MfaConfiguration": {
@@ -144,7 +144,7 @@
     },
     "FsxnSecurityGroupId": {
       "type": "String",
-      "description": "Security Group ID of the FSx ONTAP file system. Required for deploy.sh to auto-add access rules for Harvest/ToolJet task SGs.",
+      "description": "Security Group ID of the FSx for ONTAP file system. Required for deploy.sh to auto-add access rules for Harvest/ToolJet task SGs.",
       "required": false,
       "usedBy": ["deploy-script", "cleanup-script"],
       "constraints": {

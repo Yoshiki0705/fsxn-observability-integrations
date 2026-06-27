@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN New Relic FPolicy Integration - Lambda function for receiving
+  FSx for ONTAP New Relic FPolicy Integration - Lambda function for receiving
   FPolicy file operation events from EventBridge and forwarding to New Relic.
   Prerequisite: Deploy shared/templates/fpolicy-apigw.yaml first.
 

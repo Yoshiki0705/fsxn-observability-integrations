@@ -118,7 +118,7 @@ An Access Point enters MISCONFIGURED state when:
 | Volume ID | `fsvol-0a17e70de744e322f` |
 | Volume Name | `audit_logs_observability` |
 | Junction Path | `/audit_logs_observability` |
-| SVM | `svm-0d5f81cd0146af242` (FSxN_OnPre) |
+| SVM | `svm-0d5f81cd0146af242` (FSxN_OnPre) | <!-- allow:naming: SVM resource name -->
 | Access Point Name | `fsxn-audit-observability` |
 | Access Point ARN | `arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-observability` |
 | Access Point Alias | `fsxn-audit-obser-cbsi8mwwgahuh7sans3bbtxijig4sapn1b-ext-s3alias` |

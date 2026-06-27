@@ -198,7 +198,7 @@ def _read_s3_object(bucket: str, key: str) -> bytes:
     """Read object from S3 Access Point.
 
     Note: S3_ACCESS_POINT_ARN is used as the Bucket parameter.
-    This is the correct usage for FSx ONTAP S3 Access Points —
+    This is the correct usage for FSx for ONTAP S3 Access Points —
     the ARN replaces the bucket name in all S3 API calls.
     """
     response = s3_client.get_object(Bucket=S3_ACCESS_POINT_ARN, Key=key)
@@ -206,7 +206,7 @@ def _read_s3_object(bucket: str, key: str) -> bytes:
 
 
 def _parse_audit_logs(data: bytes, key: str) -> list[dict[str, Any]]:
-    """Parse FSx ONTAP audit logs based on file extension.
+    """Parse FSx for ONTAP audit logs based on file extension.
 
     Supports:
     - .evtx: Windows Event Log binary format
@@ -247,7 +247,7 @@ def _parse_audit_logs(data: bytes, key: str) -> list[dict[str, Any]]:
 def _parse_evtx(data: bytes) -> list[dict[str, Any]]:
     """Parse EVTX format audit logs.
 
-    Simplified parser for common FSx ONTAP audit event structures.
+    Simplified parser for common FSx for ONTAP audit event structures.
     """
     import struct
     from datetime import datetime, timezone

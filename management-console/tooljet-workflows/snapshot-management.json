@@ -1,11 +1,11 @@
 {
   "schemaVersion": "2.0",
   "name": "Snapshot Management",
-  "description": "FSx ONTAP Snapshot CRUD and restore operations",
+  "description": "FSx for ONTAP Snapshot CRUD and restore operations",
   "dataSources": [
     {
       "id": "ds_ontap_rest",
-      "name": "FSxN ONTAP REST",
+      "name": "FSx for ONTAP ONTAP REST",
       "kind": "restapi",
       "options": {
         "url": "{{globals.ontap_base_url}}",

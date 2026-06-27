@@ -1,11 +1,11 @@
 {
   "schemaVersion": "2.0",
   "name": "Snapshot Restore Workflow",
-  "description": "Full snapshot restore workflow with confirmation dialog, job polling, and NAS client disruption warnings for FSx ONTAP volumes",
+  "description": "Full snapshot restore workflow with confirmation dialog, job polling, and NAS client disruption warnings for FSx for ONTAP volumes",
   "dataSources": [
     {
       "id": "ds_ontap_rest",
-      "name": "FSxN ONTAP REST",
+      "name": "FSx for ONTAP ONTAP REST",
       "kind": "restapi",
       "options": {
         "url": "{{globals.ontap_base_url}}",

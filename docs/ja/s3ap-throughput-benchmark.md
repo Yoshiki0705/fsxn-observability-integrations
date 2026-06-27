@@ -174,7 +174,7 @@ import boto3
 cloudwatch = boto3.client("cloudwatch")
 
 cloudwatch.put_metric_data(
-    Namespace="Custom/FSxNPipeline",
+    Namespace="Custom/FSxONTAPPipeline",
     MetricData=[
         {
             "MetricName": "FilesProcessedPerInvocation",

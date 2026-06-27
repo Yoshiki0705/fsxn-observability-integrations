@@ -10,7 +10,7 @@ Architecture (Verified Working):
 
 Prerequisites:
     - FPolicy stack deployed (shared/templates/fpolicy-apigw.yaml)
-    - FSx ONTAP SVM with FPolicy configured (port 9898, async mode)
+    - FSx for ONTAP SVM with FPolicy configured (port 9898, async mode)
     - AWS credentials with CloudWatch Logs, ECS, and SQS read access
 
 Usage:
@@ -488,7 +488,7 @@ def step_diagnose_connection_failure(
     print("  1. Is the Fargate task IP registered in ONTAP external engine?")
     print("     Check: vserver fpolicy show-engine -vserver <svm>")
     print("  2. Is Security Group <fpolicy-server-sg> allowing TCP 9898 inbound?")
-    print("  3. Is the FSxN SVM SG (<fsxn-svm-sg>) in the same VPC?")
+    print("  3. Is the FSx for ONTAP SVM SG (<fsxn-svm-sg>) in the same VPC?")
     print("  4. Does the ECS task role have sqs:SendMessage permission?")
     print("  5. Has the Fargate task restarted? (IP changes on restart)")
     print("     The IP Auto-Updater Lambda should handle this automatically.")
@@ -713,7 +713,7 @@ Examples:
     parser.add_argument(
         "--svm-name",
         required=True,
-        help="FSx ONTAP SVM name (e.g., FPolicySMB)",
+        help="FSx for ONTAP SVM name (e.g., FPolicySMB)",
     )
 
     return parser.parse_args()

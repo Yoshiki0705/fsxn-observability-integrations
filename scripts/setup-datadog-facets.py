@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create Datadog Facets for FSxN audit log attributes.
+"""Create Datadog Facets for FSx for ONTAP audit log attributes.
 
 Creates the 6 required Facets in Datadog for structured log searching.
 Uses the Datadog Logs API to create facets programmatically.

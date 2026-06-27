@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Management Console - Monitoring Stack (Stack 5 of 5)
+  FSx for ONTAP Management Console - Monitoring Stack (Stack 5 of 5)
   Creates CloudWatch Alarms, CloudWatch Dashboard, and SNS Topic
   for operational monitoring of the management console components.
   Depends on: fsxn-mgmt-observability (Stack 3), fsxn-mgmt-console (Stack 4).
@@ -89,7 +89,7 @@ Resources:
     Condition: CreateSnsTopic
     Properties:
       TopicName: fsxn-mgmt-console-alarms
-      DisplayName: FSxN Management Console Alarms
+      DisplayName: FSx for ONTAP Management Console Alarms
       KmsMasterKeyId: alias/aws/sns
       Tags:
         - Key: Project
@@ -255,7 +255,7 @@ Resources:
         [P2] AMP write buffer depth exceeds 800 — metrics delivery delayed.
         MTTR target: < 4 hours. Check AMP workspace health and ADOT logs.
         Runbook: docs/en/setup-guide.md#harvest-cannot-reach-ontap
-      Namespace: FSxNManagementConsole
+      Namespace: FSxONTAPManagementConsole
       MetricName: AmpBufferDepth
       Dimensions:
         - Name: Service
@@ -295,7 +295,7 @@ Resources:
                 "width": 24,
                 "height": 1,
                 "properties": {
-                  "markdown": "# FSxN Management Console — Operational Dashboard"
+                  "markdown": "# FSx for ONTAP Management Console — Operational Dashboard"
                 }
               },
               {

@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  FSxN Management Console - Authentication Stack (Stack 2: fsxn-mgmt-auth)
+  FSx for ONTAP Management Console - Authentication Stack (Stack 2: fsxn-mgmt-auth)
   Creates Amazon Cognito User Pool with configurable MFA, App Client for ALB integration,
   hosted UI domain, and SAML IdP configuration for Amazon Managed Grafana.
   Deploy AFTER network stack and BEFORE observability/console stacks.

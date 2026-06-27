@@ -1,4 +1,4 @@
-"""FSx ONTAP Log Parser Lambda Layer.
+"""FSx for ONTAP Log Parser Lambda Layer.
 
 Provides utilities for parsing FSx for NetApp ONTAP audit logs
 in EVTX, XML, and JSON formats.

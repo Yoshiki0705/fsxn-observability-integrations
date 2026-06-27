@@ -517,9 +517,9 @@ python3 shared/scripts/test-xml-e2e.py --vendor datadog
 
 | Monitor ID | 名称 | 種別 | 閾値 | 重要度 |
 |-----------|------|------|------|--------|
-| 13360510 | [FSxN] Mass File Deletion Detected | Log Alert | >50 deletes/5min per user | Critical |
-| 13360511 | [FSxN] Abnormal Access Volume | Log Alert | >1000 accesses/1h per user | High |
-| 13360512 | [FSxN] Access Failure Spike | Log Alert | >10 failures/15min per user | Medium |
+| 13360510 | [FSx-ONTAP] Mass File Deletion Detected | Log Alert | >50 deletes/5min per user | Critical |
+| 13360511 | [FSx-ONTAP] Abnormal Access Volume | Log Alert | >1000 accesses/1h per user | High |
+| 13360512 | [FSx-ONTAP] Access Failure Spike | Log Alert | >10 failures/15min per user | Medium |
 
 各モニターの特徴:
 - 通知メッセージに調査手順を含む
@@ -534,7 +534,7 @@ python3 shared/scripts/test-xml-e2e.py --vendor datadog
 ### ステップ P4: ダッシュボード確認（有料プラン）
 
 - **結果**: ✅ 成功
-- **ダッシュボード名**: FSx ONTAP Audit Log Overview
+- **ダッシュボード名**: FSx for ONTAP Audit Log Overview
 - **ダッシュボード ID**: ggx-7ad-6e4
 - **ステータス**: アクティブ、データ受信中
 

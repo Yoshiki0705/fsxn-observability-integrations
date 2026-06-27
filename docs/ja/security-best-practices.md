@@ -1,4 +1,4 @@
-# FSxN Observability Integrations セキュリティベストプラクティス
+# FSx for ONTAP Observability Integrations セキュリティベストプラクティス
 
 ## 概要
 
