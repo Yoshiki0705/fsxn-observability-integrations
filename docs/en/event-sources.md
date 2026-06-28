@@ -2,21 +2,25 @@
 
 ## Overview
 
-This project supports **three event sources** from FSx for ONTAP.
+This project supports **four event sources** from FSx for ONTAP.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │ FSx for ONTAP Event Sources                                         │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  1. Audit Logs (File Access Auditing)                               │
+│  1. File Access Audit Logs                                          │
 │     → S3 Bucket → EventBridge → Lambda → Vendor                    │
 │                                                                     │
-│  2. EMS (Event Management System)                                   │
+│  2. Admin Audit Logs (NEW — Syslog VPCE)                            │
+│     → Syslog → VPC Endpoint → CloudWatch Logs                      │
+│     (No EC2/Lambda required for AWS-native path)                    │
+│                                                                     │
+│  3. EMS (Event Management System)                                   │
 │     → Webhook → API Gateway → Lambda → Vendor                      │
 │     → CloudWatch Events → EventBridge → Lambda → Vendor            │
 │                                                                     │
-│  3. FPolicy (File Screening)                                        │
+│  4. FPolicy (File Screening)                                        │
 │     → TCP:9898 → ECS Fargate → SQS → EventBridge → Lambda → Vendor│
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -24,7 +28,7 @@ This project supports **three event sources** from FSx for ONTAP.
 
 ---
 
-## 1. Audit Logs (File Access Auditing)
+## 1. File Access Audit Logs
 
 ### Target Events
 - File/directory access (EventID 4663)
@@ -42,7 +46,74 @@ See Step 2 in the [Prerequisites Guide](prerequisites.md).
 
 ---
 
-## 2. EMS (Event Management System)
+## 2. Admin Audit Logs (Management Activity — Syslog VPCE)
+
+### Target Events
+- ONTAP CLI command execution (SSH sessions)
+- REST API calls (POST/GET/PATCH/DELETE)
+- Privilege escalation (`set -privilege diagnostic`)
+- Login/logout events
+- Configuration changes (volume create, policy modify, etc.)
+
+### Delivery Path (AWS-Native — No EC2 Required)
+
+```
+FSx for ONTAP (cluster log-forwarding)
+    │ Syslog (TCP port 1514 or 6514)
+    ▼
+VPC Endpoint (com.amazonaws.{region}.syslog-logs)
+    │ AWS PrivateLink
+    ▼
+CloudWatch Logs (/syslog/fsxn-admin-audit)
+```
+
+This path is fully managed — no Lambda, no EC2, no agents. CloudWatch Logs automatically parses syslog fields (facility, severity, hostname, appName, message).
+
+### Key Advantages Over EC2 Syslog
+
+| Aspect | EC2 syslog-ng (legacy) | Syslog VPC Endpoint (new) |
+|--------|----------------------|--------------------------|
+| Compute | EC2 instance(s) | None (managed service) |
+| Cost | ~$66/month (EC2+EBS) | ~$8/month (VPCE + CW Logs) |
+| Patching | Monthly OS updates | None |
+| HA | Manual multi-AZ setup | Multi-AZ ENIs built-in |
+| Deploy time | Hours | 15 minutes |
+
+### Configuration
+
+**CloudFormation**: `shared/templates/syslog-vpce-cloudwatch.yaml`
+
+**ONTAP REST API**:
+```bash
+curl -sk -u fsxadmin:<password> \
+  -X POST "https://<mgmt-ip>/api/security/audit/destinations?force=true" \
+  -H "Content-Type: application/json" \
+  -d '{"address":"<VPCE_ENI_IP>","port":1514,"protocol":"tcp_unencrypted","facility":"local7"}'
+```
+
+**Protocol options**:
+
+| Protocol | Port | ONTAP parameter | When to use |
+|----------|------|-----------------|-------------|
+| TCP+TLS | 6514 | `tcp_encrypted` | Production (encrypted) |
+| TCP plaintext | 1514 | `tcp_unencrypted` | Initial validation, PrivateLink-only networks |
+
+### Optional: Fan-out to Vendors
+
+```
+CloudWatch Logs → Subscription Filter → Lambda → Datadog/Splunk/SIEM
+CloudWatch Logs → Subscription Filter → Firehose → Splunk/S3
+```
+
+### Setup Guide
+
+See [Syslog VPCE Setup Guide](syslog-vpce-setup-guide.md) for full step-by-step instructions.
+
+References: [AWS Docs - Syslog ingestion](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CWL_Syslog.html) | [NetApp - Audit destinations](https://docs.netapp.com/us-en/ontap/system-admin/forward-command-history-log-file-destination-task.html)
+
+---
+
+## 3. EMS (Event Management System)
 
 ### Target Events
 
@@ -111,7 +182,7 @@ References: [AWS Docs - Monitoring FSx for ONTAP](https://docs.aws.amazon.com/fs
 
 ---
 
-## 3. FPolicy (File Screening)
+## 4. FPolicy (File Screening)
 
 ### Target Events
 
@@ -229,9 +300,10 @@ References: [NetApp FPolicy API](https://library.netapp.com/ecmdocs/ECMLP2886776
 
 | Use Case | Event Source | Recommended Pattern |
 |----------|-------------|-------------------|
-| Compliance audit | Audit Logs | S3 → EventBridge → Lambda |
+| Compliance audit (file access) | File Access Audit Logs | S3 → EventBridge → Lambda |
+| Admin activity audit | Admin Audit Logs | Syslog VPCE → CloudWatch Logs |
 | Ransomware detection alert | EMS (ARP/AI) | Webhook → API GW → Lambda |
 | Capacity management alert | EMS (Quota) | CloudWatch → EventBridge → Lambda |
 | Real-time file monitoring | FPolicy | TCP:9898 → ECS Fargate → SQS → EventBridge → Lambda |
 | DLP (Data Loss Prevention) | FPolicy (sync) | TCP:9898 → ECS Fargate → Decision |
-| Security SIEM integration | Audit Logs + EMS | Combined pattern |
+| Security SIEM integration | All sources | CloudWatch Logs hub → Subscription → SIEM |
