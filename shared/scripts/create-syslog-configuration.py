@@ -86,6 +86,20 @@ def main():
     )
     args = parser.parse_args()
 
+    # Input validation
+    if not args.vpce_id.startswith("vpce-"):
+        print(
+            f"❌ Invalid VPC Endpoint ID: {args.vpce_id} (must start with 'vpce-')",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if not args.log_group_arn.startswith("arn:aws:logs:"):
+        print(
+            f"❌ Invalid Log Group ARN: {args.log_group_arn} (must start with 'arn:aws:logs:')",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     print(f"Creating Syslog Configuration:")
     print(f"  VPC Endpoint: {args.vpce_id}")
     print(f"  Log Group:    {args.log_group_arn}")

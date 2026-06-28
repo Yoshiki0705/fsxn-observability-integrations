@@ -187,12 +187,12 @@ Outputs:
     Description: >
       REQUIRED: Configure ONTAP log-forwarding.
       SSH to FSx management endpoint and run:
-      security audit log-forwarding create -destination <VPCE_ENI_IP> -port 1514 -protocol tcp-unencrypted -facility local7
-      (Use port 6514 + tcp-encrypted for production with TLS)
+      security audit log-forwarding create -destination <VPCE_ENI_IP> -port 6514 -protocol tcp-encrypted -facility local7
+      (Use port 1514 + tcp-unencrypted as fallback if TLS validation fails)
     Value: !Sub >
       ssh fsxadmin@<FSx-Management-IP>
       "security audit log-forwarding create
       -destination <VPCE_ENI_IP>
-      -port 1514
-      -protocol tcp-unencrypted
+      -port 6514
+      -protocol tcp-encrypted
       -facility local7"

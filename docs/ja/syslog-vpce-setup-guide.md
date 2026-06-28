@@ -123,6 +123,8 @@ curl -sk -u fsxadmin:<PASSWORD> \
 
 ### Option B: SSH + ONTAP CLI
 
+> **CLI コマンド名の注意**: ONTAP 9.11.1 以降では `cluster log-forwarding` コマンドが `security audit log-forwarding` に変更されています。FSx for ONTAP（9.11.1+）では `security audit log-forwarding` を使用してください。古いドキュメントや記事で `cluster log-forwarding` と記載されている場合がありますが、同じ機能です。
+
 ```bash
 ssh fsxadmin@<FSx-Management-IP>
 
@@ -141,10 +143,15 @@ FsxId*> security audit log-forwarding show
 
 | プロトコル | ポート | ONTAP パラメータ | 推奨用途 |
 |-----------|--------|-----------------|---------|
-| TCP + TLS | 6514 | `tcp-encrypted` | 本番環境（暗号化必須時） |
-| TCP Plaintext | 1514 | `tcp-unencrypted` | 初期検証、PrivateLink 内で完結する場合 |
+| TCP + TLS | 6514 | `tcp-encrypted` | **本番環境（推奨）** — 暗号化あり |
+| TCP Plaintext | 1514 | `tcp-unencrypted` | 初期検証用フォールバック |
 
 > **検証での知見**: TCP plaintext (1514) は追加の証明書設定なしで動作確認できます。TLS (6514) の場合、ONTAP がサーバー証明書（AWS 管理の Amazon Trust Services 証明書）を検証するため、ONTAP ノードが CA を信頼していることを確認してください。PrivateLink 経由のため通信経路自体は VPC 内に閉じています。
+
+> **本番環境向けセキュリティ強化**:
+> - **Security Group を FSx サブネット CIDR に限定**: テンプレートデフォルトの VPC CIDR (`10.0.0.0/16`) を、FSx for ONTAP が配置されたサブネットの CIDR（例: `10.0.3.0/24`）に狭めてください。
+> - **認証情報の取り扱い**: `curl -u fsxadmin:<PASSWORD>` のようにコマンドラインにパスワードを渡すのは検証用です。本番では Secrets Manager から取得し、環境変数経由で渡してください。
+> - **TLS を使用**: 本番では `tcp-encrypted` (ポート 6514) を使用してください。PrivateLink 内であっても defense-in-depth として暗号化を推奨します。
 
 ---
 
@@ -239,6 +246,35 @@ aws logs delete-log-group \
 ---
 
 ## 次のステップ
+
+### 運用監視（推奨）
+
+Syslog パイプライン自体の健全性を監視するため、以下の CloudWatch メトリクスとアラームを設定してください:
+
+```bash
+# SyslogMessagesDropped メトリクスを監視するアラーム
+aws cloudwatch put-metric-alarm \
+  --alarm-name "FSx-ONTAP-SyslogDropped" \
+  --metric-name SyslogMessagesDropped \
+  --namespace AWS/Logs \
+  --statistic Sum \
+  --period 300 \
+  --threshold 1 \
+  --comparison-operator GreaterThanOrEqualToThreshold \
+  --evaluation-periods 1 \
+  --dimensions Name=LogGroupName,Value=/syslog/fsxn-admin-audit \
+  --alarm-actions <SNS_TOPIC_ARN> \
+  --region ap-northeast-1
+```
+
+| メトリクス | 意味 | アラーム閾値案 |
+|-----------|------|-------------|
+| `SyslogMessagesDropped` | 配信失敗で破棄されたメッセージ数 | > 0 (5 分間) |
+| `IncomingLogEvents` | 受信ログイベント数 | < 1 (1 時間) で「ログ到着停止」検知 |
+
+> **ヒント**: ONTAP の fsx-control-plane は定期的にアクセスチェックを実行するため、通常はログが常時到着します。1 時間以上ログがない場合、VPCE 接続や ONTAP 設定に問題がある可能性があります。
+
+### その他の次のステップ
 
 - **CloudWatch Alarms**: 特定操作（権限昇格、ユーザー作成等）をメトリクスフィルタで検知
 - **Subscription Filter**: CloudWatch Logs → Lambda → Datadog/Splunk/SIEM へ二次配信
