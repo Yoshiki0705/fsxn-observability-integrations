@@ -17,11 +17,11 @@
 
 > **What "serverless" means in this series**: Minimizing server management and undifferentiated collector operations — not forcing every component into Lambda. FPolicy requires a persistent TCP listener, so we use ECS Fargate (serverless containers). Event decoupling uses SQS. Short-lived processing uses Lambda. Each AWS service is chosen for its operational characteristics, not to satisfy a "Lambda-only" constraint.
 
-## Three Telemetry Paths
+## Four Telemetry Paths
 
-This project supports three ONTAP telemetry sources:
+This project supports four ONTAP telemetry sources:
 
-### Path 1: Audit Logs (S3 AP + EventBridge Scheduler)
+### Path 1: File Access Audit Logs (S3 AP + EventBridge Scheduler)
 ```
 ONTAP Audit Logs → S3 Access Point → EventBridge Scheduler → Lambda → Vendor API
 ```
@@ -29,7 +29,17 @@ ONTAP Audit Logs → S3 Access Point → EventBridge Scheduler → Lambda → Ve
 - **Latency**: Near-real-time (depends on Scheduler interval, typically 5 minutes)
 - **Format**: EVTX / XML
 
-### Path 2: EMS Events (Webhook)
+### Path 2: Admin Audit Logs (Syslog VPC Endpoint → CloudWatch Logs)
+```
+ONTAP log-forwarding → Syslog (TCP 1514/6514) → VPC Endpoint → CloudWatch Logs
+```
+- **Use case**: Management activity tracking (CLI/API operations)
+- **Latency**: Real-time (seconds)
+- **Format**: RFC 3164 syslog (auto-parsed by CloudWatch)
+- **Compute**: None (fully managed, no Lambda/EC2)
+- **Optional fan-out**: CloudWatch Logs → Subscription Filter → Lambda/Firehose → Vendor
+
+### Path 3: EMS Events (Webhook)
 ```
 ONTAP EMS → Webhook (HTTPS) → API Gateway → Lambda → Vendor API
 ```
@@ -37,7 +47,7 @@ ONTAP EMS → Webhook (HTTPS) → API Gateway → Lambda → Vendor API
 - **Latency**: Real-time (~30 seconds)
 - **Format**: JSON
 
-### Path 3: FPolicy File Operations (ECS Fargate)
+### Path 4: FPolicy File Operations (ECS Fargate)
 ```
 ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Vendor API
 ```
@@ -48,13 +58,14 @@ ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Vendor API
 
 ## ONTAP Telemetry Source Selection Guide
 
-| Requirement | Best Source | Latency |
-|-------------|------------|---------|
-| Compliance file access history | Audit logs | Near-real-time (Scheduler interval) |
-| Ransomware detection | ARP via EMS | Real-time (webhook) |
-| Real-time file operation detail | FPolicy | Real-time (TCP) |
-| Operational alerting (quota, HA, volume full) | EMS | Real-time (webhook) |
-| Vendor-neutral pipeline | OpenTelemetry | Configuration-dependent |
+| Requirement | Best Source | Latency | Compute |
+|-------------|------------|---------|---------|
+| Compliance file access history | File access audit logs | Near-real-time (Scheduler interval) | Lambda |
+| Admin activity audit | Admin audit logs (syslog) | Real-time (seconds) | None (managed) |
+| Ransomware detection | ARP via EMS | Real-time (webhook) | Lambda |
+| Real-time file operation detail | FPolicy | Real-time (TCP) | Fargate + Lambda |
+| Operational alerting (quota, HA, volume full) | EMS | Real-time (webhook) | Lambda |
+| Vendor-neutral pipeline | OpenTelemetry | Configuration-dependent | Collector + Lambda |
 
 ## Component Details
 
