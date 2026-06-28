@@ -2,21 +2,25 @@
 
 ## 概要
 
-本プロジェクトは FSx for ONTAP の**3つのイベントソース**に対応しています。
+本プロジェクトは FSx for ONTAP の**4つのイベントソース**に対応しています。
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │ FSx for ONTAP イベントソース                                          │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  1. 監査ログ (File Access Auditing)                                  │
+│  1. ファイルアクセス監査ログ                                           │
 │     → S3 バケット → EventBridge → Lambda → Vendor                   │
 │                                                                     │
-│  2. EMS (Event Management System)                                   │
+│  2. 管理監査ログ (NEW — Syslog VPCE)                                 │
+│     → Syslog → VPC Endpoint → CloudWatch Logs                      │
+│     (EC2/Lambda 不要の AWS ネイティブパス)                             │
+│                                                                     │
+│  3. EMS (Event Management System)                                   │
 │     → Webhook → API Gateway → Lambda → Vendor                      │
 │     → CloudWatch Events → EventBridge → Lambda → Vendor            │
 │                                                                     │
-│  3. FPolicy (ファイルスクリーニング)                                    │
+│  4. FPolicy (ファイルスクリーニング)                                    │
 │     → TCP:9898 → ECS Fargate → SQS → EventBridge → Lambda → Vendor │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -24,7 +28,7 @@
 
 ---
 
-## 1. 監査ログ (File Access Auditing)
+## 1. ファイルアクセス監査ログ
 
 ### 対象イベント
 - ファイル/ディレクトリのアクセス (EventID 4663)
@@ -42,7 +46,57 @@ FSx for ONTAP (vserver audit) → S3 バケット → EventBridge → Lambda →
 
 ---
 
-## 2. EMS (Event Management System)
+## 2. 管理監査ログ (Management Activity — Syslog VPCE)
+
+### 対象イベント
+- ONTAP CLI コマンド実行（SSH セッション）
+- REST API 呼び出し（POST/GET/PATCH/DELETE）
+- 権限昇格（`set -privilege diagnostic`）
+- ログイン/ログアウト
+- 構成変更（ボリューム作成、ポリシー変更等）
+
+### 配信パス（AWS ネイティブ — EC2 不要）
+
+```
+FSx for ONTAP (cluster log-forwarding)
+    │ Syslog (TCP port 1514 or 6514)
+    ▼
+VPC Endpoint (com.amazonaws.{region}.syslog-logs)
+    │ AWS PrivateLink
+    ▼
+CloudWatch Logs (/syslog/fsxn-admin-audit)
+```
+
+Lambda も EC2 も不要のフルマネージドパスです。CloudWatch Logs が syslog フィールド（facility, severity, hostname, appName, message）を自動パースします。
+
+### EC2 Syslog との比較
+
+| 観点 | EC2 syslog-ng（従来） | Syslog VPC Endpoint（新） |
+|------|-------------------|--------------------------|
+| コンピュート | EC2 インスタンス | なし（マネージド） |
+| コスト | ~$66/月 | ~$8/月 |
+| パッチ適用 | 月次 | 不要 |
+| HA | 手動マルチ AZ | マルチ AZ ENI 組み込み |
+
+### 設定
+
+**CloudFormation**: `shared/templates/syslog-vpce-cloudwatch.yaml`
+
+**ONTAP REST API**:
+```bash
+curl -sk -u fsxadmin:<password> \
+  -X POST "https://<mgmt-ip>/api/security/audit/destinations?force=true" \
+  -H "Content-Type: application/json" \
+  -d '{"address":"<VPCE_ENI_IP>","port":1514,"protocol":"tcp_unencrypted","facility":"local7"}'
+```
+
+### セットアップガイド
+
+詳細は [Syslog VPCE セットアップガイド](syslog-vpce-setup-guide.md) を参照。
+
+---
+
+## 3. EMS (Event Management System)
 
 ### 対象イベント
 
@@ -111,7 +165,7 @@ FSx for ONTAP EMS → CloudWatch Events → EventBridge Rule → Lambda → Vend
 
 ---
 
-## 3. FPolicy (ファイルスクリーニング)
+## 4. FPolicy (ファイルスクリーニング)
 
 ### 対象イベント
 

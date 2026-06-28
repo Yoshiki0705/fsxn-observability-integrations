@@ -32,11 +32,11 @@
                  └──────────────────────┘
 ```
 
-## 3つのテレメトリパス
+## 4つのテレメトリパス
 
-本プロジェクトは ONTAP の3つのテレメトリソースに対応します:
+本プロジェクトは ONTAP の4つのテレメトリソースに対応します:
 
-### パス 1: 監査ログ（S3 AP + EventBridge Scheduler）
+### パス 1: ファイルアクセス監査ログ（S3 AP + EventBridge Scheduler）
 ```
 ONTAP 監査ログ → S3 Access Point → EventBridge Scheduler → Lambda → Vendor API
 ```
@@ -44,7 +44,17 @@ ONTAP 監査ログ → S3 Access Point → EventBridge Scheduler → Lambda → 
 - **レイテンシ**: ニアリアルタイム（Scheduler 間隔依存、通常5分）
 - **形式**: EVTX / XML
 
-### パス 2: EMS イベント（Webhook）
+### パス 2: 管理監査ログ（Syslog VPC Endpoint → CloudWatch Logs）
+```
+ONTAP log-forwarding → Syslog (TCP 1514/6514) → VPC Endpoint → CloudWatch Logs
+```
+- **用途**: 管理アクティビティの記録（CLI/API 操作）
+- **レイテンシ**: リアルタイム（秒単位）
+- **形式**: RFC 3164 syslog（CloudWatch が自動パース）
+- **コンピュート**: なし（フルマネージド、Lambda/EC2 不要）
+- **オプション**: CloudWatch Logs → Subscription Filter → Lambda/Firehose → Vendor
+
+### パス 3: EMS イベント（Webhook）
 ```
 ONTAP EMS → Webhook (HTTPS) → API Gateway → Lambda → Vendor API
 ```
@@ -52,7 +62,7 @@ ONTAP EMS → Webhook (HTTPS) → API Gateway → Lambda → Vendor API
 - **レイテンシ**: リアルタイム（~30秒）
 - **形式**: JSON
 
-### パス 3: FPolicy ファイル操作（ECS Fargate）
+### パス 4: FPolicy ファイル操作（ECS Fargate）
 ```
 ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Vendor API
 ```
@@ -65,13 +75,14 @@ ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Vendor API
 
 ## ONTAP テレメトリソース選択ガイド
 
-| 要件 | 最適ソース | レイテンシ |
-|------|-----------|----------|
-| コンプライアンス向けファイルアクセス履歴 | 監査ログ | ニアリアルタイム（Scheduler 間隔依存） |
-| ランサムウェア検知 | ARP via EMS | リアルタイム（webhook） |
-| イベント駆動ファイル操作詳細 | FPolicy | イベント駆動（TCP） |
-| 運用アラート（クォータ、HA、ボリューム満杯） | EMS | リアルタイム（webhook） |
-| ベンダーニュートラルパイプライン | OpenTelemetry | 構成依存 |
+| 要件 | 最適ソース | レイテンシ | コンピュート |
+|------|-----------|----------|-----------|
+| コンプライアンス向けファイルアクセス履歴 | ファイルアクセス監査ログ | ニアリアルタイム | Lambda |
+| 管理アクティビティ監査 | 管理監査ログ (syslog) | リアルタイム（秒） | なし（マネージド） |
+| ランサムウェア検知 | ARP via EMS | リアルタイム（webhook） | Lambda |
+| イベント駆動ファイル操作詳細 | FPolicy | イベント駆動（TCP） | Fargate + Lambda |
+| 運用アラート（クォータ、HA、ボリューム満杯） | EMS | リアルタイム（webhook） | Lambda |
+| ベンダーニュートラルパイプライン | OpenTelemetry | 構成依存 | Collector + Lambda |
 
 ## コンポーネント詳細
 
