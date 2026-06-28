@@ -37,7 +37,11 @@ os.environ.setdefault("SPLUNK_SOURCE", "fsxn-observability")
 os.environ.setdefault("VERIFY_SSL", "true")
 os.environ.setdefault("LOG_LEVEL", "DEBUG")
 
-# Add lambda directory to path for imports
+# Isolate this vendor's handler module: purge any previously cached handler
+# so that `import handler` in test files resolves to THIS vendor's lambda/.
+_handler_modules = ["handler", "ems_handler", "fpolicy_handler"]
+for _m in _handler_modules:
+    sys.modules.pop(_m, None)
 LAMBDA_DIR = Path(__file__).parent.parent / "lambda"
 if str(LAMBDA_DIR) not in sys.path:
     sys.path.insert(0, str(LAMBDA_DIR))

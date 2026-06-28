@@ -8,8 +8,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Add lambda directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "lambda"))
+# Isolate this vendor's handler module: purge any previously cached handler
+# so that `import handler` in test files resolves to THIS vendor's lambda/.
+_handler_modules = ["handler", "ems_handler", "fpolicy_handler"]
+for _m in _handler_modules:
+    sys.modules.pop(_m, None)
+_lambda_dir = str(Path(__file__).parent.parent / "lambda")
+if _lambda_dir not in sys.path:
+    sys.path.insert(0, _lambda_dir)
 
 
 @pytest.fixture(autouse=True)
