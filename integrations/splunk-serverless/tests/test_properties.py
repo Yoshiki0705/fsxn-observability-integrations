@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -15,6 +16,7 @@ from botocore.exceptions import ClientError
 from hypothesis import given, settings, assume
 from hypothesis import strategies as st
 
+sys.modules.pop("handler", None)
 import handler
 
 
@@ -441,6 +443,7 @@ def test_response_count_accuracy(logs: list[dict[str, Any]]) -> None:
 # Feature: splunk-serverless-e2e-verification, Property 7: EMS Event Formatting and Forwarding
 # **Validates: Requirements 5.1, 5.2**
 
+sys.modules.pop("ems_handler", None)
 import ems_handler
 
 # --- Strategies for Property 7 ---

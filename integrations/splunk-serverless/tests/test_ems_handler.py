@@ -33,6 +33,7 @@ os.environ.setdefault(
 
 # Add lambda directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "lambda"))
+sys.modules.pop("ems_handler", None)
 
 import ems_handler
 
