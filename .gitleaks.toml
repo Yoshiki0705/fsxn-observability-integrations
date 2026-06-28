@@ -14,6 +14,17 @@ paths = [
   '''docs/blog/''',
   '''.kiro/''',
   '''AGENTS.md''',
+  '''integrations/.*/tests/''',
+  '''shared/test-data/''',
+  '''examples/''',
+  '''docs/.*/verification-results-.*\.md''',
+  '''scripts/verification/''',
+  '''integrations/.*/scripts/''',
+  '''docs/''',
+  '''scripts/''',
+  '''shared/scripts/''',
+  '''shared/lambda-layers/.*/tests/''',
+  '''integrations/.*/README\.md''',
 ]
 regexTarget = "line"
 regexes = [
@@ -23,6 +34,9 @@ regexes = [
   '''placeholder''',
   '''example''',
   '''CIDR''',
+  '''sample''',
+  '''test''',
+  '''fixture''',
 ]
 
 [[rules]]
@@ -49,10 +63,12 @@ regexes = [
   '''123456789012''',
   '''000000000000''',
   '''placeholder''',
+  '''example''',
 ]
 paths = [
   '''.kiro/''',
   '''docs/blog/''',
+  '''integrations/.*/template.*\.yaml''',
 ]
 
 [allowlist]
@@ -62,4 +78,8 @@ paths = [
   '''package-lock.json''',
   '''.hypothesis/''',
   '''.playwright-mcp/''',
+  '''management-console/tests/''',
+  '''integrations/.*/tests/''',
+  '''scripts/verification/tests/''',
+  '''shared/scripts/datadog-screenshot-continuation-prompt\.md''',
 ]

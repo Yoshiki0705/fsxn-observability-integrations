@@ -53,10 +53,6 @@ jobs:
         run: npx jest --passWithNoTests
 
       - name: Python tests - All vendors
-        # Note: Some tests have pre-existing failures (223/393).
-        # Tests run correctly now (import collision fixed) but need code fixes.
-        # TODO: Fix failing tests and remove continue-on-error
-        continue-on-error: true
         env:
           AWS_DEFAULT_REGION: ap-northeast-1
           AWS_ACCESS_KEY_ID: testing
@@ -64,22 +60,21 @@ jobs:
           AWS_SECURITY_TOKEN: testing
           AWS_SESSION_TOKEN: testing
         run: |
-          python -m pytest \
-            integrations/datadog/tests/ \
-            integrations/grafana/tests/ \
-            integrations/splunk-serverless/tests/ \
-            integrations/otel-collector/tests/ \
-            integrations/new-relic/tests/ \
-            integrations/elastic/tests/ \
-            integrations/dynatrace/tests/ \
-            integrations/sumo-logic/tests/ \
-            integrations/honeycomb/tests/ \
-            integrations/crowdstrike/tests/ \
-            --import-mode=importlib \
-            -v --tb=short \
-            --cov=integrations \
-            --cov-report=term-missing \
-            --cov-report=html:coverage-html
+          FAILED=0
+          for vendor in datadog grafana splunk-serverless otel-collector new-relic elastic dynatrace sumo-logic honeycomb crowdstrike; do
+            echo "::group::Testing $vendor"
+            python -m pytest "integrations/$vendor/tests/" \
+              -v --tb=short \
+              --cov=integrations/$vendor \
+              --cov-append \
+              --cov-report= || FAILED=1
+            echo "::endgroup::"
+          done
+          python -m pytest --cov-report=term-missing --cov-report=html:coverage-html --co -q 2>/dev/null || true
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::One or more vendor test suites failed"
+            exit 1
+          fi
 
       - name: Python tests - Shared Lambda Layers
         env:
@@ -91,7 +86,6 @@ jobs:
         run: |
           python -m pytest \
             shared/lambda-layers/ems-parser/tests/ \
-            --import-mode=importlib \
             -v --tb=short
 
       - name: Python tests - Shared Parser (log-parser v1.1.0)

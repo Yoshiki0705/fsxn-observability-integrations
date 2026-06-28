@@ -457,7 +457,7 @@ FirehoseDeliveryStream:
 Snowflake は [OpenFlow ListenOTLP プロセッサ](https://docs.snowflake.com/en/user-guide/data-integration/openflow/processors/listenotlp) やコミュニティレシーバー（[snowflake-opentelemetry-receiver](https://github.com/KellerKev/snowflake-opentelemetry-receiver)）を通じて OTLP データを受信できます。既存の Snowflake データレイクハウス内で FSx for ONTAP 監査ログの SQL ベースセキュリティ分析が可能になります。
 
 ```yaml
-# 例: OTel Collector Snowflake exporter（コミュニティパス）
+# Example: OTel Collector exporter for Snowflake (community path)
 exporters:
   otlphttp/snowflake:
     endpoint: https://<account>.snowflakecomputing.com/v1/otlp

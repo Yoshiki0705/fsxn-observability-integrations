@@ -16,7 +16,6 @@ from hypothesis import strategies as st
 
 # Add lambda directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "lambda"))
-sys.modules.pop("handler", None)
 
 import handler
 
