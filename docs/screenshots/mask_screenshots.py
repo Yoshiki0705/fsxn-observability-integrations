@@ -753,6 +753,104 @@ def mask_honeycomb_screenshot():
     print(f"  ✅ {filepath.name}: マスク完了")
 
 
+def mask_log_alarm_screenshots():
+    """CloudWatch Log Alarm 系スクリーンショットのマスク処理。
+
+    対象ファイル (いずれも 1512x861, 同一ブラウザセッション):
+      - 01-cloudwatch-alarms-list.png
+      - 02-log-alarm-detail-insufficient-data.png
+      - 02-log-alarm-detail-with-query.png
+      - 03-logs-insights-query-result.png
+      - 04-log-alarm-state-ok.png
+
+    マスク対象:
+      - 上部ナビバー右端のアカウントボタン
+        （アカウント ID 末尾 + IAM ユーザー名を表示するパネル）
+
+    アカウントパネルは x = width-280 から始まり、リージョンセレクタ
+    "Asia Pacific (Tokyo)" はその左（width-290 以左）にあるため、
+    width-286 から右端までをナビバー背景色で塗りつぶすことで
+    リージョンセレクタを損なわずアカウント情報のみを除去できる。
+    """
+    log_alarm_files = [
+        "01-cloudwatch-alarms-list.png",
+        "02-log-alarm-detail-insufficient-data.png",
+        "02-log-alarm-detail-with-query.png",
+        "03-logs-insights-query-result.png",
+        "04-log-alarm-state-ok.png",
+    ]
+    navbar_color = (22, 29, 38)
+
+    for filename in log_alarm_files:
+        filepath = SCRIPT_DIR / filename
+        if not filepath.exists():
+            print(f"  ⏭️  {filename}: ファイルが見つかりません")
+            continue
+
+        img = Image.open(filepath).convert("RGB")
+        width, height = img.size
+        print(f"  📐 {filename}: {width}x{height}")
+
+        # アカウントボタン領域（ナビバー右端）
+        account_box = (width - 286, 0, width, 58)
+        mask_region(img, account_box, color=navbar_color)
+
+        img.save(filepath)
+        print(f"  ✅ {filename}: マスク完了（アカウントボタン）")
+
+
+def mask_syslog_vpce_screenshots():
+    """syslog-vpce/ 配下 CloudWatch スクリーンショットのマスク処理。
+
+    対象ファイル (いずれも 3360x1812, Retina 2x):
+      - 01-cloudwatch-log-group-overview.png
+      - 02-cloudwatch-log-events-ontap-audit.png
+
+    マスク対象 (すべて白背景 (255,255,255) で塗りつぶし):
+      01:
+        - ARN 詳細内の AWS アカウント ID（12 桁）
+        - ログストリーム名内の VPC エンドポイント ID (vpce-...)
+      02:
+        - パンくずリスト内の VPC エンドポイント ID (vpce-...)
+        - ログメッセージ列に繰り返し現れる FSx ファイルシステム ID
+          (FsxId... = fs-...) を含む送信元ホスト名の縦帯
+
+    注: ナビバーはアカウント情報テキストを含まない新レイアウトのため
+    ナビバーマスクは不要。
+    """
+    white = (255, 255, 255)
+
+    # --- 01: log group overview ---
+    fp01 = SCRIPT_DIR / "syslog-vpce" / "01-cloudwatch-log-group-overview.png"
+    if fp01.exists():
+        img = Image.open(fp01).convert("RGB")
+        width, height = img.size
+        print(f"  📐 syslog-vpce/{fp01.name}: {width}x{height}")
+        # ARN 詳細内のアカウント ID（":" に続く 12 桁）
+        mask_region(img, (1024, 556, 1214, 596), color=white)
+        # ログストリーム名（VPC エンドポイント ID を含む）全体
+        mask_region(img, (686, 1626, 1380, 1678), color=white)
+        img.save(fp01)
+        print(f"  ✅ syslog-vpce/{fp01.name}: マスク完了（アカウント ID + vpce ID）")
+    else:
+        print(f"  ⏭️  syslog-vpce/{fp01.name}: ファイルが見つかりません")
+
+    # --- 02: log events ---
+    fp02 = SCRIPT_DIR / "syslog-vpce" / "02-cloudwatch-log-events-ontap-audit.png"
+    if fp02.exists():
+        img = Image.open(fp02).convert("RGB")
+        width, height = img.size
+        print(f"  📐 syslog-vpce/{fp02.name}: {width}x{height}")
+        # パンくずリスト末尾セグメント（VPC エンドポイント ID を含むストリーム名）全体
+        mask_region(img, (1014, 126, 1700, 172), color=white)
+        # ログメッセージ列の FsxId ホスト名（2 箇所/行）を全行にわたって覆う縦帯
+        mask_region(img, (1496, 564, 2268, 1718), color=white)
+        img.save(fp02)
+        print(f"  ✅ syslog-vpce/{fp02.name}: マスク完了（vpce ID + FsxId 列）")
+    else:
+        print(f"  ⏭️  syslog-vpce/{fp02.name}: ファイルが見つかりません")
+
+
 def main(target_dir: Path | None = None) -> None:
     """Run all masking operations.
 
@@ -794,6 +892,12 @@ def main(target_dir: Path | None = None) -> None:
     print("\n--- マルチバックエンド検証分 ---")
     mask_grafana_cloud_screenshot()
     mask_honeycomb_screenshot()
+
+    print("\n--- CloudWatch Log Alarm 検証分 ---")
+    mask_log_alarm_screenshots()
+
+    print("\n--- syslog VPC エンドポイント検証分 ---")
+    mask_syslog_vpce_screenshots()
 
     # Phase 2: PNG metadata stripping (all files)
     print()
