@@ -465,6 +465,7 @@ All scripts use environment variables with sensible defaults:
 - `shared/templates/sqs-buffering.yaml` — SQS buffer + DLQ + alarms (Level 3)
 - `shared/templates/secrets-rotation-sample.yaml` — Auto-rotation Lambda (all vendors)
 - `shared/templates/multi-account-stackset.yaml` — StackSets deployment (Enterprise)
+- `shared/templates/cloudwatch-log-alarm.yaml` — CloudWatch Log Alarm (`AWS::CloudWatch::LogAlarm`, GA 2026-07); direct log-to-alarm, no metric filter. cfn-lint E3006 expected until spec update.
 
 ### Security & CI
 - `guard/rules/critical-security.guard` — Blocking cfn-guard rules (wildcard IAM, secrets in env, DLQ encryption)
@@ -475,6 +476,8 @@ All scripts use environment variables with sensible defaults:
 - `shared/scripts/fpolicy-fargate-control.sh` — FPolicy Fargate start/stop/status
 - `shared/scripts/fpolicy-update-engine-ip.sh` — ONTAP Engine IP auto-update
 - `shared/fpolicy-server/build-and-push.sh` — ECR image build (linux/amd64 required)
+- `shared/scripts/deploy-log-alarm.sh` — Deploy CloudWatch Log Alarm (env-var driven; CLI has no `put-log-alarm` yet, use CFN)
+- `shared/scripts/cleanup-log-alarm.sh` — Delete Log Alarm stacks (`--all`, `--delete-sns`, `-y`)
 - `docs/screenshots/mask_screenshots.py` — Screenshot masking (PII removal)
 
 ### Documentation (key docs for understanding the project)
