@@ -62,3 +62,34 @@ For advanced detection, correlate across sources:
 1. **ARP alert + FPolicy bulk operations** — Confirms ransomware activity with file-level detail
 2. **Failed access spike + successful access from new IP** — Potential credential compromise
 3. **Quota warning + bulk write from single user** — Possible data exfiltration or abuse
+
+---
+
+## CloudWatch Log Alarm Native Detection (GA 2026-07)
+
+CloudWatch Log Alarm enables creating alarms directly from CloudWatch Logs without metric filters.
+
+### Scope
+
+- **Admin audit logs** (Syslog VPC Endpoint → CloudWatch Logs): ✅ Directly usable
+- **File access audit logs** (S3 bucket → Lambda): Requires separate pipeline to CloudWatch Logs
+
+### Detection Patterns
+
+| Pattern | Query | Threshold | Use Case |
+|---------|-------|-----------|----------|
+| Sensitive path access | `filter @message like /\/vol\/data\/confidential/` | > 0 | Compliance |
+| Auth failure spike | `filter @message like /Failure/` | > 10 | Unauthorized access |
+| Bulk deletion | `filter @message like /DELETE/` | > 50 | Ransomware indicator |
+| Privileged user ops | `filter @message like /fsxadmin/` | > 0 | Internal controls |
+
+### Deploy
+
+```bash
+DETECTION_TYPE=sensitive-file-access \
+TARGET_PATTERN="/vol/data/confidential" \
+CREATE_SNS_TOPIC=true \
+  bash shared/scripts/deploy-log-alarm.sh
+```
+
+Details: [CloudWatch Log Alarm Setup Guide](./cloudwatch-log-alarm.md)

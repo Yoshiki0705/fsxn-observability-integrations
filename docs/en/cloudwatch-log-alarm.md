@@ -3,6 +3,17 @@
 > **Template**: `shared/templates/cloudwatch-log-alarm.yaml`
 > **Prerequisite**: FSx for ONTAP admin audit logs flowing to CloudWatch Logs ([Syslog VPC Endpoint Setup](./syslog-vpce-setup-guide.md))
 > **AWS Announcement**: 2026-07-01
+> **Time to deploy**: ~5 min deploy, ~10 min first evaluation (15 min total to verify)
+
+---
+
+## Quick Start Success Criteria
+
+| # | Checkpoint | Method |
+|---|-----------|--------|
+| 1 | CloudFormation stack CREATE_COMPLETE | `aws cloudformation describe-stacks` |
+| 2 | Alarm state transitions INSUFFICIENT_DATA → OK | Console or CLI (wait 5-10 min) |
+| 3 | Test operation triggers ALARM + SNS notification | Run ONTAP CLI operation, check email |
 
 ---
 
@@ -424,14 +435,29 @@ Log Alarm uses M-out-of-N evaluation:
 
 ## Cost Estimate
 
-| Item | Cost | Notes |
-|------|------|-------|
-| Log Alarm | $0.30/alarm/month | Same as standard CloudWatch Alarm |
-| Scheduled Query | Depends on data scanned | $0.0076/GB scanned |
-| SNS notification | $0.50/1M emails | First 1,000 emails free |
+### Log Alarm Standalone
+
+| Log Volume/Day | Monthly Estimate | Notes |
+|---------------|-----------------|-------|
+| 100 MB | ~$6.6 | Small environment |
+| 500 MB | ~$33 | Medium environment |
+| 1 GB | ~$66 | Large environment |
+
+### Comparison with Metric Filter Approach
+
+| Item | Metric Filter Approach | Log Alarm Approach |
+|------|----------------------|-------------------|
+| Custom metric | ~$0.30/metric/month | Not needed |
+| Alarm | ~$0.10/alarm/month | ~$0.30/alarm/month |
+| Scheduled Query | Not needed | $0.0076/GB scanned |
+| **Total (100MB/day)** | **~$3** | **~$6.6** |
+
+Log Alarm costs ~2x more but provides:
+- Log lines in notifications → **faster investigation** (reduces labor cost)
+- Retroactive queries → **applies to existing logs**
+- Single-step setup → **reduced operational complexity**
 
 5-minute interval × 1 alarm × 288 executions/day.
-If log volume is 100MB/day: 100MB × 288 × $0.0076/GB ≈ **$0.22/day ≈ $6.6/month**.
 
 > **Cost optimization**: Increase `EvaluationFrequencyMinutes` or add `limit` to queries to reduce scan volume.
 
@@ -518,6 +544,33 @@ To account for log delivery latency, set `StartTimeOffset` slightly longer than 
 ### CloudWatch Log Alarm vs OTel Collector Alert Rules
 
 This project also provides OTel Collector paths for log delivery to vendors. Selection guidance:
+
+### Selection Flowchart
+
+```mermaid
+flowchart TD
+    A[Need log-based alerting] --> B{Need time-series metrics on dashboards?}
+    B -->|Yes| C[Metric Filter approach]
+    B -->|No| D{Need Anomaly Detection?}
+    D -->|Yes| C
+    D -->|No| E{Need Metric Math across multiple metrics?}
+    E -->|Yes| C
+    E -->|No| F{Need advanced correlation or dashboards?}
+    F -->|Yes| G[OTel Collector + Vendor alert rules]
+    F -->|No| H[CloudWatch Log Alarm ✅]
+```
+
+### Pipeline Positioning
+
+| Path | Best for | Additional Infra | Cost |
+|------|---------|-----------------|------|
+| **Log Alarm** (this template) | Simple threshold alerts, immediate detection | None (managed) | ~$6.6/month (100MB/day) |
+| **Lambda → Vendor** | Advanced dashboards, correlation, SIEM | Lambda | Vendor billing dependent |
+| **OTel Collector** | Multi-backend, PII redaction, protocol translation | Collector | Collector ops + vendor |
+
+> Log Alarm does not "complete" your monitoring. Use it as first-alert for security detection, then investigate in detail with vendor tools (Datadog/Splunk/Grafana).
+
+### Detailed Comparison
 
 | Aspect | CloudWatch Log Alarm | OTel + Vendor Alerts |
 |--------|---------------------|---------------------|
