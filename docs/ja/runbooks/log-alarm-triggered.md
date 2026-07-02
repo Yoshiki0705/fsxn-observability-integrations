@@ -167,6 +167,7 @@ fields @timestamp, @message
 - `EvaluationFrequencyMinutes` を短縮（5 → 1 分）
 - クエリのフィルタパターンを拡張
 - `AlarmThreshold` を下げる
+- **疎なパターンに注意**: `stats count(*)` は 0 件のとき結果行を返さない（欠損扱い）。イベントが評価ウィンドウに入らないと発火しないため、頻度を短くしてウィンドウの取りこぼしを減らす（詳細は[セットアップガイドの落とし穴節](../cloudwatch-log-alarm.md#よくある落とし穴-疎なパターンは-alarm-になりにくいe2e-検証で確認)）
 
 ### コストが高い場合
 

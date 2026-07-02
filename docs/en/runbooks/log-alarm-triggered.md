@@ -166,6 +166,10 @@ Unauthorized operation → Confirm with manager → Escalate if needed (Step 3)
 - Decrease `EvaluationFrequencyMinutes` (5 → 1 min)
 - Broaden query filter patterns
 - Lower `AlarmThreshold`
+- **Watch for sparse patterns**: `stats count(*)` returns no result row on zero matches
+  (treated as missing). The alarm only fires when a match lands in an evaluation window,
+  so shorten the frequency to reduce window gaps (see the [setup guide pitfall
+  section](../cloudwatch-log-alarm.md#common-pitfall-sparse-patterns-rarely-reach-alarm-confirmed-in-e2e))
 
 ### High Cost
 
