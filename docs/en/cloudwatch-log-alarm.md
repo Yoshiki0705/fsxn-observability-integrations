@@ -490,17 +490,34 @@ When `ActionLogLineCount > 0`, alarm notifications include matching log lines. T
 - Limit SNS topic subscribers to minimum required
 - Enable encryption (SSE-KMS) on the SNS topic
 
-### KMS-Encrypted Log Groups
+### KMS-Encrypted Log Groups (Confirmed in E2E)
 
-If the CloudWatch Logs log group is KMS-encrypted, `ScheduledQueryExecutionRole` requires additional KMS `Decrypt` permissions:
+**Conclusion: `ScheduledQueryExecutionRole` does NOT need `kms:Decrypt`.** Decryption is
+performed by the CloudWatch Logs service via the KMS key policy, so the role only needs
+its `logs:*` query permissions.
+
+Instead, grant decryption to the CloudWatch Logs service principal in the **KMS key
+policy**:
 
 ```json
 {
+  "Sid": "AllowCloudWatchLogs",
   "Effect": "Allow",
-  "Action": ["kms:Decrypt"],
-  "Resource": "arn:aws:kms:<region>:<account-id>:key/<key-id>"
+  "Principal": { "Service": "logs.<region>.amazonaws.com" },
+  "Action": ["kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:Describe*"],
+  "Resource": "*",
+  "Condition": {
+    "ArnEquals": {
+      "kms:EncryptionContext:aws:logs:arn": "arn:aws:logs:<region>:<account-id>:log-group:<log-group-name>"
+    }
+  }
 }
 ```
+
+> **Verified (2026-07-02)**: Created a Log Alarm against a KMS-encrypted log group with a
+> role that has **no** `kms:Decrypt`. With only the key policy above, the alarm evaluated
+> successfully (transitioned to ALARM on a match and fired the SNS action), not
+> INSUFFICIENT_DATA. The role does not need `kms:Decrypt`.
 
 ### SNS Topic Access Policy
 
