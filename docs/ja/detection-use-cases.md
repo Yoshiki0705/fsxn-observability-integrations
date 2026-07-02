@@ -62,3 +62,34 @@ Action: ログレビュー + ユーザー確認
 1. **ARP アラート + FPolicy 大量操作** — ファイルレベルの詳細でランサムウェア活動を確認
 2. **アクセス失敗スパイク + 新規 IP からの成功アクセス** — 認証情報漏洩の可能性
 3. **クォータ警告 + 単一ユーザーからの大量書き込み** — データ持ち出しまたは不正利用の可能性
+
+---
+
+## CloudWatch Log Alarm によるネイティブ検知（2026-07 GA）
+
+CloudWatch Log Alarm を使用すると、CloudWatch Logs に配信された監査ログに対してメトリクスフィルターなしで直接アラームを作成できます。
+
+### 対象
+
+- **管理監査ログ** (Syslog VPC Endpoint → CloudWatch Logs): ✅ そのまま利用可能
+- **ファイルアクセス監査ログ** (S3 bucket → Lambda): CloudWatch Logs への転送パイプラインが別途必要
+
+### 検知パターン例
+
+| パターン | クエリ | 閾値 | 用途 |
+|---------|--------|------|------|
+| 機密パスアクセス | `filter @message like /\/vol\/data\/confidential/` | > 0 | コンプライアンス |
+| 認証失敗スパイク | `filter @message like /Failure/` | > 10 | 不正アクセス検知 |
+| 大量削除 | `filter @message like /DELETE/` | > 50 | ランサムウェア兆候 |
+| 特権ユーザー操作 | `filter @message like /fsxadmin/` | > 0 | 内部統制 |
+
+### デプロイ
+
+```bash
+DETECTION_TYPE=sensitive-file-access \
+TARGET_PATTERN="/vol/data/confidential" \
+CREATE_SNS_TOPIC=true \
+  bash shared/scripts/deploy-log-alarm.sh
+```
+
+詳細: [CloudWatch Log Alarm セットアップガイド](./cloudwatch-log-alarm.md)
