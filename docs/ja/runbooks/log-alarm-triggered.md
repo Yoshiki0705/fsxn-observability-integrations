@@ -26,6 +26,8 @@ CloudWatch Console → Alarms → 該当アラーム → History タブ
 - Query 結果の数値（count）
 - マッチしたログ件数
 
+> **注**: 疎なパターン（`count(*) > 0`）のアラームは、マッチを含むウィンドウが評価された瞬間だけ ALARM になり直後に OK へ戻る（フラップする）ことがあります。OK に戻っていても、OK→ALARM 遷移時に SNS 通知は発報済みです。History タブで過去の遷移を確認してください。
+
 ### 1.3 Logs Insights で詳細調査
 
 ```
