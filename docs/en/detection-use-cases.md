@@ -72,7 +72,7 @@ CloudWatch Log Alarm enables creating alarms directly from CloudWatch Logs witho
 ### Scope
 
 - **Admin audit logs** (Syslog VPC Endpoint → CloudWatch Logs): ✅ Directly usable
-- **File access audit logs** (S3 bucket → Lambda): Requires separate pipeline to CloudWatch Logs
+- **File access audit logs** (FSx for ONTAP S3 AP → EventBridge Scheduler → Lambda): Requires separate pipeline to CloudWatch Logs
 
 ### Detection Patterns
 

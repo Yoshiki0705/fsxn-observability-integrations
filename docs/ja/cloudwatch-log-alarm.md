@@ -33,7 +33,7 @@ FSx for ONTAP には 2 種類の監査ログがあります。本テンプレー
 | ログ種別 | 配信経路 | フォーマット | Log Alarm 対象 |
 |---------|---------|------------|--------------|
 | **管理監査ログ** (Admin Audit) | Syslog → VPC Endpoint → CloudWatch Logs | Syslog テキスト | ✅ 本テンプレート |
-| **ファイルアクセス監査ログ** (File Access Audit) | S3 バケット → Lambda → 各ベンダー | EVTX / XML バイナリ | ❌ 別パイプライン |
+| **ファイルアクセス監査ログ** (File Access Audit) | FSx for ONTAP S3 AP → EventBridge Scheduler → Lambda → 各ベンダー | EVTX / XML バイナリ | ❌ 別パイプライン |
 
 管理監査ログには ONTAP CLI/API の操作記録が含まれます（例: ボリューム操作、Snapshot 操作、ユーザー管理、セキュリティ設定変更）。
 

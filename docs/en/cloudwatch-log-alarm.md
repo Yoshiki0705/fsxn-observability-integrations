@@ -33,7 +33,7 @@ FSx for ONTAP has two types of audit logs. This template primarily targets **adm
 | Log Type | Delivery Path | Format | Log Alarm Target |
 |----------|-------------|--------|-----------------|
 | **Admin Audit Logs** | Syslog → VPC Endpoint → CloudWatch Logs | Syslog text | ✅ This template |
-| **File Access Audit Logs** | S3 bucket → Lambda → Vendors | EVTX / XML binary | ❌ Separate pipeline |
+| **File Access Audit Logs** | FSx for ONTAP S3 AP → EventBridge Scheduler → Lambda → Vendors | EVTX / XML binary | ❌ Separate pipeline |
 
 Admin audit logs contain ONTAP CLI/API operation records (e.g., volume operations, Snapshot operations, user management, security configuration changes).
 
