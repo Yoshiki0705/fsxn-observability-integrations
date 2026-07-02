@@ -246,6 +246,8 @@ ONTAP System Manager is accessible via NetApp Console and enables browser-based 
 ### Operations & Production
 - [Pipeline SLO Definitions](pipeline-slo.md)
 - [Operational Guide](operational-guide.md)
+- [CloudWatch Log Alarm](cloudwatch-log-alarm.md)
+- [Log Alarm Triggered Runbook](runbooks/log-alarm-triggered.md)
 - [DLQ Replay Runbook](runbooks/dlq-replay.md)
 - [Lambda Errors Runbook](runbooks/lambda-errors.md)
 - [Checkpoint Staleness Runbook](runbooks/checkpoint-stale.md)

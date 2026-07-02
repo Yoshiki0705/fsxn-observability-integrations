@@ -518,6 +518,10 @@ policy**:
 > role that has **no** `kms:Decrypt`. With only the key policy above, the alarm evaluated
 > successfully (transitioned to ALARM on a match and fired the SNS action), not
 > INSUFFICIENT_DATA. The role does not need `kms:Decrypt`.
+>
+> **Note**: The `cloudwatch-log-alarm.yaml` template does not modify the policy of an
+> existing external KMS key. For a KMS-encrypted log group, apply the key policy grant
+> above **separately** yourself.
 
 ### SNS Topic Access Policy
 

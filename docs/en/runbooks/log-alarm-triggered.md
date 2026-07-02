@@ -26,6 +26,11 @@ CloudWatch Console → Alarms → Target alarm → History tab
 - Query result value (count)
 - Number of matched log entries
 
+> **Note**: Sparse-pattern alarms (`count(*) > 0`) may enter ALARM only during the window
+> that contains a match and return to OK right after (flapping). Even if it shows OK now,
+> the SNS notification already fired on the OK→ALARM transition. Check the History tab for
+> past transitions.
+
 ### 1.3 Logs Insights Deep Dive
 
 ```
