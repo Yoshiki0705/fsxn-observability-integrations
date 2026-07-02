@@ -490,17 +490,28 @@ Log Alarm は約 2 倍のコストですが、以下で回収可能:
 - SNS トピックの購読者を最小限に制限
 - SNS トピックに暗号化（SSE-KMS）を設定
 
-### KMS 暗号化されたロググループ
+### KMS 暗号化されたロググループ（E2E 検証で確認）
 
-CloudWatch Logs ロググループが KMS で暗号化されている場合、`ScheduledQueryExecutionRole` に KMS の `Decrypt` 権限が追加で必要です:
+**結論: `ScheduledQueryExecutionRole` に `kms:Decrypt` は不要です。** 復号は CloudWatch Logs サービスが KMS キーポリシー経由で行うため、ロールに必要なのは `logs:*` のクエリ権限だけです。
+
+代わりに、**KMS キーポリシー**で CloudWatch Logs サービスプリンシパルに復号を許可します:
 
 ```json
 {
+  "Sid": "AllowCloudWatchLogs",
   "Effect": "Allow",
-  "Action": ["kms:Decrypt"],
-  "Resource": "arn:aws:kms:<region>:<account-id>:key/<key-id>"
+  "Principal": { "Service": "logs.<region>.amazonaws.com" },
+  "Action": ["kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:Describe*"],
+  "Resource": "*",
+  "Condition": {
+    "ArnEquals": {
+      "kms:EncryptionContext:aws:logs:arn": "arn:aws:logs:<region>:<account-id>:log-group:<log-group-name>"
+    }
+  }
 }
 ```
+
+> **検証（2026-07-02）**: `kms:Decrypt` を**持たない**ロールで、KMS 暗号化ロググループに対する Log Alarm を作成。上記キーポリシーのみで、アラームは INSUFFICIENT_DATA ではなく正常に評価され（マッチ時に ALARM へ遷移し SNS 通知も発火）、クエリ成功を確認しました。ロール側の `kms:Decrypt` は不要です。
 
 ### SNS トピックのアクセスポリシー
 

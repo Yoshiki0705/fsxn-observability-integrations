@@ -117,10 +117,13 @@ Parameters:
       0 = any matching event triggers alarm (count > 0).
 
   EvaluationFrequencyMinutes:
-    Type: Number
-    Default: 5
-    AllowedValues: [1, 5, 10, 15, 30, 60]
-    Description: How often the query runs (minutes).
+    Type: String
+    Default: '5'
+    AllowedValues: ['1', '5', '10', '15', '30', '60']
+    Description: >
+      How often the query runs (minutes). String type so !FindInMap reliably
+      matches the string keys in FrequencyToSeconds (a Number Ref does not
+      match string map keys — confirmed in E2E 2026-07-02).
 
   QueryResultsToEvaluate:
     Type: Number
@@ -235,7 +238,7 @@ Resources:
         ScheduledQueryRoleARN: !GetAtt ScheduledQueryExecutionRole.Arn
         AggregationExpression: 'count(*)'
         ScheduleConfiguration:
-          ScheduleExpression: !Sub rate(${EvaluationFrequencyMinutes} minutes)
+          ScheduleExpression: !FindInMap [FrequencyToSeconds, !Ref EvaluationFrequencyMinutes, Rate]
           StartTimeOffset: !FindInMap [FrequencyToSeconds, !Ref EvaluationFrequencyMinutes, Seconds]
       AlarmActions:
         - !Ref AlarmSnsTopicArn
@@ -266,7 +269,7 @@ Resources:
         ScheduledQueryRoleARN: !GetAtt ScheduledQueryExecutionRole.Arn
         AggregationExpression: 'count(*)'
         ScheduleConfiguration:
-          ScheduleExpression: !Sub rate(${EvaluationFrequencyMinutes} minutes)
+          ScheduleExpression: !FindInMap [FrequencyToSeconds, !Ref EvaluationFrequencyMinutes, Rate]
           StartTimeOffset: !FindInMap [FrequencyToSeconds, !Ref EvaluationFrequencyMinutes, Seconds]
       AlarmActions:
         - !Ref AlarmSnsTopicArn
@@ -297,7 +300,7 @@ Resources:
         ScheduledQueryRoleARN: !GetAtt ScheduledQueryExecutionRole.Arn
         AggregationExpression: 'count(*)'
         ScheduleConfiguration:
-          ScheduleExpression: !Sub rate(${EvaluationFrequencyMinutes} minutes)
+          ScheduleExpression: !FindInMap [FrequencyToSeconds, !Ref EvaluationFrequencyMinutes, Rate]
           StartTimeOffset: !FindInMap [FrequencyToSeconds, !Ref EvaluationFrequencyMinutes, Seconds]
       AlarmActions:
         - !Ref AlarmSnsTopicArn
@@ -328,7 +331,7 @@ Resources:
         ScheduledQueryRoleARN: !GetAtt ScheduledQueryExecutionRole.Arn
         AggregationExpression: 'count(*)'
         ScheduleConfiguration:
-          ScheduleExpression: !Sub rate(${EvaluationFrequencyMinutes} minutes)
+          ScheduleExpression: !FindInMap [FrequencyToSeconds, !Ref EvaluationFrequencyMinutes, Rate]
           StartTimeOffset: !FindInMap [FrequencyToSeconds, !Ref EvaluationFrequencyMinutes, Seconds]
       AlarmActions:
         - !Ref AlarmSnsTopicArn
@@ -354,7 +357,7 @@ Resources:
         ScheduledQueryRoleARN: !GetAtt ScheduledQueryExecutionRole.Arn
         AggregationExpression: !Ref CustomAggregation
         ScheduleConfiguration:
-          ScheduleExpression: !Sub rate(${EvaluationFrequencyMinutes} minutes)
+          ScheduleExpression: !FindInMap [FrequencyToSeconds, !Ref EvaluationFrequencyMinutes, Rate]
           StartTimeOffset: !FindInMap [FrequencyToSeconds, !Ref EvaluationFrequencyMinutes, Seconds]
       AlarmActions:
         - !Ref AlarmSnsTopicArn
@@ -362,22 +365,32 @@ Resources:
       ActionLogLineRoleArn: !If [IncludeLogLines, !GetAtt LogLineRole.Arn, !Ref 'AWS::NoValue']
 
 Mappings:
-  # Note: Parameter EvaluationFrequencyMinutes is Type: Number but FindInMap
-  # works correctly because CloudFormation stringifies the value when used as
-  # a map key. Confirmed working in E2E deploy (2026-07-02).
+  # EvaluationFrequencyMinutes is Type: String so !Ref returns a string that
+  # reliably matches these string keys. (A Number Ref does not match string map
+  # keys — the ScheduleExpression FindInMap silently failed and produced an
+  # invalid rate; confirmed and fixed in E2E 2026-07-02.)
+  #
+  # Rate strings use singular "minute" for value 1: AWS rejects "rate(1 minutes)"
+  # with "Use singular unit with value 1".
   FrequencyToSeconds:
     '1':
       Seconds: 60
+      Rate: rate(1 minute)
     '5':
       Seconds: 300
+      Rate: rate(5 minutes)
     '10':
       Seconds: 600
+      Rate: rate(10 minutes)
     '15':
       Seconds: 900
+      Rate: rate(15 minutes)
     '30':
       Seconds: 1800
+      Rate: rate(30 minutes)
     '60':
       Seconds: 3600
+      Rate: rate(60 minutes)
 
 Outputs:
   AlarmArn:
