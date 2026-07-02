@@ -528,6 +528,28 @@ To verify the alarm fires correctly:
 2. Confirm syslog delivery (event reaches CloudWatch Logs)
 3. Wait for next scheduled execution (up to `EvaluationFrequencyMinutes`) and verify alarm fires
 
+### Common Pitfall: Sparse Patterns Rarely Reach ALARM (Confirmed in E2E)
+
+You created a `count(*) > 0` (threshold 0) alarm, but it stays OK forever and never
+reaches ALARM. We hit this exact behavior during E2E validation. Two causes:
+
+1. **`stats count(*)` returns *no result row* when zero events match** (not a row with
+   value `0`, but no row at all). This is treated as missing data, and with
+   `TreatMissingData: notBreaching` it is evaluated as OK.
+2. **The alarm only fires when at least one match lands inside an evaluation window.**
+   If a pattern produces only ~12 matches per hour, most 5-minute windows have zero
+   matches. In our test, 5 of 6 consecutive windows had 0 matches; only 1 had 4.
+
+So detecting sparse events with `count(*) > 0` means the alarm enters ALARM only during
+the window that actually contains a match, then returns to OK right after. SNS still
+fires on the OK→ALARM transition, so detection works — but **to verify behavior
+reliably, use a dense pattern (e.g., `ssh`, hundreds of matches per 10 min) or generate
+a burst of matching events right before testing.**
+
+> For "always want to know when it happens" use cases, this behavior is fine (a single
+> match triggers the notification). It is not suited for visualizing "has been OK for a
+> sustained period."
+
 ### StartTimeOffset Recommendations
 
 To account for log delivery latency, set `StartTimeOffset` slightly longer than the query frequency:
