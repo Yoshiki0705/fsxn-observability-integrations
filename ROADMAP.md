@@ -74,6 +74,7 @@ Target: 2027 H1
 | 14 | System Manager Reality Check: GUI vs CLI vs Observability | Draft |
 | 15 | CrowdStrike Falcon LogScale via HEC — Parser v1.1.0 | Ready for publication |
 | 16 | Datadog Paid Plan: Pipeline, Monitors, and Detection Workflows | Planned |
+| 17 | Alerting on Audit Logs with CloudWatch Log Alarms (no metric filter) | Ready for publication |
 
 ## Contributing
 
