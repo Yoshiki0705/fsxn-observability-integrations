@@ -170,6 +170,48 @@ OTel Collector を使って、同一の監査ログを Grafana Cloud と Honeyco
 
 ---
 
+## シナリオ 7: CloudWatch Log Alarm によるネイティブ検知 (AWS ネイティブ)
+
+### ストーリー
+ベンダー製品を使わず、AWS だけで完結する検知。機密パスへのアクセスを 1 件でも検知したら即通知（`sensitive-file-access`）、および 5 分間に 50 件を超える削除でランサムウェアの兆候を検知（`bulk-delete-operations`）する。管理監査ログは前回構築した Syslog VPC エンドポイント経由で CloudWatch Logs に届いている前提。
+
+### 手順
+
+1. **準備**: 管理監査ログが CloudWatch Logs（`/syslog/fsxn-admin-audit`）に配信済み
+2. **デプロイ（機密ファイルアクセス検知）**:
+   ```bash
+   DETECTION_TYPE=sensitive-file-access \
+   TARGET_PATTERN="/vol/data/confidential" \
+   CREATE_SNS_TOPIC=true \
+   SNS_TOPIC_NAME=fsxn-security-alerts \
+     bash shared/scripts/deploy-log-alarm.sh
+   ```
+3. **デプロイ（大量削除検知）**:
+   ```bash
+   DETECTION_TYPE=bulk-delete-operations \
+   ALARM_THRESHOLD=50 \
+   QUERY_RESULTS_TO_ALARM=2 \
+   SNS_TOPIC_ARN=<YOUR_SNS_ARN> \
+     bash shared/scripts/deploy-log-alarm.sh
+   ```
+4. **確認（コンソール）**: CloudWatch → Alarms に「Log alarm」タイプで表示される
+
+   ![CloudWatch Alarms 一覧 — Log alarm タイプ表示](../screenshots/01-cloudwatch-alarms-list.png)
+
+5. **確認（実データ）**: Logs Insights でクエリを実行し、監査ログがヒットすることを確認（下は `/volume/` フィルタで 12 件マッチ、3,482 レコード scan）
+
+   ![Logs Insights — 監査ログのクエリ結果（/volume/ で 12 件マッチ）](../screenshots/03-logs-insights-query-result.png)
+
+### 期待される結果
+- 該当アクセスが無い間、アラームは「OK」を維持（INSUFFICIENT_DATA → OK 遷移を確認）
+- 機密パスへのアクセスや閾値超過の削除が発生すると ALARM に遷移し、SNS 経由で通知（`ActionLogLineCount` 設定時はマッチしたログ行も通知に含まれる）
+
+   ![Log alarm — 状態 OK（INSUFFICIENT_DATA → OK 遷移を確認）](../screenshots/04-log-alarm-state-ok.png)
+
+> 詳細な手順・検知プリセット（5 種）・IAM 要件は [CloudWatch Log Alarm ガイド](cloudwatch-log-alarm.md) を参照。
+
+---
+
 ## デモ環境セットアップチェックリスト
 
 - [ ] FSx for ONTAP ファイルシステム稼働中
