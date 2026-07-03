@@ -323,16 +323,21 @@ Aggregation: `count(*)` / Threshold: `> 0`
 
 ### Pattern 2: After-Hours Access Detection
 
+> ⚠️ **Timezone**: ONTAP syslog timestamps and `@timestamp` in Logs Insights are **UTC**. If your business hours are local (e.g., JST 09:00–18:00), you must shift by the UTC offset or the window is wrong — JST business hours 09–18 are **UTC 00–09**. Bake the offset into the query (JST = UTC+9), or your "after-hours" alarm fires all afternoon and stays silent overnight.
+
 ```
-fields @timestamp, @message
+# JST business hours (09:00-18:00 JST = 00:00-09:00 UTC).
+# Adjust +9h into the comparison so the window matches local hours.
+fields @timestamp, @message, (datefloor(@timestamp, 1h) + 9h) as jst_hour
 | filter @message like /\/vol\/data\//
-| filter datefloor(@timestamp, 1h) not between
-    concat(formatTimestamp(@timestamp, 'yyyy-MM-dd'), 'T09:00:00')
-    and concat(formatTimestamp(@timestamp, 'yyyy-MM-dd'), 'T18:00:00')
+| filter tomillis(jst_hour) % 86400000 < 32400000       # before 09:00 JST
+      or tomillis(jst_hour) % 86400000 >= 64800000      # at/after 18:00 JST
 | limit 20
 ```
 
 Aggregation: `count(*)` / Threshold: `> 0`
+
+> If your on-call and log analysis are all in one region/timezone, the simplest robust option is to store the offset as a stack parameter and generate the query, rather than hand-editing UTC boundaries.
 
 ### Pattern 3: Administrative Operations by Specific User
 
@@ -477,7 +482,22 @@ Log Alarm costs ~2x more but provides:
 
 5-minute interval × 1 alarm × 288 executions/day.
 
-> **Cost optimization**: Increase `EvaluationFrequencyMinutes` or add `limit` to queries to reduce scan volume.
+### How Cost Scales (read before fanning out)
+
+The table above is **per alarm**. Scan cost is driven by:
+
+```
+bytes scanned = (log group volume in the query window) × (query runs per day) × (number of alarms)
+```
+
+Each alarm runs its **own** Scheduled Query over the same log group, so ten alarms on one 100 MB/day log group is roughly **10×** the single-alarm figure — not a flat add-on. Model your estimate as *alarms × cadence × scan size*.
+
+Two levers keep it bounded:
+
+1. **Narrow each query** — `filter` early and add `limit` to reduce bytes scanned per run.
+2. **Consolidate** — where multiple detections share a query shape, combine them into fewer alarms instead of one alarm per pattern.
+
+> **Cost optimization**: Increase `EvaluationFrequencyMinutes` (15 min ≈ 1/3 of 5 min) or add `limit` to queries to reduce scan volume.
 
 ---
 
@@ -507,6 +527,34 @@ When `ActionLogLineCount > 0`, alarm notifications include matching log lines. T
 - For high-sensitivity logs, consider `ActionLogLineCount=0`
 - Limit SNS topic subscribers to minimum required
 - Enable encryption (SSE-KMS) on the SNS topic
+
+#### Regulated environments (healthcare / finance / public sector): default to `ActionLogLineCount=0`
+
+Once matched log lines enter SNS → email / Slack / PagerDuty, that data (usernames, file paths, client IPs — and in healthcare potentially **PHI**) has **left the CloudWatch boundary** and lands in systems that may not be in your compliance scope. For regulated data the safe default is:
+
+```yaml
+ActionLogLineCount: 0   # notify that something matched; keep the log lines in CloudWatch
+```
+
+Responders then pivot into Logs Insights (inside the audited boundary) for the detail. Treat `ActionLogLineCount > 0` as an explicit, reviewed decision when the notification path crosses a compliance boundary — not the default.
+
+> **Governance caveat**: This template provides a detection *mechanism*, not a compliance attestation. Whether a given alarm, retention setting, or notification path satisfies APPI / FISC / ISMAP / HIPAA is a determination for your compliance team, not something a CloudWatch feature confers. Classify the fields in your audit log (see [data-classification.md](./data-classification.md)) before wiring notifications.
+
+### Audit Trail of the Alert Itself
+
+For regulated environments, detection is only half the requirement — you also need evidence that the alarm fired and who was notified. Three records back this up; confirm their retention before relying on them:
+
+| Record | Where | Retention |
+|--------|-------|-----------|
+| Alarm state transitions (OK ↔ ALARM) | CloudWatch alarm history | **90 days** (fixed, not configurable) |
+| State-change events | EventBridge (CloudWatch Alarm state-change) → route to S3/Firehose or a log group | Your policy |
+| Alarm create/modify ("who configured this detection") | CloudTrail management events | Your CloudTrail policy |
+
+> If your compliance scope requires proving "the alert fired at T and paged on-call" for multiple years, capture the EventBridge state-change event to S3 with your retention policy — the 90-day alarm history alone will not satisfy multi-year evidence requirements.
+
+### Multi-Account Rollout
+
+The deployment examples are single-account. To roll the same Log Alarm baseline across many accounts (MSP fleets, org-wide guardrails), wrap the template in the [multi-account StackSets pattern](./multi-account-deployment.md): one `AWS::CloudWatch::LogAlarm` definition deployed to every target account/Region, with the SNS/PagerDuty topic per account or centralized via cross-account SNS.
 
 ### KMS-Encrypted Log Groups (Confirmed in E2E)
 
@@ -548,6 +596,144 @@ CloudWatch needs permission to publish to the SNS topic as an alarm action. For 
 ---
 
 ## Operational Notes
+
+### What the Admin Audit Log Can and Cannot See (scoping)
+
+The presets in the template default to the **admin audit log** (`/syslog/fsxn-admin-audit`), which records **management-plane** operations only. It does **not** contain end-user file I/O over NFS/SMB. Concretely:
+
+| Preset | On `/syslog/fsxn-admin-audit` it detects | It does NOT detect | For the "not" case, use |
+|--------|------------------------------------------|--------------------|--------------------------|
+| `bulk-delete-operations` | Admin-plane deletes (Snapshot delete, `volume delete`) | Ransomware encrypting/deleting user files over SMB | ONTAP ARP + FPolicy |
+| `sensitive-file-access` | An admin *command* referencing the path | A user opening the file | File-access audit / FPolicy |
+| `specific-user-activity` | Admin/CLI/API actions by the account | The account's NFS/SMB file access | File-access audit |
+
+To run these presets against **user file activity**, point `LogGroupName` at a log group where the **file-access audit log** (EVTX/XML parsed to text) has been landed — not the admin audit log group. See [Detection Use Cases](./detection-use-cases.md) for which source each detection belongs to.
+
+> System Manager (GUI) operations are executed via the ONTAP REST API internally, so they **are** captured in the admin audit log — a GUI-driven Snapshot delete is detected the same as a CLI one. (See Part 14 for the System Manager management-plane details.)
+
+### `security audit` — What Gets Captured
+
+What lands in the admin audit log is governed by ONTAP's `security audit` settings, **not** by log-forwarding. Read/GET operations are **off by default**:
+
+```
+security audit modify -cliget on -httpget on -ontapiget on
+```
+
+Without this, `sensitive-file-access` / `specific-user-activity` queries that rely on read operations return nothing. `cluster log-forwarding` only controls the destination — enable the right `security audit` categories first. (`cluster log-forwarding` also supports **multiple destinations**, so CloudWatch can be added alongside an existing on-prem SIEM without cutover.)
+
+### Native ONTAP EMS Alerting vs Pushing to CloudWatch (right tool)
+
+ONTAP EMS can notify **natively** — email and SNMP traps configured directly in ONTAP (`event notification destination` / `event notification`). You don't always need AWS in the path:
+
+| Keep it in ONTAP (EMS native email/SNMP) | Push to CloudWatch (syslog → Log Alarm) |
+|------------------------------------------|------------------------------------------|
+| Storage team already watches ONTAP; few events | You want alerts unified with AWS-side signals (Lambda errors, DLQ, pipeline health) |
+| No AWS-side correlation needed | You want Logs Insights queries, retroactive search, SNS→PagerDuty escalation |
+| Air-gapped / minimal cloud dependency | You want one on-call surface across storage + serverless pipeline |
+
+Neither is "better" — choose by where your operations team already lives.
+
+### Metrics vs Logs (don't conflate)
+
+Log Alarm is for **log/event text** (discrete audit/EMS events). Capacity and performance **trending** — volume utilization, IOPS, latency over time — belongs to **metrics**, via NetApp Harvest → Grafana or FSx for ONTAP CloudWatch metrics + metric alarms. Use Log Alarm to know "an admin deleted a Snapshot"; use metrics to know "this volume is 90% full and trending up." They are complementary, not substitutes.
+
+### Dead-Man's Switch (detect upstream syslog delivery failure)
+
+If ONTAP-side syslog delivery stops (network, VPC endpoint, or `log-forwarding` misconfig), a Log Alarm silently stays OK/INSUFFICIENT_DATA and your detection is dead without warning. Add a **heartbeat** alarm that fires when ingestion volume drops to zero:
+
+```
+fields @timestamp
+| stats count(*) as events by bin(15m)
+```
+
+Alarm on `events < 1` (with `TreatMissingData: breaching`) over the log group — for an actively-managed cluster there should always be *some* admin/EMS traffic. This catches "the pipeline died" independently of any content detection. Pair it with the Scheduled Query monitoring below.
+
+### DR / Multi-Region
+
+Log Alarms are **regional**. In an Active-Passive DR design, deploy the same Log Alarm stack in the DR Region so detection survives a failover, and so DR-side EMS events (`sms.vol.full` on the SnapMirror destination) are visible. See [cross-region-replication.md](./cross-region-replication.md).
+
+### Who Can Silence the Detection (tamper resistance)
+
+Detection you can't trust to still be running is not detection. A principal with CloudWatch/CloudFormation permissions can **delete the alarm or the log group** and silence everything — and the dead-man's-switch above catches *ingestion* stopping, not *alarm deletion*. Harden accordingly:
+
+- **Separate the "delete alarm / delete log group" permission** from day-to-day roles. Guard it with an SCP (deny `cloudwatch:DeleteAlarms`, `logs:DeleteLogGroup` on the detection resources except for a break-glass role).
+- **Detect alarm/log-group deletion** via CloudTrail management events → EventBridge → notify (an attacker who disables detection should itself trigger an alert).
+- **Prevent, don't just detect, on the storage side**: the admin-plane "Snapshot delete" detection pairs with **SnapLock** — tamper-proof (WORM) Snapshots that *cannot* be deleted before expiry. Detection tells you someone tried; SnapLock makes sure your recovery points survive the attempt. Treat them as prevention + detection, not either/or.
+
+### MITRE ATT&CK Mapping
+
+Mapping the detections to ATT&CK gives SOC teams a shared vocabulary and clarifies coverage:
+
+| Detection (this template) | ATT&CK Technique | Why it maps |
+|---------------------------|------------------|-------------|
+| Snapshot delete (admin audit) | **T1490 Inhibit System Recovery** | Deleting Snapshots removes restore points before ransomware/destruction |
+| Bulk admin delete / `volume delete` | **T1485 Data Destruction** | Management-plane destruction of data/volumes |
+| Privileged-user / `security login` changes | **T1078 Valid Accounts**, **T1098 Account Manipulation** | Stolen-credential use, role/account tampering |
+| Failed access spike | **T1110 Brute Force** | Repeated auth failures |
+| User-file encryption (ARP, Part 3) | **T1486 Data Encrypted for Impact** | Ransomware encryption at the storage layer |
+
+> Note the division of labor: T1486 (encryption) is ARP's job; **T1490 (Inhibit System Recovery)** — an attacker deleting Snapshots so you *can't* roll back the encryption — is exactly what the admin-audit Log Alarm adds. The two together close a gap either alone would leave.
+
+### Detection Coverage Map (one-slide view for leadership)
+
+| Plane | What an attacker does | Primary control | This project |
+|-------|----------------------|-----------------|--------------|
+| Storage | Encrypts user files | ARP (ML) | Part 3 |
+| File protocol | Mass delete/rename over NFS/SMB | FPolicy | Part 4 |
+| Admin/management | Deletes Snapshots, offlines volumes, alters accounts | Admin audit + Log Alarm | This article |
+| Recovery integrity | Removes restore points | SnapLock (prevention) | Complementary |
+
+### Query Validation (avoid silent false-negatives)
+
+A typo in a Logs Insights query produces a **silent no-match** — the alarm sits at OK forever and you believe you're covered. The dead-man's switch catches ingestion loss, not a bad query. Before deploying:
+
+1. Run the exact query in the **Logs Insights console** against a window you *know* contains a matching event; confirm a non-zero count.
+2. Generate a matching event (e.g., a test Snapshot delete on a scratch volume) and confirm the alarm transitions OK → ALARM.
+3. In CI, at minimum lint the query string and assert it is non-empty and references the intended log group; a full behavioral test requires a live log group with seeded events.
+
+### ONTAP Minimum Version & FSx Notes
+
+- EMS-over-syslog (`event notification destination create -syslog ...`) and admin-audit `cluster log-forwarding` are available on modern ONTAP 9.x; confirm the exact minor version on your FSx for ONTAP file system with `version` / `system node image show`.
+- **Multi-AZ vs Single-AZ**: node/stream naming differs (`FsxId...-01/-02` on Multi-AZ). Query the whole log group (see above) so AZ topology doesn't change your detection.
+- **`fsxadmin` scoping**: on FSx, `fsxadmin` is the primary admin. A `specific-user-activity` alarm on `fsxadmin` will match *all* admin activity — scope it to specific commands, or reserve it for genuinely separated roles.
+
+### Service Quotas
+
+CloudWatch limits the number of alarms and concurrent Scheduled Queries per account/Region. Before fanning out many presets (or many accounts via StackSets), check the current quotas in Service Quotas and request increases if your detection catalog is large.
+
+### Log Retention vs Query Window
+
+Retroactive queries only reach as far back as the **log group retention**. If retention is shorter than your query/evaluation window you get silent gaps; if it's very long you pay for storage you may not query. Set the log group retention deliberately (a common baseline for audit is 90–400 days depending on the compliance framework) and keep it ≥ your longest Log Alarm window.
+
+### Compliance Framework Breadth
+
+Beyond APPI / FISC / ISMAP / HIPAA, admin-audit alerting commonly supports evidence for **PCI-DSS Requirement 10** (audit trails / monitoring), **SOC 2** (CC7.2 detection of anomalies), and **ISO/IEC 27001 A.12.4** (logging and monitoring). As always this is a *mechanism*; which control it satisfies is your auditor's determination.
+
+### Notification Path Reliability & Encryption Boundary
+
+- **Delivery reliability**: the alarm firing is not the end — the SNS delivery can fail (unconfirmed subscription, endpoint 5xx, PagerDuty outage). Enable an SNS **delivery-status/DLQ** configuration on the topic and monitor `NumberOfNotificationsFailed` so a missed page doesn't go unnoticed.
+- **Encryption boundary**: SSE-KMS on the SNS topic and KMS on the log group protect data **at rest and in transit** — they do **not** protect the matched log lines once a human reads them in email/Slack/PagerDuty. KMS is not a substitute for the `ActionLogLineCount=0` decision in regulated environments.
+
+### Composite Alarms (reduce noise)
+
+To require two independent signals before paging, wrap a Log Alarm and a metric alarm in a **CloudWatch composite alarm** (`AWS::CloudWatch::CompositeAlarm`) with an `ALARM(logAlarm) AND ALARM(metricAlarm)` rule — e.g., "Snapshot-delete detected **and** volume throughput spiked". This cuts false pages where a single signal is ambiguous, at the cost of some sensitivity.
+
+### Multi-Node Log Streams (ONTAP)
+
+The admin audit log is cluster-scoped, but FSx for ONTAP delivers it **per node** — you will see streams prefixed `FsxId...-01`, `FsxId...-02`. Query the whole **log group** (do not pin `@logStream`) so the Log Alarm sees activity regardless of which node handled the request. An alarm scoped to a single stream silently misses half your traffic during HA takeover or normal LIF distribution.
+
+### Baselining a Threshold Before Enabling (bulk-delete, etc.)
+
+Scheduled bulk operations (nightly backups, batch ETL, archive cleanup) can legitimately exceed a count threshold and page on-call for nothing. Before enabling a count-based alarm in production, baseline your normal volume for a few days **without** an alarm action:
+
+```
+fields @timestamp, @message
+| filter @message like /delete/
+| stats count(*) as deletes by bin(5m)
+| sort deletes desc
+```
+
+Read the top `deletes` values (your routine peak), then set the threshold above it — or exclude known service accounts / maintenance windows in the query.
 
 ### Monitoring Scheduled Query Execution
 
@@ -678,7 +864,16 @@ ALARM (SNS notification fires)
 ### Caveats Discovered During Validation
 
 1. **AWS CLI not supported**: `put-log-alarm` not available in CLI v2.35.x. Use CloudFormation or Console
-2. **cfn-lint unrecognized**: `AWS::CloudWatch::LogAlarm` not in cfn-lint resource spec (E3006). Deploy works correctly
+2. **cfn-lint unrecognized**: `AWS::CloudWatch::LogAlarm` not in cfn-lint resource spec (E3006). Deploy works correctly. For CI/CoE standardization, suppress it **per resource** (not a blanket disable) so the check re-activates once the spec catches up:
+   ```yaml
+   SensitiveFileAccessAlarm:
+     Type: AWS::CloudWatch::LogAlarm
+     Metadata:
+       cfn-lint:
+         config:
+           ignore_checks: [E3006]
+   ```
+   Or in CI: `cfn-lint --ignore-checks E3006`. Note that drift detection will not cover a resource type the CLI cannot yet describe — treat CloudFormation as the single source of truth until the API surface completes.
 3. **Initial evaluation delay**: First query execution takes 5-10 min after stack creation
 4. **M-out-of-N**: With threshold > 0, alarm requires M consecutive breaches. For immediate detection, set `QueryResultsToAlarm=1`
 
