@@ -131,6 +131,24 @@ This enables "alert immediately when someone accesses a specific file" requireme
 
 ---
 
+## E2E Validation (Screenshots)
+
+We deployed the template in a real environment (Tokyo region) and confirmed the state transition end to end. Screenshots have account IDs / PII masked.
+
+In the console, the alarm appears as a new **"Log alarm"** type, distinct from existing metric alarms.
+
+![CloudWatch Alarms list — Log alarm type](../screenshots/01-cloudwatch-alarms-list.png)
+
+Running the query in Logs Insights shows the audit logs matching as real data (below: `/volume/` filter, 12 matches, 3,482 records scanned). The bar chart shows per-window counts.
+
+![Logs Insights — audit log query result (/volume/ filter, 12 matches, 3,482 records scanned)](../screenshots/03-logs-insights-query-result.png)
+
+The alarm stays **OK** while there is no matching access (INSUFFICIENT_DATA → OK transition confirmed). With a `> 0` threshold, it flips to ALARM the moment a single access to a sensitive path appears.
+
+![Log alarm — state OK (INSUFFICIENT_DATA → OK transition confirmed)](../screenshots/04-log-alarm-state-ok.png)
+
+---
+
 ## Deployment
 
 ### Deploy Script (Recommended)

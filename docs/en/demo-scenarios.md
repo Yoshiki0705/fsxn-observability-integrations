@@ -170,6 +170,48 @@ Alert immediately when files with specific extensions (.exe, .bat, .ps1) are cre
 
 ---
 
+## Scenario 7: Native Detection with CloudWatch Log Alarm (AWS-native)
+
+### Story
+Detection that stays entirely within AWS, no vendor product required. Alert the moment a single access to a sensitive path is detected (`sensitive-file-access`), and flag a ransomware indicator when deletions exceed 50 within 5 minutes (`bulk-delete-operations`). Assumes admin audit logs already reach CloudWatch Logs via the Syslog VPC endpoint built earlier.
+
+### Steps
+
+1. **Setup**: Admin audit logs delivered to CloudWatch Logs (`/syslog/fsxn-admin-audit`)
+2. **Deploy (sensitive file access detection)**:
+   ```bash
+   DETECTION_TYPE=sensitive-file-access \
+   TARGET_PATTERN="/vol/data/confidential" \
+   CREATE_SNS_TOPIC=true \
+   SNS_TOPIC_NAME=fsxn-security-alerts \
+     bash shared/scripts/deploy-log-alarm.sh
+   ```
+3. **Deploy (bulk delete detection)**:
+   ```bash
+   DETECTION_TYPE=bulk-delete-operations \
+   ALARM_THRESHOLD=50 \
+   QUERY_RESULTS_TO_ALARM=2 \
+   SNS_TOPIC_ARN=<YOUR_SNS_ARN> \
+     bash shared/scripts/deploy-log-alarm.sh
+   ```
+4. **Verify (console)**: CloudWatch → Alarms shows the alarm as a "Log alarm" type
+
+   ![CloudWatch Alarms list — Log alarm type](../screenshots/01-cloudwatch-alarms-list.png)
+
+5. **Verify (real data)**: Run the query in Logs Insights and confirm audit logs match (below: `/volume/` filter, 12 matches, 3,482 records scanned)
+
+   ![Logs Insights — audit log query result (/volume/ filter, 12 matches)](../screenshots/03-logs-insights-query-result.png)
+
+### Expected Result
+- While there is no matching access, the alarm stays **OK** (INSUFFICIENT_DATA → OK transition confirmed)
+- When sensitive-path access or a threshold-exceeding delete occurs, it transitions to ALARM and notifies via SNS (with `ActionLogLineCount` set, the matched log lines are included in the notification)
+
+   ![Log alarm — state OK (INSUFFICIENT_DATA → OK transition confirmed)](../screenshots/04-log-alarm-state-ok.png)
+
+> For full steps, the five detection presets, and IAM requirements, see the [CloudWatch Log Alarm guide](cloudwatch-log-alarm.md).
+
+---
+
 ## Demo Environment Checklist
 
 - [ ] FSx for ONTAP file system running
