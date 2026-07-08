@@ -174,6 +174,54 @@ ONTAP 認証情報を JSON として保存:
 
 ## デプロイ
 
+### デプロイ前チェックリスト
+
+デプロイ前に以下を確認してください（デプロイ失敗の最も一般的な原因）:
+
+| # | 確認事項 | 確認方法 | 不足時の対応 |
+|---|---------|---------|------------|
+| 1 | Secrets Manager に ONTAP パスワードが保存済み | `aws secretsmanager get-secret-value --secret-id <name>` | 作成: `{"username":"fsxadmin","password":"<pwd>"}` |
+| 2 | パスワードが実際の FSx for ONTAP と一致 | SSH で ONTAP に接続できるか | リセット: `aws fsx update-file-system --file-system-id <id> --ontap-configuration FsxAdminPassword=<new>` |
+| 3 | Lambda サブネットが ONTAP mgmt IP に到達可能 | 同一 VPC/サブネット | ルートテーブルを確認 |
+| 4 | SG が Lambda → ONTAP TCP 443 を許可 | ONTAP ENI の SG に Lambda SG からのイングレスがあるか | ルール追加（下記参照） |
+| 5 | VPC の DNS サポートが有効 | `aws ec2 describe-vpc-attribute --attribute enableDnsSupport` | `true` である必要あり |
+
+### パラメータ値の確認方法
+
+```bash
+# 1. FSx for ONTAP 管理 IP
+aws fsx describe-file-systems --file-system-ids <fs-id> \
+  --query 'FileSystems[0].OntapConfiguration.Endpoints.Management.IpAddresses[0]' \
+  --output text
+
+# 2. VPC とサブネット（FSx と同じ）
+aws fsx describe-file-systems --file-system-ids <fs-id> \
+  --query 'FileSystems[0].{VpcId:VpcId,SubnetIds:SubnetIds}' --output json
+
+# 3. SVM 名
+aws fsx describe-storage-virtual-machines \
+  --filters Name=file-system-id,Values=<fs-id> \
+  --query 'StorageVirtualMachines[].Name' --output text
+
+# 4. Secrets Manager ARN
+aws secretsmanager list-secrets --filters Key=name,Values=fsx \
+  --query 'SecretList[].ARN' --output text
+```
+
+### Security Group 設定（必須）
+
+ONTAP 管理エンドポイントの ENI に紐づく Security Group に、Lambda SG からの TCP 443 イングレスルールを追加:
+
+```bash
+# ONTAP ENI の Security Group を特定
+# aws fsx describe-file-systems → NetworkInterfaceIds → describe-network-interfaces
+
+# ルール追加: Lambda SG → ONTAP SG (TCP 443)
+aws ec2 authorize-security-group-ingress \
+  --group-id <ontap-eni-sg> \
+  --ip-permissions 'IpProtocol=tcp,FromPort=443,ToPort=443,UserIdGroupPairs=[{GroupId=<lambda-sg>,Description="Automated response Lambda"}]'
+```
+
 ### CloudFormation スタックのデプロイ
 
 ```bash
@@ -184,12 +232,61 @@ aws cloudformation deploy \
     OntapMgmtIp=<management-ip> \
     OntapCredentialsSecretArn=arn:aws:secretsmanager:<region>:<account>:secret:<name> \
     VpcId=<vpc-id> \
-    SubnetIds=<subnet-1>,<subnet-2> \
+    SubnetIds=<subnet-id> \
     SecurityGroupId=<sg-id> \
     DefaultSvmName=<svm-name> \
-    NotificationEmail=admin@example.com \
+    NotificationEmail=<your-email> \
+    CreateVpcEndpoints=true \
   --capabilities CAPABILITY_NAMED_IAM
 ```
+
+> **`CreateVpcEndpoints` パラメータ**: Secrets Manager と SNS のインターフェース VPC Endpoint をデフォルトで作成します。VPC 内の Lambda は VPC Endpoint（または NAT Gateway）なしでは AWS API に到達**できません**。既にこれらの VPC Endpoint がある場合は `false` に設定してください。
+
+### デプロイ後: Lambda Layer の接続
+
+ontap_response モジュールは Lambda Layer として提供されます（インラインコードには含まれません）:
+
+```bash
+# Layer zip をビルド
+bash shared/python/build-layer.sh
+
+# Lambda Layer として発行
+LAYER_ARN=$(aws lambda publish-layer-version \
+  --layer-name fsxn-shared-python \
+  --zip-file fileb://shared/python/dist/fsxn-shared-python-layer.zip \
+  --compatible-runtimes python3.12 \
+  --description "FSx for ONTAP shared modules" \
+  --query 'LayerVersionArn' --output text)
+
+# Lambda に接続
+aws lambda update-function-configuration \
+  --function-name fsxn-automated-response-handler \
+  --layers $LAYER_ARN
+```
+
+### デプロイ検証
+
+```bash
+# health_check を送信（5 秒以内に完了するはず）
+TOPIC_ARN=$(aws cloudformation describe-stacks \
+  --stack-name fsxn-automated-response \
+  --query 'Stacks[0].Outputs[?OutputKey==`TriggerTopicArn`].OutputValue' \
+  --output text)
+
+aws sns publish --topic-arn $TOPIC_ARN \
+  --message '{"action":"health_check","svm_name":"<svm-name>"}'
+
+# Lambda ログを確認（15 秒待機）
+sleep 15
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/fsxn-automated-response-handler \
+  --start-time $(( $(date +%s) - 30 ))000 \
+  --query 'events[-3:].message' --output text
+```
+
+**成功の指標**: Duration < 5秒、`timeout` なし、`ERROR` なし。
+
+**`timeout` が出る場合**: VPC Endpoint（Secrets Manager + SNS）と Security Group ルールを確認。
 
 ### 検知ソースの接続
 

@@ -71,11 +71,67 @@ Parameters:
       built-in protection list (fsxadmin, administrator, vsadmin, system).
     Default: ''
 
+  CreateVpcEndpoints:
+    Type: String
+    Description: >-
+      Create VPC Endpoints for Secrets Manager and SNS. Set to 'false' if your
+      VPC already has these endpoints. Lambda in VPC CANNOT reach AWS APIs
+      without VPC Endpoints or a NAT Gateway.
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+
 Conditions:
   HasNotificationEmail: !Not [!Equals [!Ref NotificationEmail, '']]
   HasDefaultSvm: !Not [!Equals [!Ref DefaultSvmName, '']]
+  ShouldCreateVpcEndpoints: !Equals [!Ref CreateVpcEndpoints, 'true']
 
 Resources:
+  # ================================================================
+  # VPC Endpoints — Required for Lambda to access AWS services
+  # Without these, Lambda in VPC cannot reach Secrets Manager or SNS.
+  # If your VPC already has these endpoints, set CreateVpcEndpoints=false.
+  # ================================================================
+  SecretsManagerVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.secretsmanager'
+      VpcEndpointType: Interface
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+      PrivateDnsEnabled: true
+
+  SnsVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.sns'
+      VpcEndpointType: Interface
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+      PrivateDnsEnabled: true
+
+  VpcEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      GroupDescription: Allow Lambda to access VPC Endpoints (Secrets Manager, SNS)
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref SecurityGroupId
+          Description: Lambda SG to VPC Endpoint (HTTPS)
+
+  # ================================================================
+  # SNS Topics
+  # ================================================================
+
   # SNS Topic — entry point for automated response triggers
   ResponseTriggerTopic:
     Type: AWS::SNS::Topic

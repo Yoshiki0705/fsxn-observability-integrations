@@ -175,6 +175,63 @@ Store ONTAP credentials as JSON:
 
 ## Deployment
 
+### Pre-Deployment Checklist
+
+Before deploying, verify the following (most common causes of deployment failures):
+
+| # | Check | How to Verify | If Missing |
+|---|-------|---------------|-----------|
+| 1 | ONTAP admin password in Secrets Manager | `aws secretsmanager get-secret-value --secret-id <name>` | Create: `{"username":"fsxadmin","password":"<pwd>"}` |
+| 2 | Password matches actual FSx for ONTAP | SSH to ONTAP should connect | Reset: `aws fsx update-file-system --file-system-id <id> --ontap-configuration FsxAdminPassword=<new>` then update Secrets Manager |
+| 3 | Lambda subnet can reach ONTAP mgmt IP | Same VPC/subnet, or route exists | Verify route table |
+| 4 | SG allows Lambda → ONTAP TCP 443 | ONTAP ENI SG has ingress for Lambda SG | Add rule (see below) |
+| 5 | VPC has DNS support enabled | `aws ec2 describe-vpc-attribute --vpc-id <id> --attribute enableDnsSupport` | Must be `true` for VPC Endpoints |
+
+### Finding Your Parameter Values
+
+```bash
+# 1. FSx for ONTAP Management IP
+aws fsx describe-file-systems --file-system-ids <fs-id> \
+  --query 'FileSystems[0].OntapConfiguration.Endpoints.Management.IpAddresses[0]' \
+  --output text
+
+# 2. VPC and Subnet (same as FSx)
+aws fsx describe-file-systems --file-system-ids <fs-id> \
+  --query 'FileSystems[0].{VpcId:VpcId,SubnetIds:SubnetIds}' --output json
+
+# 3. SVM name
+aws fsx describe-storage-virtual-machines \
+  --filters Name=file-system-id,Values=<fs-id> \
+  --query 'StorageVirtualMachines[].Name' --output text
+
+# 4. Secrets Manager ARN (for ONTAP creds)
+aws secretsmanager list-secrets --filters Key=name,Values=fsx \
+  --query 'SecretList[].ARN' --output text
+
+# 5. Security Groups in the VPC
+aws ec2 describe-security-groups --filters "Name=vpc-id,Values=<vpc-id>" \
+  --query 'SecurityGroups[].{Id:GroupId,Name:GroupName}' --output table
+```
+
+### Security Group Configuration (Required)
+
+The Lambda function must be able to reach the ONTAP management endpoint on TCP 443. Add an ingress rule to the ONTAP ENI's Security Group:
+
+```bash
+# Find the Security Group attached to FSx for ONTAP's ENI
+FSX_ENI_SG=$(aws ec2 describe-network-interfaces \
+  --filters "Name=vpc-id,Values=<vpc-id>" "Name=requester-id,Values=*fsx*" \
+  --query 'NetworkInterfaces[0].Groups[0].GroupId' --output text 2>/dev/null)
+
+# If the above returns empty, find manually:
+# aws fsx describe-file-systems → NetworkInterfaceIds → describe-network-interfaces
+
+# Add rule: allow Lambda SG → ONTAP SG on TCP 443
+aws ec2 authorize-security-group-ingress \
+  --group-id $FSX_ENI_SG \
+  --ip-permissions 'IpProtocol=tcp,FromPort=443,ToPort=443,UserIdGroupPairs=[{GroupId=<your-lambda-sg>,Description="Automated response Lambda to ONTAP mgmt"}]'
+```
+
 ### Deploy the CloudFormation Stack
 
 ```bash
@@ -185,12 +242,61 @@ aws cloudformation deploy \
     OntapMgmtIp=<management-ip> \
     OntapCredentialsSecretArn=arn:aws:secretsmanager:<region>:<account>:secret:<name> \
     VpcId=<vpc-id> \
-    SubnetIds=<subnet-1>,<subnet-2> \
+    SubnetIds=<subnet-id> \
     SecurityGroupId=<sg-id> \
     DefaultSvmName=<svm-name> \
-    NotificationEmail=admin@example.com \
+    NotificationEmail=<your-email> \
+    CreateVpcEndpoints=true \
   --capabilities CAPABILITY_NAMED_IAM
 ```
+
+> **`CreateVpcEndpoints` parameter**: The stack creates Interface VPC Endpoints for Secrets Manager and SNS by default. Lambda in VPC **cannot** reach AWS APIs without these endpoints (or a NAT Gateway). Set to `false` if your VPC already has them.
+
+### Post-Deployment: Attach Lambda Layer
+
+The ontap_response module is delivered as a Lambda Layer (not embedded in the inline code):
+
+```bash
+# Build the layer zip
+bash shared/python/build-layer.sh
+
+# Publish as Lambda Layer
+LAYER_ARN=$(aws lambda publish-layer-version \
+  --layer-name fsxn-shared-python \
+  --zip-file fileb://shared/python/dist/fsxn-shared-python-layer.zip \
+  --compatible-runtimes python3.12 \
+  --description "FSx for ONTAP shared modules (ontap_response, auth_cache)" \
+  --query 'LayerVersionArn' --output text)
+
+# Attach to the response Lambda
+aws lambda update-function-configuration \
+  --function-name fsxn-automated-response-handler \
+  --layers $LAYER_ARN
+```
+
+### Verify Deployment
+
+```bash
+# Send health_check — should complete in <5 seconds with no errors
+TOPIC_ARN=$(aws cloudformation describe-stacks \
+  --stack-name fsxn-automated-response \
+  --query 'Stacks[0].Outputs[?OutputKey==`TriggerTopicArn`].OutputValue' \
+  --output text)
+
+aws sns publish --topic-arn $TOPIC_ARN \
+  --message '{"action":"health_check","svm_name":"<svm-name>"}'
+
+# Wait and check Lambda log
+sleep 15
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/fsxn-automated-response-handler \
+  --start-time $(( $(date +%s) - 30 ))000 \
+  --query 'events[-3:].message' --output text
+```
+
+**Success indicators**: Duration < 5s, no `timeout`, no `ERROR` in logs.
+
+**If you see `timeout`**: Check VPC Endpoints (Secrets Manager + SNS) and Security Group rules.
 
 ### Connect Detection Sources
 
