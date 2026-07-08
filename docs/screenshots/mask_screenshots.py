@@ -851,6 +851,58 @@ def mask_syslog_vpce_screenshots():
         print(f"  ⏭️  syslog-vpce/{fp02.name}: ファイルが見つかりません")
 
 
+def mask_automated_response_screenshots():
+    """automated-response/ 配下スクリーンショットのマスク処理。
+
+    AWS Console のスクリーンショット。アカウントボタン（右上）をマスク。
+    対象:
+      - 01-cfn-stacks-list.png
+      - 02-vpc-endpoints.png
+      - 03-lambda-function-overview.png
+      - 04-lambda-log-cloudwatch.png
+      - 05-lambda-log-stream-detail.png
+      - 06-lambda-log-events-search.png
+      - 16-fsx-volumes-list.png
+    """
+    subdir = SCRIPT_DIR / "automated-response"
+    if not subdir.exists():
+        print("  ℹ️  automated-response/ ディレクトリが存在しません（スキップ）")
+        return
+
+    png_files = sorted(subdir.glob("*.png"))
+    if not png_files:
+        print("  ℹ️  automated-response/ に PNG ファイルなし（スキップ）")
+        return
+
+    for fp in png_files:
+        try:
+            img = Image.open(fp)
+            width, height = img.size
+            print(f"  📐 {fp.name}: {width}x{height}")
+
+            # AWS Console: アカウント名/ID は右上ナビゲーションバーに表示
+            # 一般的に右上 200px 幅 × 40px 高さの領域にアカウント情報
+            # ナビバー全体の高さは約 40-50px
+            nav_bar_height = 50
+            account_region_width = 250
+
+            # 右上のアカウントボタン領域をマスク (ダーク背景色)
+            account_box = (width - account_region_width, 0, width, nav_bar_height)
+            mask_region(img, account_box, color=(35, 47, 62))  # AWS Console nav dark blue
+
+            # ARN 表示部分があれば中央部もマスク候補
+            # （アカウントID 12桁が表示される可能性のある領域）
+            # ここでは安全のためナビバー全体右半分をマスク
+            nav_right_box = (width // 2, 0, width, nav_bar_height)
+            mask_region(img, nav_right_box, color=(35, 47, 62))
+
+            img.save(fp)
+            img.close()
+            print(f"  ✅ {fp.name}: マスク完了（アカウントボタン）")
+        except Exception as e:
+            print(f"  ⚠️  {fp.name}: エラー - {e}")
+
+
 def main(target_dir: Path | None = None) -> None:
     """Run all masking operations.
 
@@ -898,6 +950,9 @@ def main(target_dir: Path | None = None) -> None:
 
     print("\n--- syslog VPC エンドポイント検証分 ---")
     mask_syslog_vpce_screenshots()
+
+    print("\n--- Automated Response 検証分 ---")
+    mask_automated_response_screenshots()
 
     # Phase 2: PNG metadata stripping (all files)
     print()
