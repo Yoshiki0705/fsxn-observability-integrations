@@ -503,7 +503,27 @@ A: It provides the same *containment actions* (block/snapshot/disconnect). Detec
 A: The invocation fails, the message goes to the DLQ, and the DLQ alarm fires. Investigate network connectivity (Security Group, route tables, ONTAP management LIF status).
 
 **Q: Can I block a user across multiple SVMs simultaneously?**
-A: Send one SNS message per SVM. The composite actions operate on a single SVM per invocation. For multi-SVM blocking, publish multiple messages or implement a fan-out Lambda.
+A: Send one SNS message per SVM. The composite actions operate on a single SVM per invocation. For multi-SVM blocking, publish multiple messages or use the Step Functions fan-out pattern below:
+
+```
+EventBridge / SIEM Alert
+  -> Step Functions (fan-out)
+       -> Parallel state:
+            Branch 1: SNS publish (svm-prod-01, contain_smb_threat)
+            Branch 2: SNS publish (svm-prod-02, contain_smb_threat)
+            Branch 3: SNS publish (svm-dr-01, contain_smb_threat)
+       -> Wait for all branches
+       -> Notify: "Blocked user on 3 SVMs"
+```
+
+Alternatively, use a simple bash loop with the CLI helper:
+```bash
+for SVM in svm-prod-01 svm-prod-02 svm-dr-01; do
+  ./shared/scripts/automated-response-cli.sh contain-smb \
+    --svm "$SVM" --domain CORP --user jdoe \
+    --volume vol_data --reason "ARP detection - multi-SVM block"
+done
+```
 
 **Q: How quickly does the block take effect?**
 A: SMB name-mapping blocks are effective immediately for new connections. Existing sessions remain active until disconnected (the `contain_smb_threat` action handles this). NFS export-policy rules are effective immediately for new mounts; existing mounts may require cache expiry.

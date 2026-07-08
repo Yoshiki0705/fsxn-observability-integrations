@@ -317,6 +317,16 @@ Resources:
                               volume_name=payload.get("volume_name"),
                               reason=reason,
                           )
+                      elif action == "contain_multiprotocol_threat":
+                          result = client.contain_multiprotocol_threat(
+                              svm_name=svm_name,
+                              domain=payload.get("domain", ""),
+                              username=payload.get("username", ""),
+                              client_ip=payload.get("client_ip", ""),
+                              volume_name=payload.get("volume_name"),
+                              policy_name=payload.get("policy_name", "default"),
+                              reason=reason,
+                          )
                       elif action == "block_smb_user":
                           result = client.block_smb_user(
                               svm_name=svm_name,

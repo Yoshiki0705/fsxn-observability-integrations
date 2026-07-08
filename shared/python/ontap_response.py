@@ -958,3 +958,119 @@ class OntapResponseClient:
         results["status"] = "partial_failure" if failed else "contained"
 
         return results
+
+    def contain_multiprotocol_threat(
+        self,
+        svm_name: str,
+        domain: str,
+        username: str,
+        client_ip: str,
+        volume_name: str | None = None,
+        policy_name: str = "default",
+        reason: str = "automated-response",
+        trigger_id: str = "",
+    ) -> dict[str, Any]:
+        """Execute full multi-protocol threat containment.
+
+        For volumes accessible via both SMB and NFS, a single-protocol
+        block is insufficient — the attacker may switch protocols. This
+        composite action blocks both the SMB user AND the NFS client IP,
+        creates a protective snapshot, and disconnects active sessions.
+
+        Steps:
+        1. Create protective snapshot (if volume specified)
+        2. Block SMB user via name-mapping
+        3. Block NFS client IP via export-policy rule
+        4. Disconnect active CIFS sessions
+
+        Args:
+            svm_name: Name of the SVM.
+            domain: Windows domain of the compromised user.
+            username: Windows username to block.
+            client_ip: NFS client IP to block (attacker's workstation).
+            volume_name: Volume to snapshot (optional).
+            policy_name: Export policy name for NFS blocking.
+            reason: Reason for containment.
+            trigger_id: Correlation ID from triggering event.
+
+        Returns:
+            Dict with results of all containment steps.
+        """
+        results: dict[str, Any] = {
+            "action": "contain_multiprotocol_threat",
+            "svm": svm_name,
+            "target_smb": f"{domain}\\{username}",
+            "target_nfs": client_ip,
+            "trigger_id": trigger_id,
+            "steps": [],
+        }
+
+        # Step 1: Snapshot
+        if volume_name:
+            try:
+                snap_result = self.create_snapshot(
+                    svm_name=svm_name,
+                    volume_name=volume_name,
+                    prefix="incident_response",
+                    comment=(
+                        f"Multiprotocol containment: {reason} | "
+                        f"user: {domain}\\{username} | ip: {client_ip}"
+                    ),
+                )
+                results["steps"].append(snap_result)
+            except OntapResponseError as e:
+                results["steps"].append({
+                    "action": "create_snapshot",
+                    "status": "failed",
+                    "error": str(e),
+                })
+
+        # Step 2: Block SMB user
+        try:
+            smb_result = self.block_smb_user(
+                svm_name=svm_name,
+                domain=domain,
+                username=username,
+            )
+            results["steps"].append(smb_result)
+        except OntapResponseError as e:
+            results["steps"].append({
+                "action": "block_smb_user",
+                "status": "failed",
+                "error": str(e),
+            })
+
+        # Step 3: Block NFS IP
+        try:
+            nfs_result = self.block_nfs_ip(
+                svm_name=svm_name,
+                policy_name=policy_name,
+                client_ip=client_ip,
+            )
+            results["steps"].append(nfs_result)
+        except OntapResponseError as e:
+            results["steps"].append({
+                "action": "block_nfs_ip",
+                "status": "failed",
+                "error": str(e),
+            })
+
+        # Step 4: Disconnect SMB sessions
+        try:
+            disconnect_result = self.disconnect_smb_sessions(
+                svm_name=svm_name,
+                user=f"{domain}\\{username}",
+            )
+            results["steps"].append(disconnect_result)
+        except OntapResponseError as e:
+            results["steps"].append({
+                "action": "disconnect_smb_sessions",
+                "status": "failed",
+                "error": str(e),
+            })
+
+        # Overall status
+        failed = [s for s in results["steps"] if s.get("status") == "failed"]
+        results["status"] = "partial_failure" if failed else "contained"
+
+        return results

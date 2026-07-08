@@ -61,3 +61,4 @@ cdk.out/
 # NetApp Console screenshots (contain real resource IDs, require masking before commit)
 integrations/netapp-console/system-manager/screenshots/
 .playwright-mcp/
+shared/python/dist/
