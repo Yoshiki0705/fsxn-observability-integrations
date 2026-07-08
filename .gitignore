@@ -62,3 +62,4 @@ cdk.out/
 integrations/netapp-console/system-manager/screenshots/
 .playwright-mcp/
 shared/python/dist/
+docs/screenshots/automated-response/*.png
