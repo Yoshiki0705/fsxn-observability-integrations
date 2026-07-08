@@ -231,3 +231,109 @@ OTel Collector を使って、同一の監査ログを Grafana Cloud と Honeyco
 3. **ダッシュボード**: 可視化されたデータ
 4. **アラート**: 通知が発報された画面
 5. **アーキテクチャ図**: 実際のリソース構成
+
+---
+
+## シナリオ 8: 自動インシデント対応 — SMB ユーザーブロック（AWS ネイティブ）
+
+### ストーリー
+CloudWatch Log Alarm または SIEM モニターで侵害ユーザーを検知。自動応答パイプラインが数秒以内に FSx for ONTAP 上でユーザーをブロックし、保護 Snapshot を作成し、アクティブセッションを切断 — 人間の介入なし。
+
+### 手順
+
+1. **セットアップ**: 自動応答スタックデプロイ済み (`shared/templates/automated-response.yaml`)
+2. **トリガー**:
+   ```bash
+   ./shared/scripts/automated-response-cli.sh contain-smb \
+     --domain CORP --user jdoe --volume vol_data \
+     --reason "内部脅威シミュレーション"
+   ```
+3. **確認（Lambda）**:
+   ```bash
+   aws logs filter-log-events \
+     --log-group-name /aws/lambda/fsxn-automated-response-handler \
+     --filter-pattern "contain_smb_threat" \
+     --query 'events[-1].message' --output text
+   ```
+4. **確認（ONTAP）**:
+   ```bash
+   ssh fsxadmin@<management-ip> "vserver name-mapping show -direction win-unix -replacement \" \""
+   ```
+5. **確認（アクセス拒否）**: ブロックされたユーザーとしてファイルアクセス → 拒否
+6. **解除**:
+   ```bash
+   ./shared/scripts/automated-response-cli.sh unblock-smb \
+     --domain CORP --user jdoe
+   ```
+
+### 期待結果
+- Lambda が 3 つの封じ込めステップ（snapshot + block + disconnect）を ~5 秒で実行
+- ユーザーは SVM 上の全共有にアクセス不可
+- 解除後、アクセス復元
+- 封じ込め詳細のメール通知を受信
+
+> 完全な手順: [自動応答デモ手順書](demo-automated-response.md)
+
+---
+
+## シナリオ 9: 時間制限付きブロックと自動解除（TTL）
+
+### ストーリー
+ブロックは無期限に持続すべきではない。TTL スタックが設定可能な期間後に期限切れのブロックを自動削除し、意図しないロックアウトを防止する。
+
+### 手順
+
+1. **セットアップ**: TTL スタックデプロイ済み (`shared/templates/automated-response-ttl.yaml`, TTL=5分)
+2. **ブロック**:
+   ```bash
+   ./shared/scripts/automated-response-cli.sh block-smb \
+     --domain CORP --user jdoe \
+     --reason "TTL デモ - 5 分後に自動解除"
+   ```
+3. **待機**: TTL クリーンアップ Lambda のログを ~5 分間観察
+   ```bash
+   aws logs tail /aws/lambda/fsxn-automated-response-ttl-cleanup --follow
+   ```
+4. **確認**: TTL 失効後にブロック自動解除
+   ```bash
+   ssh fsxadmin@<management-ip> "vserver name-mapping show -direction win-unix -replacement \" \""
+   # → 空（ブロック削除済み）
+   ```
+
+### 期待結果
+- ブロックが作成され、設定された TTL 期間アクティブ
+- TTL 失効後、EventBridge Scheduler がクリーンアップ Lambda を実行
+- 人間の介入なしでブロックが自動削除
+- 自動削除確認の通知を送信
+
+---
+
+## シナリオ 10: ARP 検知 → E2E 自動封じ込め
+
+### ストーリー
+完全なチェーン: ONTAP ARP がランサムウェア様の行動を検知 → EMS Webhook → Observability プラットフォーム → SIEM モニター発火 → SNS → Response Lambda → ユーザーブロック + Snapshot + セッション切断。検知から封じ込めまで合計 ~65 秒。
+
+### 手順
+
+1. **セットアップ**: フルパイプラインデプロイ済み（EMS Webhook + SIEM 連携 + 自動応答）
+2. **ARP シミュレーション**:
+   ```bash
+   ssh fsxadmin@<management-ip> \
+     "security anti-ransomware volume attack simulate -vserver <svm> -volume <vol>"
+   ```
+3. **観察**（60 秒以内）:
+   - EMS イベントが Observability プラットフォームに到着 (~30 秒)
+   - SIEM モニター発火、SNS に publish
+   - Response Lambda が封じ込め実行 (~5 秒)
+4. **確認**:
+   - ONTAP snapshot 作成済み (`incident_response_*`)
+   - ユーザーブロック済み（name-mapping エントリ）
+   - セッション切断済み
+   - メール通知受信
+
+### 期待結果
+- ~65 秒で完全自動封じ込め
+- 人間の介入ゼロ
+- 証拠保全済み（snapshot + 監査ログ）
+
+> 完全な手順: [自動応答デモ手順書](demo-automated-response.md) Phase 4

@@ -348,6 +348,23 @@ def lambda_handler(event, context):
     return process_sqs_batch(event, ship_single_file)
 ```
 
+### `ontap_response.py` — Automated incident response via ONTAP REST API
+```python
+from ontap_response import OntapResponseClient
+
+client = OntapResponseClient(
+    mgmt_ip=os.environ["ONTAP_MGMT_IP"],
+    username=creds["username"],
+    password=creds["password"],
+)
+# Block compromised SMB user (same mechanism as DII SWS)
+client.block_smb_user(svm_name="svm-prod", domain="CORP", username="jdoe")
+# Block attacker NFS IP
+client.block_nfs_ip(svm_name="svm-prod", policy_name="default", client_ip="10.0.5.99")
+# Full containment: snapshot + block + disconnect
+client.contain_smb_threat(svm_name="svm-prod", domain="CORP", username="jdoe", volume_name="vol1")
+```
+
 ## Operational Runbooks
 
 When alarms fire, reference these runbooks:
@@ -453,6 +470,7 @@ All scripts use environment variables with sensible defaults:
 - `shared/python/auth_cache.py` — Credential caching (TTL + reload-on-401/403)
 - `shared/python/object_ledger.py` — DynamoDB per-object processing state (Level 3)
 - `shared/python/sqs_buffer.py` — SQS producer + consumer with partial batch failures (Level 3)
+- `shared/python/ontap_response.py` — Automated response: user/IP blocking, snapshot, session disconnect via ONTAP REST API
 - `shared/lambda-layers/log-parser/python/fsxn_log_parser/parser.py` — EVTX/XML parser
 - `shared/lambda-layers/s3ap-reader/python/s3ap_reader/reader.py` — S3 AP utility
 - `shared/lambda-layers/ems-parser/` — EMS event parser + tests
@@ -465,6 +483,8 @@ All scripts use environment variables with sensible defaults:
 - `shared/templates/sqs-buffering.yaml` — SQS buffer + DLQ + alarms (Level 3)
 - `shared/templates/secrets-rotation-sample.yaml` — Auto-rotation Lambda (all vendors)
 - `shared/templates/multi-account-stackset.yaml` — StackSets deployment (Enterprise)
+- `shared/templates/automated-response.yaml` — Automated incident response (user/IP blocking, snapshot via ONTAP REST API)
+- `shared/templates/automated-response-ttl.yaml` — Time-limited blocks with EventBridge Scheduler auto-unblock
 - `shared/templates/cloudwatch-log-alarm.yaml` — CloudWatch Log Alarm (`AWS::CloudWatch::LogAlarm`, GA 2026-07); direct log-to-alarm, no metric filter. cfn-lint E3006 expected until spec update.
 
 ### Security & CI
@@ -479,6 +499,7 @@ All scripts use environment variables with sensible defaults:
 - `shared/scripts/deploy-log-alarm.sh` — Deploy CloudWatch Log Alarm (env-var driven; CLI has no `put-log-alarm` yet, use CFN)
 - `shared/scripts/cleanup-log-alarm.sh` — Delete Log Alarm stacks (`--all`, `--delete-sns`, `-y`)
 - `docs/screenshots/mask_screenshots.py` — Screenshot masking (PII removal)
+- `shared/scripts/automated-response-cli.sh` — CLI helper for automated response (block/unblock/contain/test)
 
 ### Documentation (key docs for understanding the project)
 - `docs/en/pipeline-slo.md` — SLO definitions + Go/No-Go criteria
@@ -487,6 +508,8 @@ All scripts use environment variables with sensible defaults:
 - `docs/en/multi-account-deployment.md` — StackSets guide
 - `docs/en/cross-region-replication.md` — DR patterns
 - `integrations/otel-collector/docs/en/pii-redaction-cookbook.md` — 7 OTel Collector redaction recipes
+- `docs/en/automated-response-guide.md` — Automated incident response (user/IP blocking via ONTAP REST API)
+- `docs/en/ems-detection-capabilities.md` — EMS event catalog (30+ events, delivery patterns, latency comparison)
 
 ## Deploying Prerequisites
 

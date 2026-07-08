@@ -41,6 +41,7 @@ All 9 vendor integrations are E2E verified. Datadog paid plan verification compl
 - [x] Poison-pill auto-skip with alerting
 - [x] OTel Collector PII redaction cookbook (per-regulation)
 - [x] Compliance evidence pack template (ISMAP, FISC, SOC2)
+- [x] Automated incident response module (ONTAP REST API user/IP blocking, snapshot, session disconnect)
 - [ ] Cost model validation (estimated vs actual billing comparison)
 
 ## Phase 4: Community & Ecosystem (In Progress)
@@ -74,6 +75,8 @@ Target: 2027 H1
 | 14 | System Manager Reality Check: GUI vs CLI vs Observability | Draft |
 | 15 | CrowdStrike Falcon LogScale via HEC — Parser v1.1.0 | Ready for publication |
 | 16 | Datadog Paid Plan: Pipeline, Monitors, and Detection Workflows | Planned |
+| 17 | CloudWatch Log Alarms: No Metric Filter Required | Published |
+| 18 | Automated Incident Response: Block Users/IPs via ONTAP REST API | Ready for publication |
 | 17 | Alerting on Audit Logs with CloudWatch Log Alarms (no metric filter) | Ready for publication |
 
 ## Contributing

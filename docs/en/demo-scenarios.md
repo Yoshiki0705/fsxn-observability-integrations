@@ -231,3 +231,109 @@ Capture the following screenshots for each demo:
 3. **Dashboard**: Visualized data
 4. **Alert**: Notification fired screen
 5. **Architecture Diagram**: Actual resource layout
+
+---
+
+## Scenario 8: Automated Incident Response — SMB User Block (AWS-native)
+
+### Story
+A compromised user is detected via CloudWatch Log Alarm or SIEM monitor. The automated response pipeline blocks the user on FSx for ONTAP within seconds, creates a protective snapshot, and disconnects their active sessions — all without human intervention.
+
+### Steps
+
+1. **Setup**: Automated response stack deployed (`shared/templates/automated-response.yaml`)
+2. **Trigger**:
+   ```bash
+   ./shared/scripts/automated-response-cli.sh contain-smb \
+     --domain CORP --user jdoe --volume vol_data \
+     --reason "Simulated insider threat"
+   ```
+3. **Verify (Lambda)**:
+   ```bash
+   aws logs filter-log-events \
+     --log-group-name /aws/lambda/fsxn-automated-response-handler \
+     --filter-pattern "contain_smb_threat" \
+     --query 'events[-1].message' --output text
+   ```
+4. **Verify (ONTAP)**:
+   ```bash
+   ssh fsxadmin@<management-ip> "vserver name-mapping show -direction win-unix -replacement \" \""
+   ```
+5. **Verify (Access Denied)**: Attempt file access as blocked user → denied
+6. **Unblock**:
+   ```bash
+   ./shared/scripts/automated-response-cli.sh unblock-smb \
+     --domain CORP --user jdoe
+   ```
+
+### Expected Result
+- Lambda executes 3 containment steps (snapshot + block + disconnect) within ~5 seconds
+- User cannot access any share on the SVM
+- After unblock, access is restored
+- Email notification received with containment details
+
+> Full demo procedure: [Automated Response Demo Runbook](demo-automated-response.md)
+
+---
+
+## Scenario 9: Time-Limited Blocks with Auto-Unblock (TTL)
+
+### Story
+Blocks should not persist indefinitely. The TTL stack automatically removes expired blocks after a configurable period, preventing accidental lockouts.
+
+### Steps
+
+1. **Setup**: TTL stack deployed (`shared/templates/automated-response-ttl.yaml`, TTL=5min)
+2. **Block**:
+   ```bash
+   ./shared/scripts/automated-response-cli.sh block-smb \
+     --domain CORP --user jdoe \
+     --reason "TTL demo - auto-expires in 5 minutes"
+   ```
+3. **Wait**: Observe TTL cleanup Lambda logs for ~5 minutes
+   ```bash
+   aws logs tail /aws/lambda/fsxn-automated-response-ttl-cleanup --follow
+   ```
+4. **Verify**: Block auto-removed after TTL expiry
+   ```bash
+   ssh fsxadmin@<management-ip> "vserver name-mapping show -direction win-unix -replacement \" \""
+   # → Empty (block removed)
+   ```
+
+### Expected Result
+- Block is created and active for the configured TTL period
+- After TTL expiry, EventBridge Scheduler invokes cleanup Lambda
+- Block is automatically removed without human intervention
+- Notification sent confirming auto-removal
+
+---
+
+## Scenario 10: ARP Detection → End-to-End Auto-Containment
+
+### Story
+The complete chain: ONTAP ARP detects ransomware-like behavior → EMS Webhook → Observability platform → SIEM monitor fires → SNS → Response Lambda → User blocked + Snapshot + Sessions disconnected. Total time: ~65 seconds from detection to containment.
+
+### Steps
+
+1. **Setup**: Full pipeline deployed (EMS Webhook + SIEM integration + automated response)
+2. **Simulate ARP**:
+   ```bash
+   ssh fsxadmin@<management-ip> \
+     "security anti-ransomware volume attack simulate -vserver <svm> -volume <vol>"
+   ```
+3. **Observe** (within 60 seconds):
+   - EMS event arrives at Observability platform (~30s)
+   - SIEM monitor fires and publishes to SNS
+   - Response Lambda executes containment (~5s)
+4. **Verify**:
+   - ONTAP snapshot created (`incident_response_*`)
+   - User blocked (name-mapping entry)
+   - Sessions disconnected
+   - Email notification received
+
+### Expected Result
+- Complete automated containment in ~65 seconds
+- Zero manual intervention required
+- Evidence preserved (snapshot + audit logs)
+
+> Full procedure: [Automated Response Demo Runbook](demo-automated-response.md) Phase 4

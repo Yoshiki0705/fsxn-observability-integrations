@@ -295,3 +295,12 @@ Screenshots to capture during demo execution of this guide:
 - [NetApp Docs: Restore data from ARP snapshots](https://docs.netapp.com/us-en/ontap/anti-ransomware/recover-data-task.html)
 - [NetApp Docs: Respond to abnormal activity](https://docs.netapp.com/us-en/ontap/anti-ransomware/respond-abnormal-task.html)
 - [NetApp KB: Ransomware prevention and recovery](https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/ONTAP_OS/Ransomware_prevention_and_recovery_in_ONTAP)
+
+---
+
+## Related Documents
+
+- [Automated Incident Response Guide](automated-response-guide.md) — Automated user/IP blocking triggered by ARP detection
+- [EMS Detection Capabilities](ems-detection-capabilities.md) — Full EMS event catalog including ARP events
+- [Demo Runbook: Automated Response](demo-automated-response.md) — Step-by-step demo including ARP → auto-block flow
+- [Security Monitoring Index](security-monitoring-index.md) — Navigation across all security documents
