@@ -5,7 +5,7 @@
 Step-by-step procedure for demonstrating the automated incident response feature end-to-end. Covers: deploy → trigger detection → verify auto-block → confirm access denial → unblock → confirm restored access.
 
 Use this runbook for:
-- Customer demos (live or recorded)
+- Live demos (in-person or recorded)
 - E2E verification before blog publication
 - Internal training
 
@@ -434,7 +434,7 @@ aws cloudformation delete-stack --stack-name fsxn-automated-response
 | Phase 6 (Operational) | ~1 min | Status check |
 | **Total** | **~24 min** | Full demo with all phases |
 
-For a shorter demo (customer meeting): Phase 1 + Phase 2 + Phase 4 = ~13 minutes.
+For a shorter demo (meeting): Phase 1 + Phase 2 + Phase 4 = ~13 minutes.
 
 ---
 

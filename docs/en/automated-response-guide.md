@@ -111,7 +111,7 @@ Dedicated storage security products (such as DII Storage Workload Security) prov
 | Integration with SIEM | Limited export | Native (detection originates from SIEM) |
 | Cost model | Per-node license | Pay-per-use (Lambda invocations) |
 
-> **Storage Operations lens**: The underlying ONTAP mechanisms are identical — both approaches use the same REST API endpoints. The difference is where detection intelligence lives. Dedicated products embed ML in their SaaS; this approach delegates detection to the customer's chosen observability platform.
+> **Storage Operations lens**: The underlying ONTAP mechanisms are identical — both approaches use the same REST API endpoints. The difference is where detection intelligence lives. Dedicated products embed ML in their SaaS; this approach delegates detection to your chosen observability platform.
 
 > **Security Architect lens**: AWS-native detection provides broader attack context (VPC Flow Logs, CloudTrail, GuardDuty findings) that storage-only solutions cannot correlate. For organizations with existing SIEM investments, this is a natural extension of their security operations workflow.
 

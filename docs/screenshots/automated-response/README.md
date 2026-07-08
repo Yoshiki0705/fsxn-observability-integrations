@@ -3,7 +3,7 @@
 ## Purpose
 
 Screenshots required for E2E verification of the automated incident response feature.
-Used in: Blog Part 18, customer demo, internal documentation.
+Used in: Blog Part 18, live demos, internal documentation.
 
 ## Required Screenshots (20 total)
 
