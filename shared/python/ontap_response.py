@@ -392,7 +392,7 @@ class OntapResponseClient:
             "ro_rule": ["never"],
             "rw_rule": ["never"],
             "superuser": ["never"],
-            "protocols": ["nfs3", "nfs4", "cifs"],
+            "protocols": ["any"],
             "index": rule_index,
         }
 
