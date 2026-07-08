@@ -55,6 +55,43 @@
 | Cold start (VPC Lambda) | ~320ms | < 5s |
 | All actions complete within | 120s timeout | No timeout |
 
+## CLI Evidence (replaces console screenshots where masking issues exist)
+
+### VPC Endpoints (Available)
+
+```
+$ aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=vpc-05192d06e1e91d756" \
+    --query 'VpcEndpoints[].{Service:ServiceName,Type:VpcEndpointType,State:State}' \
+    --output table
+
++-------------------------------------------+------------+-------------+
+|                  Service                  |   State    |    Type     |
++-------------------------------------------+------------+-------------+
+|  com.amazonaws.ap-northeast-1.s3          |  available |  Gateway    |
+|  com.amazonaws.ap-northeast-1.ssm         |  available |  Interface  |
+|  com.amazonaws.ap-northeast-1.ssmmessages |  available |  Interface  |
+|  com.amazonaws.ap-northeast-1.ec2messages |  available |  Interface  |
+|  com.amazonaws.ap-northeast-1.secretsmanager | available | Interface |
+|  com.amazonaws.ap-northeast-1.sns         |  available |  Interface  |
++-------------------------------------------+------------+-------------+
+```
+
+### FSx for ONTAP Volumes
+
+```
+$ aws fsx describe-volumes --filters Name=file-system-id,Values=fs-002ec851eba809979 \
+    --query 'Volumes[].{Name:Name,Id:VolumeId}' --output table
+
++--------------------------------------------------+---------------------+
+|                        Id                        |        Name         |
++--------------------------------------------------+---------------------+
+|  fsvol-0183178c8b9ec5392                         |  vol1               |
+|  fsvol-03476bedce8e1d0da                         |  fsxsvm01_root      |
+|  fsvol-0dd4e8f7e2527299e                         |  testvol01          |
+|  ...                                             |  (12 volumes total) |
++--------------------------------------------------+---------------------+
+```
+
 ## Lessons Learned (Reflected in Docs/CFn)
 
 1. **VPC Lambda needs VPC Endpoints** -- Added to CFn template (CreateVpcEndpoints param)
