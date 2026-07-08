@@ -308,10 +308,17 @@ After deployment, subscribe the trigger SNS topic to your detection sources:
 # (configured during Log Alarm creation)
 ```
 
-**Datadog Monitor → SNS:**
-```
-Use Datadog's @sns-<topic-name> notification in monitor message
-```
+**SIEM / Observability Platform → SNS:**
+
+| Platform | How to Connect |
+|----------|---------------|
+| Datadog | `@sns-<topic-name>` in Monitor notification message |
+| Splunk | Alert action → AWS SNS notification (Splunk Add-on for AWS) |
+| Elastic | Kibana Alert → SNS connector action |
+| Grafana | Alert rule → Contact point → AWS SNS |
+| New Relic | Workflow → Destination → AWS SNS |
+| PagerDuty | Event Orchestration → Custom Action → SNS publish via Lambda |
+| Any platform | HTTP webhook → Lambda → SNS publish |
 
 **Manual test invocation:**
 ```bash
@@ -415,15 +422,15 @@ ARP emits events at two severity levels. **Only auto-block on `alert` (high conf
 
 > **ARP Learning Period**: ARP requires 30 days to establish a behavioral baseline. During this period, `warning` events are common and often benign (bulk file conversions, backup software). Auto-blocking on `warning` during learning will disrupt legitimate users.
 
-**Detection rule configuration example (Datadog Monitor)**:
+**Detection rule configuration example (any SIEM)**:
 ```
 # Auto-contain: ONLY severity=alert
-source:fsxn-ems @attributes.event_name:arw.volume.state @attributes.severity:alert
-→ Trigger: contain_smb_threat via SNS
+Filter: source=fsxn-ems AND event_name=arw.volume.state AND severity=alert
+→ Action: SNS publish (contain_smb_threat)
 
 # Notify only: severity=warning
-source:fsxn-ems @attributes.event_name:arw.volume.state @attributes.severity:warning
-→ Trigger: Slack/PagerDuty notification (investigation only)
+Filter: source=fsxn-ems AND event_name=arw.volume.state AND severity=warning
+→ Action: Notify (Slack/PagerDuty/email — investigation only, do NOT auto-block)
 ```
 
 ### Example 1: CloudWatch Log Alarm → Auto-Block
@@ -438,16 +445,16 @@ CloudWatch Log Alarm (query: failed logins > 10)
   → SNS notification to security team
 ```
 
-### Example 2: Datadog ARP Monitor → Full Containment
+### Example 2: SIEM ARP Monitor → Full Containment
 
-When Datadog receives an ARP EMS event and the monitor fires:
+When your observability platform receives an ARP EMS event and the detection rule fires:
 
 ```
-ONTAP ARP → EMS Webhook → Datadog
-  → Datadog Monitor fires
-  → Workflow → SNS publish (contain_smb_threat)
+ONTAP ARP → EMS Webhook → Observability Platform (any vendor)
+  → Detection rule fires (ARP event matched)
+  → Workflow/Action → SNS publish (contain_smb_threat)
   → Lambda → ONTAP: snapshot + block + disconnect
-  → PagerDuty escalation
+  → Notification → PagerDuty / Slack / email
 ```
 
 ### Example 3: FPolicy Mass Deletion → IP Block
@@ -455,7 +462,7 @@ ONTAP ARP → EMS Webhook → Datadog
 When FPolicy analytics detect >50 deletes/5min from a single IP:
 
 ```
-FPolicy → SQS → Lambda → Datadog/Elastic
+FPolicy → SQS → Lambda → SIEM (any vendor)
   → SIEM rule fires (mass deletion threshold)
   → SNS publish (contain_nfs_threat)
   → Lambda → ONTAP: snapshot + block IP
