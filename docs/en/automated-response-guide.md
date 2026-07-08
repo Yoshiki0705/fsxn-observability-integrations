@@ -549,6 +549,38 @@ The CloudFormation template embeds Lambda code as `ZipFile` for quickstart deplo
 
 ---
 
+## Cleanup / Teardown
+
+```bash
+# Delete TTL stack first (no dependencies)
+aws cloudformation delete-stack --stack-name fsxn-automated-response-ttl
+
+# Delete main stack (VPC Endpoints + Lambda + SNS)
+aws cloudformation delete-stack --stack-name fsxn-automated-response
+
+# Remove Lambda Layer (optional)
+aws lambda delete-layer-version --layer-name fsxn-shared-python --version-number 2
+
+# Delete test snapshots created during verification
+# ssh fsxadmin@<management-ip> "volume snapshot delete -vserver <svm> -volume <vol> -snapshot incident_response_*"
+```
+
+---
+
+## Verified Environment
+
+This solution was E2E verified on:
+
+| Item | Value |
+|------|-------|
+| FSx for ONTAP | Single-AZ, ONTAP 9.17.1 |
+| Region | ap-northeast-1 (Tokyo) |
+| Lambda Runtime | Python 3.12 |
+| Actions tested | health_check, create_snapshot, block_smb_user, block_nfs_ip, unblock, TTL cleanup, cooldown |
+| All actions | < 1 second (after VPC Endpoints provisioned) |
+
+---
+
 ## Related Documents
 
 - [ARP Incident Response Guide](arp-incident-response-guide.md)

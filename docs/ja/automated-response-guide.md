@@ -495,6 +495,40 @@ export-policy rule delete -vserver <svm> -policyname <policy> -ruleindex <index>
 
 ---
 
+---
+
+## クリーンアップ / 環境削除
+
+```bash
+# TTL スタックを先に削除（依存関係なし）
+aws cloudformation delete-stack --stack-name fsxn-automated-response-ttl
+
+# メインスタックを削除（VPC Endpoints + Lambda + SNS）
+aws cloudformation delete-stack --stack-name fsxn-automated-response
+
+# Lambda Layer を削除（オプション）
+aws lambda delete-layer-version --layer-name fsxn-shared-python --version-number 2
+
+# テスト Snapshot の削除
+# ssh fsxadmin@<management-ip> "volume snapshot delete -vserver <svm> -volume <vol> -snapshot incident_response_*"
+```
+
+---
+
+## 検証済み環境
+
+本ソリューションは以下の環境で E2E 検証済み:
+
+| 項目 | 値 |
+|------|---|
+| FSx for ONTAP | Single-AZ, ONTAP 9.17.1 |
+| リージョン | ap-northeast-1 (Tokyo) |
+| Lambda ランタイム | Python 3.12 |
+| テスト済みアクション | health_check, create_snapshot, block_smb_user, block_nfs_ip, unblock, TTL cleanup, cooldown |
+| 全アクション | 1 秒未満（VPC Endpoints プロビジョニング後） |
+
+---
+
 ## 関連ドキュメント
 
 - [ARP インシデント対応ガイド](arp-incident-response-guide.md)

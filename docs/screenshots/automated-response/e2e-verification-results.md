@@ -15,6 +15,18 @@
 | 4 | block_smb_user (direct API) | PASS | 201 Created | index:99, CORP\\testuser99 |
 | 5 | list_active_blocks | PASS | <1s | API responding correctly |
 | 6 | TTL cleanup (EventBridge) | PASS | 1.5s | "no expired blocks found" (correct) |
+| 7 | unblock_smb_user | PASS | <1s | entries_removed: 1 |
+| 8 | cooldown (2nd snapshot) | PASS | <1s | "cooldown active — 0.2 min ago (limit: 15m)" |
+
+## Verified Environment
+
+| Item | Value |
+|------|-------|
+| ONTAP Version | NetApp Release 9.17.1P7D1 (June 2026) |
+| FSx Deployment | Single-AZ |
+| Region | ap-northeast-1 (Tokyo) |
+| Lambda Runtime | Python 3.12 |
+| Layer | fsxn-shared-python:2 |
 
 ## Deployment Issues Encountered and Resolved
 
