@@ -72,7 +72,7 @@ The Syslog VPCE path (June 2026) handles **admin audit and EMS events only** —
 
 ## Architecture Options for Large-Volume File Access Logs
 
-For environments with high file access audit volume (e.g., 71 GB GZIP/day):
+For environments with high file access audit volume (tens of GB/day or more):
 
 ### Option 1: Step Functions Distributed Map + Lambda (Recommended for EC2 elimination)
 
@@ -86,8 +86,7 @@ ONTAP volume (EVTX)
 ```
 
 - Parallelism: up to 10,000 concurrent Lambda invocations
-- Processing time: 40 min (EC2) → minutes (Lambda parallel)
-- Cost: Lambda execution + S3 storage (comparable to EC2)
+- Processing time: scales linearly with parallelism (minutes vs hours)
 - This project's EVTX parser: `shared/lambda-layers/log-parser/`
 
 ### Option 2: XML Format + Glue (Simplest if format change acceptable)
@@ -134,20 +133,20 @@ ONTAP volume (EVTX)
 ```
 
 - Best of both worlds: low-cost bulk storage + real-time security detection
-- CloudWatch Logs receives only 1-5% of total volume (cost-effective)
+- CloudWatch Logs receives only a small fraction of total volume (cost-effective)
 
 ---
 
-## Cost Comparison (71 GB GZIP/day ≈ 200-300 GB expanded)
+## Cost Considerations for Large Volumes
 
-| Approach | Monthly Cost | Notes |
-|----------|-------------|-------|
-| Current: EC2 batch (40 min/day) | ~$100-150 | EC2 + S3 + Athena |
-| All to CloudWatch Logs | **$4,500-7,000** | CW Logs ingestion $0.76/GB × 200-300 GB/day |
-| Option 1: Step Functions + Lambda → S3 + Athena | ~$100-200 | Lambda + S3 + Athena (no EC2) |
-| Option 4: Hybrid (full→S3, filtered→CW) | ~$150-250 | Adds CW Logs cost for filtered subset only |
+| Approach | Relative Cost | Notes |
+|----------|--------------|-------|
+| EC2 batch processing | Baseline | Fixed EC2 cost + S3 + Athena |
+| All to CloudWatch Logs | **Very high** | CW Logs ingestion $0.76/GB — prohibitive at tens of GB/day |
+| Option 1: Step Functions + Lambda → S3 + Athena | Similar to EC2 baseline | Lambda + S3 + Athena (no EC2 management) |
+| Option 4: Hybrid (full→S3, filtered→CW) | Slightly above baseline | Adds CW Logs cost for filtered subset only |
 
-> **Key insight**: Sending the full 71 GB/day to CloudWatch Logs is cost-prohibitive (~$5,000/month). The practical approach is to keep bulk data in S3 (for Athena) and send only security-relevant events to CloudWatch Logs (for real-time detection and alarming).
+> **Key insight**: Sending high-volume file access logs (tens of GB/day) entirely to CloudWatch Logs is cost-prohibitive. The practical approach is to keep bulk data in S3 (for Athena) and send only security-relevant events to CloudWatch Logs (for real-time detection and alarming).
 
 ---
 
@@ -179,8 +178,8 @@ A: No. Glue does not natively support EVTX (Windows Event Log binary). To use Gl
 **Q: What about the blog that says FSx sends JSON to CloudWatch?**
 A: That refers to FSx for Windows File Server, which has built-in CloudWatch Logs integration. Even there, the format is XML (not JSON) — but delivery is managed by AWS without any intermediary.
 
-**Q: What is the most cost-effective way to eliminate EC2 for 71 GB/day EVTX processing?**
-A: Step Functions Distributed Map + Lambda (Option 1). Processes files in parallel, eliminates EC2, and outputs JSON to S3 for Athena. Processing time drops from 40 minutes to a few minutes.
+**Q: What is the most cost-effective way to eliminate EC2 for large-volume EVTX processing?**
+A: Step Functions Distributed Map + Lambda (Option 1). Processes files in parallel, eliminates EC2, and outputs JSON to S3 for Athena. Processing time scales with parallelism rather than single-instance throughput.
 
 ---
 
