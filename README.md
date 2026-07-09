@@ -257,7 +257,7 @@ Full documentation is available in [English](docs/en/README.md) and [日本語](
 | Architecture | [Architecture](docs/en/architecture.md) · [Event Sources](docs/en/event-sources.md) · [S3 AP Specification](docs/en/s3ap-fsxn-specification.md) |
 | Management | [Decision Tree](docs/en/decision-tree-management-monitoring.md) · [System Manager GUI Guide](docs/en/system-manager-gui-guide.md) |
 | Operations | [Pipeline SLO](docs/en/pipeline-slo.md) · [Operational Guide](docs/en/operational-guide.md) · [Runbooks](docs/en/runbooks/) |
-| Monitoring | [CloudWatch Log Alarm](docs/en/cloudwatch-log-alarm.md) · [Detection Use Cases](docs/en/detection-use-cases.md) · [EMS Detection Capabilities](docs/en/ems-detection-capabilities.md) |
+| Monitoring | [CloudWatch Log Alarm](docs/en/cloudwatch-log-alarm.md) · [Detection Use Cases](docs/en/detection-use-cases.md) · [EMS Detection Capabilities](docs/en/ems-detection-capabilities.md) · [File Access Audit Format Comparison](docs/en/file-access-audit-format-comparison.md) |
 | Security | [Automated Incident Response](docs/en/automated-response-guide.md) · [Data Classification](docs/en/data-classification.md) · [Security Review Checklist](docs/en/security-review-checklist.md) · [Compliance Evidence Pack](docs/en/compliance-evidence-pack.md) |
 | Enterprise | [Multi-Account Deployment](docs/en/multi-account-deployment.md) · [Cross-Region DR](docs/en/cross-region-replication.md) · [PII Redaction Cookbook](integrations/otel-collector/docs/en/pii-redaction-cookbook.md) |
 | Partner | [Solution Brief](docs/en/partner-solution-brief.md) · [Vendor Comparison](docs/en/vendor-comparison.md) · [PoC Success Criteria](docs/en/poc-success-criteria.md) · [Workshop Guide](docs/en/workshop-hands-on-half-day.md) |
