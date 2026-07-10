@@ -20,9 +20,9 @@
 ### セキュリティアナリスト / SOC
 | 必要なこと | ドキュメント | キーセクション |
 |-----------|-----------|-------------|
-| 自動封じ込めアクションの理解 | [自動応答ガイド](automated-response-guide.md) | ブロックの仕組み |
+| 自動ストレージ層遮断の理解 | [自動応答ガイド](automated-response-guide.md) | ブロックの仕組み |
 | 評価用の完全デモ実行 | [デモ手順書](demo-automated-response.md) | 全フェーズ |
-| 専用セキュリティ製品との比較 | [自動応答ガイド](automated-response-guide.md) | 比較テーブル |
+| 専用セキュリティ製品との比較（DII Storage Workload Security など） | [自動応答ガイド](automated-response-guide.md) | 比較テーブル、FAQ |
 | 検知レイテンシの確認 | [EMS 検知機能リファレンス](ems-detection-capabilities.md) | 配信レイテンシ比較 |
 
 ### クラウドアーキテクト / DevOps

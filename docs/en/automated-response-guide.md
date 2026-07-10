@@ -2,7 +2,9 @@
 
 ## Executive Summary
 
-This guide describes how to implement automated threat containment for Amazon FSx for NetApp ONTAP using AWS-native detection services combined with ONTAP REST API response actions. The approach delivers the same containment capabilities — user blocking, IP blocking, and protective snapshots — available in dedicated storage security products, while keeping detection and orchestration within the AWS ecosystem and third-party observability platforms.
+This guide describes how to implement automated storage-layer access blocking for Amazon FSx for NetApp ONTAP using AWS-native detection services combined with ONTAP REST API response actions. The approach delivers the same containment-phase capabilities — user blocking, IP blocking, and protective snapshots — available in dedicated storage security products, while keeping detection and orchestration within the AWS ecosystem and third-party observability platforms.
+
+> **Scope note**: This module automates the *containment* phase (NIST SP 800-61) at the storage layer only — blocking access and preserving evidence. Host isolation, malware removal, credential rotation, and blocking lateral movement to other systems (eradication/recovery) are out of scope and still require human judgment or another IR tool.
 
 **Key capabilities:**
 - Block compromised SMB users via ONTAP name-mapping (access denied across all volumes)
@@ -354,6 +356,7 @@ aws sns publish \
 |--------|-------|----------|
 | `contain_smb_threat` | Snapshot → Block user → Disconnect sessions | Compromised AD user detected |
 | `contain_nfs_threat` | Snapshot → Block IP | Suspicious NFS client activity |
+| `contain_multiprotocol_threat` | Snapshot → Block SMB user → Block NFS IP → Disconnect sessions | Volume accessed via both SMB and NFS — a single-protocol block is insufficient because the attacker can switch protocols |
 
 ---
 
@@ -511,6 +514,12 @@ export-policy rule delete -vserver <svm> -policyname <policy> -ruleindex <index>
 | Lambda errors | CloudWatch Lambda metrics | > 0 in 5 min |
 | Response latency | Lambda Duration metric | p95 > 10s |
 | Active blocks | Custom metric (optional) | Tracking only |
+| Protected-account block attempts | CloudWatch Logs filter on `Cannot block protected account` (HTTP 403 from `_validate_username`) | > 0 — investigate immediately |
+| Block rate (any protocol) | Custom metric from Lambda invocation count | Alarm above your expected incident rate — see the "10. Rate Limits & Scalability" section in the [Security Addendum](automated-response-security-addendum.md) |
+
+> **Incident Response lens**: A rejected attempt to block a protected account (`fsxadmin`, `administrator`, or an entry in `PROTECTED_ACCOUNTS_EXTRA`) is a signal worth investigating on its own — it can indicate a misconfigured detection rule pointing at the wrong identity, or an attacker attempting to use the response pipeline itself to lock out legitimate admins. Alert on this condition rather than only logging it.
+>
+> **Reliability lens**: An automated response system that blocks too aggressively becomes a self-inflicted denial-of-service vector (e.g., a noisy detection rule triggering `contain_smb_threat` against many users in a short window). Set an alarm on invocation/block rate, not just on failures, so a runaway detection source is caught before it locks out a large population.
 
 ---
 
@@ -521,7 +530,7 @@ export-policy rule delete -vserver <svm> -policyname <policy> -ruleindex <index>
 - **Audit trail**: All actions are logged in CloudWatch Logs with correlation IDs.
 - **Cooldown protection**: Snapshot creation has a configurable cooldown (default 15 min) to prevent storage exhaustion during sustained attacks.
 - **Marker-based cleanup**: All response rules include `fsxn_auto_response` marker for safe identification and bulk removal.
-- **Time-limited blocks**: Implement a scheduled Lambda to auto-remove blocks after a configurable duration (similar to DII's time-limited access restriction).
+- **Time-limited blocks**: Deploy the companion [`automated-response-ttl.yaml`](../../shared/templates/automated-response-ttl.yaml) stack to auto-remove blocks after a configurable duration via EventBridge Scheduler. Without it, blocks persist until manually removed — decide during deployment planning whether that is acceptable for your environment.
 
 ---
 
@@ -642,7 +651,7 @@ This solution was E2E verified on:
 ## FAQ
 
 **Q: Does this replace DII Storage Workload Security entirely?**
-A: It provides the same *containment actions* (block/snapshot/disconnect). Detection intelligence differs: DII uses built-in per-user ML baselines, while this approach uses your chosen SIEM's analytics capabilities. For organizations with existing SIEM investments, the combined approach can provide broader context (network + application + storage) than storage-only detection.
+A: It provides the same *containment-phase actions* (block/snapshot/disconnect) at the storage layer. Detection intelligence differs: DII uses built-in per-user ML baselines, while this approach uses your chosen SIEM's analytics capabilities. Neither this module nor DII performs eradication or recovery (host isolation, malware removal, credential rotation) — both are containment-phase tools; the rest of the incident response lifecycle still requires a human or a separate IR tool. For organizations with existing SIEM investments, the combined approach can provide broader detection context (network + application + storage) than storage-only detection.
 
 **Q: What happens if the Lambda cannot reach ONTAP?**
 A: The invocation fails, the message goes to the DLQ, and the DLQ alarm fires. Investigate network connectivity (Security Group, route tables, ONTAP management LIF status).
@@ -661,13 +670,15 @@ EventBridge / SIEM Alert
        -> Notify: "Blocked user on 3 SVMs"
 ```
 
-Alternatively, use a simple bash loop with the CLI helper:
+Alternatively, use the `automated-response-multi-svm-cli.sh` wrapper, which fans out to multiple SVMs, reports per-SVM success/failure, and exits non-zero if any SVM failed:
+
 ```bash
-for SVM in svm-prod-01 svm-prod-02 svm-dr-01; do
-  ./shared/scripts/automated-response-cli.sh contain-smb \
-    --svm "$SVM" --domain CORP --user jdoe \
-    --volume vol_data --reason "ARP detection - multi-SVM block"
-done
+export RESPONSE_TOPIC_ARN="arn:aws:sns:ap-northeast-1:123456789012:fsxn-automated-response-trigger"
+
+./shared/scripts/automated-response-multi-svm-cli.sh contain-smb \
+  --svms "svm-prod-01,svm-prod-02,svm-dr-01" \
+  --domain CORP --user jdoe --volume vol_data \
+  --reason "ARP detection - multi-SVM block"
 ```
 
 **Q: How quickly does the block take effect?**

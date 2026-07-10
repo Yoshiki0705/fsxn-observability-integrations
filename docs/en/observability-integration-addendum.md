@@ -64,9 +64,9 @@ WriteIopsAnomalyAlarm:
 
 | Detection Source | Event | MITRE Technique | Tactic | Auto-Response? |
 |-----------------|-------|-----------------|--------|---------------|
-| ARP alert | `arw.volume.state` (alert) | T1486 Data Encrypted for Impact | Impact | ✅ Auto-contain |
-| FPolicy | Mass file deletion (>50/5min) | T1485 Data Destruction | Impact | ✅ Auto-contain |
-| FPolicy | Mass file rename (.encrypted) | T1486 Data Encrypted for Impact | Impact | ✅ Auto-contain |
+| ARP alert | `arw.volume.state` (alert) | T1486 Data Encrypted for Impact | Impact | ✅ Auto-block (storage layer) |
+| FPolicy | Mass file deletion (>50/5min) | T1485 Data Destruction | Impact | ✅ Auto-block (storage layer) |
+| FPolicy | Mass file rename (.encrypted) | T1486 Data Encrypted for Impact | Impact | ✅ Auto-block (storage layer) |
 | Admin audit | Failed management login (>10) | T1110 Brute Force | Credential Access | ⚠️ Notify + investigate |
 | Admin audit | Unauthorized export-policy change | T1562.001 Disable or Modify Tools | Defense Evasion | ⚠️ Notify |
 | FPolicy | Access from unusual IP | T1021.002 SMB/Windows Admin Shares | Lateral Movement | ⚠️ Investigate |
@@ -74,6 +74,8 @@ WriteIopsAnomalyAlarm:
 | EMS | ARP disabled | T1562.001 Disable or Modify Tools | Defense Evasion | ⚠️ Critical notify |
 | Admin audit | Name-mapping modified | T1098 Account Manipulation | Persistence | ⚠️ Notify |
 | EMS | SnapMirror broken | T1490 Inhibit System Recovery | Impact | ⚠️ Notify |
+
+> **Scope note**: "Auto-block" rows trigger the [Automated Response module](automated-response-guide.md)'s containment-phase actions (block user/IP, snapshot, session disconnect) at the storage layer only. Eradication and recovery (host isolation, malware removal, credential rotation) are not automated and still require human follow-up or a separate IR tool.
 
 > **SOC Integration**: For SIEM platforms with MITRE ATT&CK integration (Splunk ES, Elastic SIEM, Datadog Cloud SIEM), tag each detection rule with the corresponding technique ID. This enables ATT&CK Navigator coverage visualization.
 
@@ -157,7 +159,7 @@ Central Security Account
 | CloudWatch → Vendor-native (no CW) | Remove syslog VPCE, use direct Lambda | EMS webhook stays, response pipeline stays |
 | Single vendor → OTel multi-backend | Add OTel Collector, reconfigure exporters | ONTAP config, detection thresholds |
 
-**Key insight**: The SNS trigger topic is the "universal interface" between detection and response. Any system that can publish JSON to SNS can trigger containment. This is the portability layer.
+**Key insight**: The SNS trigger topic is the "universal interface" between detection and response. Any system that can publish JSON to SNS can trigger a storage-layer block. This is the portability layer.
 
 ---
 

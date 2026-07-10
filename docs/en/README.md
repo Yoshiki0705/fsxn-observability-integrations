@@ -15,7 +15,9 @@ EC2-free observability integrations for Amazon FSx for NetApp ONTAP via FSx for 
 | Goal | Recommended Path | Why |
 |---|---|---|
 | First validation | Audit poller only | Fastest way to prove read path, delivery, checkpoint, and DLQ |
-| GUI-based management | NetApp Console + System Manager | No CLI required; audit, quota, FSA all in browser |
+| GUI-based management (NetApp SaaS) | NetApp Console<!-- allow:naming --> + System Manager | No CLI required; audit, quota, FSA all in browser |
+| GUI-based management (AWS-native, VPC-internal) | [Self-hosted Management Console](../../management-console/) | No external SaaS dependency; Cognito/IAM auth |
+| Ransomware / storage-layer incident response | [Automated Incident Response Guide](automated-response-guide.md) | Storage-layer user/IP blocking, triggerable from any detection source, not tied to one vendor |
 | Single observability backend | Direct vendor integration | Fewer moving parts |
 | Grafana Cloud quickstart | Direct OTLP Gateway | Native OTLP path to Loki |
 | Multi-backend / redaction / routing | OTel Collector or Grafana Alloy | Move cross-cutting pipeline concerns out of Lambda |
@@ -63,7 +65,9 @@ FSx for ONTAP S3 Access Points do **NOT** support S3 Event Notifications or Even
 | [Sumo Logic](../../integrations/sumo-logic/) | ✅ E2E verified | HTTP Source |
 | [Honeycomb](../../integrations/honeycomb/) | ✅ E2E verified | Events Batch API |
 | [CrowdStrike Falcon LogScale](../../integrations/crowdstrike/) | ✅ HEC verified (via Splunk) | HEC via Lambda (Splunk HEC compatible) |
-| [NetApp Console / System Manager](../../integrations/netapp-console/) | ✅ Verified | GUI management + FSA (File System Analytics) |
+| [NetApp Console<!-- allow:naming --> / System Manager](../../integrations/netapp-console/) | ✅ Verified | GUI management + FSA (File System Analytics), NetApp SaaS |
+| [Self-hosted Management Console](../../management-console/) | ✅ Validated (Stacks 1-3) | AWS-native GUI management + monitoring, no external SaaS |
+| [Automated Incident Response](automated-response-guide.md) | ✅ E2E verified (36 unit tests) | Storage-layer user/IP blocking, snapshot, session disconnect — AWS-native alternative to DII<!-- allow:naming --> Storage Workload Security containment |
 
 Status:
 - ✅ **E2E verified** — Deployed and validated with real FSx for ONTAP audit logs
@@ -79,7 +83,7 @@ This project provides an **EC2-free** alternative using Lambda + ECS Fargate.
 **Before → After**:
 - 🔴 2x EC2 always-on (patching, agent updates, ~$66/month) → 🟢 Zero-ops serverless pipeline (~$6/month, pay-per-use)
 - 🔴 Audit logs locked inside FSx volume → 🟢 Instantly searchable and alertable in existing SIEM/Observability
-- 🔴 Hours from ransomware detection to response → 🟢 Alert fired within 30 seconds via EMS/FPolicy
+- 🔴 Hours from ransomware detection to response → 🟢 Alert fired within 30 seconds via EMS/FPolicy, with an optional automated storage-layer block (see [Automated Incident Response Guide](automated-response-guide.md))
 
 **Measurable outcomes**:
 - Eliminate EC2 collector operations (no patching, no agent management)
@@ -95,7 +99,7 @@ Common customer scenarios:
 - Replacing Splunk Universal Forwarder on EC2
 - Modernizing audit visibility for enterprise file shares
 - Integrating FSx for ONTAP with existing SIEM / observability platforms
-- Preparing for ransomware detection workflows using ONTAP telemetry
+- Preparing for ransomware detection workflows using ONTAP telemetry, with automated storage-layer containment as a next step (see [Automated Incident Response Guide](automated-response-guide.md))
 
 ## Try with Sample Data
 
@@ -207,25 +211,26 @@ aws cloudformation delete-stack --stack-name fsxn-observability-prerequisites --
 
 > **Note**: Deleting the stack does not affect ONTAP audit logging or existing data on the FSx volume.
 
-## GUI Management (NetApp Console / System Manager)
+## GUI Management
 
-ONTAP System Manager is accessible via NetApp Console and enables browser-based management without CLI:
+Two browser-based options exist for GUI-driven management (audit config, quota, volume/share management, FSA):
 
-- Audit log configuration and management
-- Qtree quota (capacity limit) configuration
-- File System Analytics (FSA) — file access trend visualization
-- Activity Tracking — real-time file operation monitoring
-- Volume and share management
+| Option | Data residency | Cost | Setup |
+|--------|----------------|------|-------|
+| **[Self-hosted Management Console](../../management-console/)** (AWS-native) | VPC-internal, no external SaaS | ~$250/month (24/7) | ~30 min (CloudFormation) |
+| NetApp Console<!-- allow:naming --> + System Manager (NetApp SaaS) | External SaaS portal | Link (Lambda) ~$0.008/month; System Manager itself free | NSS account + Link setup |
 
-> **Access path**: [NetApp Console](https://console.netapp.com/) → Systems → SERVICES → "Open" (System Manager)
->
-> **Cost**: NetApp Console Link (Lambda) ~$0.008/month. System Manager itself is free.
+**How to choose**: If a data residency requirement prevents sending metrics/state outside the VPC, or you want AWS-native authentication (Cognito/IAM), use the self-hosted Management Console. If you already have (or don't mind) a NetApp SaaS relationship and want the built-in System Manager UI with no AWS resources to run, use NetApp Console<!-- allow:naming -->. Both provide overlapping but not identical capabilities — see the comparison table in [management-console/README.md](../../management-console/README.md#when-to-choose-this-approach).
+
+> **NetApp Console<!-- allow:naming --> access path**: [NetApp Console](https://console.netapp.com/) → Systems → SERVICES → "Open" (System Manager)
 
 📖 [Management & Monitoring Decision Tree](decision-tree-management-monitoring.md)
 
 📖 [System Manager GUI Guide](system-manager-gui-guide.md)
 
-📖 [NetApp Console Integration](../../integrations/netapp-console/)
+📖 [NetApp Console<!-- allow:naming --> Integration](../../integrations/netapp-console/) (SaaS path) · [Self-hosted Management Console](../../management-console/) (AWS-native path)
+
+> 🔍 **Beyond day-to-day GUI management** — if you're evaluating NetApp Console<!-- allow:naming --> or DII<!-- allow:naming --> Storage Workload Security for ransomware containment, see the [Automated Incident Response Guide](automated-response-guide.md) for an AWS-native alternative (or complement) that triggers the same storage-layer blocking actions from any detection source in your existing stack.
 
 ## Documentation
 
@@ -255,6 +260,10 @@ ONTAP System Manager is accessible via NetApp Console and enables browser-based 
 - [Cost Validation Template](cost-validation.md)
 
 ### Security & Compliance
+- [Automated Incident Response Guide](automated-response-guide.md) — user/IP blocking, snapshot, session disconnect (ONTAP REST API)
+  > 🔍 Looking for AD-integrated user/IP-level storage-layer access blocking, similar to what dedicated storage security products (e.g., DII Storage Workload Security) provide? See the comparison table and FAQ in this guide. Scope: storage-layer blocking and evidence preservation only — host isolation, malware removal, and credential rotation are out of scope.
+- [EMS Detection Capabilities](ems-detection-capabilities.md) — 30+ events, push delivery, latency comparison
+- [Security Monitoring Index](security-monitoring-index.md) — role-based and feature-based documentation index
 - [Data Classification Guide](data-classification.md)
 - [Retention Policy Matrix](retention-policy-matrix.md)
 - [Compliance Evidence Pack](compliance-evidence-pack.md)

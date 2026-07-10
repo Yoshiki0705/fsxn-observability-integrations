@@ -1,24 +1,31 @@
 # FSx for ONTAP Management Console — Partner Brief
 
-## Customer Challenge
+## Problem Statement
 
 Storage administrators managing Amazon FSx for NetApp ONTAP need unified monitoring and management capabilities without relying on external SaaS platforms or ONTAP CLI expertise.
 
 ## Solution Pattern
 
-Self-hosted management console deployed within the customer's VPC using AWS managed services:
+Self-hosted management console deployed within the account owner's VPC using AWS managed services:
 - **Monitoring**: NetApp Harvest → Amazon Managed Prometheus → Amazon Managed Grafana (20+ dashboards)
 - **Management**: Low-code UI (Appsmith/ToolJet) on ECS Fargate with ONTAP REST API integration
 - **Authentication**: Amazon Cognito with MFA support
 
-## Key Differentiators
+## How This Compares
 
-| vs NetApp DII/BlueXP | vs Custom Development | vs CLI-only |
-|----------------------|----------------------|-------------|
-| No external SaaS dependency | No React/frontend development | GUI for all operations |
-| VPC-internal data residency | Pre-built ONTAP dashboards | Reduced training time |
-| AWS-native authentication | CloudFormation deployment | Audit trail built-in |
-| Customer-owned infrastructure | Low-code UI customization | Error prevention (validation) |
+This pattern is one option among several; the right choice depends on data residency, customization needs, and whether standard SaaS/CLI tooling already meets requirements.
+
+| Consideration | This pattern | NetApp DII<!-- allow:naming -->/BlueXP<!-- allow:naming --> | Custom development (React/etc.) | CLI-only |
+|----------------------|----------------------|----------------------|----------------------|-------------|
+| External SaaS dependency | None | Required | None | None |
+| Data residency | VPC-internal | External SaaS | Depends on hosting | VPC-internal |
+| Authentication | AWS-native (Cognito) | NetApp's own | Custom-built | ONTAP local |
+| Build effort | Low-code configuration | None (managed service) | Frontend development required | None |
+| Dashboards | Pre-built via Harvest | Pre-built | Must build | Not applicable |
+| Operations interface | GUI | GUI | GUI (custom) | Terminal only |
+| Trade-off | ~$250/month AWS resource cost; you operate it | Ongoing SaaS subscription | Development + maintenance cost | No GUI; steeper learning curve for new operators |
+
+> **How to choose** (Partner/SI lens): Lead with the requirement, not the tool. If a data residency constraint rules out external SaaS, this pattern or CLI-only are the remaining options. If no such constraint exists and the team already has a NetApp SaaS relationship, DII<!-- allow:naming -->/BlueXP<!-- allow:naming --> may be the faster path since it needs no additional AWS infrastructure to operate.
 
 ## PoC Success Criteria
 
@@ -49,7 +56,7 @@ Self-hosted management console deployed within the customer's VPC using AWS mana
 1. Custom domain + ACM certificate for ALB
 2. Grafana dashboard customization for customer's specific volumes/SVMs
 3. RBAC configuration (Cognito groups → Admin/Viewer roles)
-4. Integration with existing observability pipeline (if applicable)
+4. Integration with an existing observability pipeline (if applicable)
 
 ## Resources
 

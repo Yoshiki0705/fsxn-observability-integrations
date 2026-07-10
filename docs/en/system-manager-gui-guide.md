@@ -13,24 +13,25 @@ This document provides step-by-step instructions for operations teams to use **O
 
 ---
 
-## Background: System Manager vs NetApp BlueXP vs NetApp Console
+## Background: System Manager vs NetApp BlueXP<!-- allow:naming --> vs NetApp Console<!-- allow:naming -->
 
 | Tool | Type | Cost | Account Required | Purpose |
 |------|------|------|-----------------|---------|
-| **ONTAP System Manager** | ONTAP GUI (accessed via NetApp Console) | **Free** | NSS account required | General storage management |
-| **NetApp Console** (formerly BlueXP) | SaaS portal | Free (basic features) | NSS account required | System Manager host + multi-cloud management |
+| **ONTAP System Manager** | ONTAP GUI (accessed via NetApp Console<!-- allow:naming -->) | **Free** | NSS account required | General storage management |
+| **NetApp Console**<!-- allow:naming --> (formerly BlueXP<!-- allow:naming -->) | SaaS portal | Free (basic features) | NSS account required | System Manager host + multi-cloud management |
+| **[Self-hosted Management Console](../../management-console/)** | AWS-native (ECS Fargate + AMP/AMG) | ~$250/month (24/7) | None (AWS account only) | VPC-internal monitoring + management UI |
 | **ONTAP REST API** | HTTP API (direct access) | **Free** | None (fsxadmin auth) | Automation & scripting |
 | **ONTAP CLI** | SSH command line | **Free** | None (fsxadmin auth) | Advanced configuration |
 
-> ⚠️ **Critical constraint**: Unlike on-premises ONTAP, FSx for ONTAP does **NOT** display the System Manager UI when you directly browse to `https://<management-endpoint-ip>` (returns 404 error). System Manager GUI access requires **NetApp Console**. REST API (`/api/`) and CLI (SSH) are directly accessible.
+> ⚠️ **Critical constraint**: Unlike on-premises ONTAP, FSx for ONTAP does **NOT** display the System Manager UI when you directly browse to `https://<management-endpoint-ip>` (returns 404 error). System Manager GUI access requires **NetApp Console<!-- allow:naming -->**. REST API (`/api/`) and CLI (SSH) are directly accessible.
 
-**Bottom line**: GUI-based storage management requires **NetApp Console setup**. CLI/REST API can be used immediately without any NetApp account.
+**Bottom line**: GUI-based storage management requires **NetApp Console<!-- allow:naming --> setup**. CLI/REST API can be used immediately without any NetApp account.
 
 ---
 
-## 1. Accessing System Manager (via NetApp Console)
+## 1. Accessing System Manager (via NetApp Console<!-- allow:naming -->)
 
-### 1.1 NetApp Console Setup Steps
+### 1.1 NetApp Console<!-- allow:naming --> Setup Steps
 
 To use System Manager with FSx for ONTAP, the following setup is required:
 
@@ -43,15 +44,15 @@ To use System Manager with FSx for ONTAP, the following setup is required:
 
 > **Note**: Account creation is free. Support case filing requires a paid support contract, but this is NOT needed for System Manager usage.
 
-#### Step 2: Log in to NetApp Console
+#### Step 2: Log in to NetApp Console<!-- allow:naming -->
 
-1. Go to [NetApp Console](https://console.netapp.com)
+1. Go to [NetApp Console<!-- allow:naming -->](https://console.netapp.com)
 2. Log in with NSS credentials
 3. Set up account name on first login
 
 #### Step 3: Register AWS Credentials
 
-Add AWS credentials to NetApp Console:
+Add AWS credentials to NetApp Console<!-- allow:naming -->:
 
 - **Read-only**: Discovery and monitoring of FSx for ONTAP only
 - **Read/write**: Volume creation, modification, and other management operations
@@ -72,21 +73,21 @@ To use management features including System Manager, one of the following is req
 
 #### Step 5: Discover FSx for ONTAP
 
-1. NetApp Console → **Systems** page
+1. NetApp Console<!-- allow:naming --> → **Systems** page
 2. **Discover** → Select **Amazon FSx for NetApp ONTAP**
 3. Specify AWS region and credentials
 4. Existing FSx for ONTAP file systems are discovered
 
 #### Step 6: Open System Manager
 
-1. NetApp Console → **Systems** page → Select target file system
+1. NetApp Console<!-- allow:naming --> → **Systems** page → Select target file system
 2. Click **System Manager**
 3. Enter `fsxadmin` credentials
-4. System Manager UI is displayed within NetApp Console
+4. System Manager UI is displayed within NetApp Console<!-- allow:naming -->
 
-### 1.2 Alternative: CLI / REST API (No NetApp Console Required)
+### 1.2 Alternative: CLI / REST API (No NetApp Console<!-- allow:naming --> Required)
 
-Management methods that do NOT require NetApp Console setup:
+Management methods that do NOT require NetApp Console<!-- allow:naming --> setup:
 
 | Method | Access Target | Authentication | Use Case |
 |--------|--------------|----------------|----------|
@@ -94,7 +95,7 @@ Management methods that do NOT require NetApp Console setup:
 | **ONTAP REST API** | `https://<management-endpoint-ip>/api/` | Basic Auth (fsxadmin) | Automation & scripting |
 | **AWS CLI** | `aws fsx ...` | IAM authentication | File system-level management |
 
-> **Recommended**: Perform initial configuration (audit logs, quotas) via CLI/REST API, then use NetApp Console (System Manager) for day-to-day monitoring and management. This hybrid approach is the most practical.
+> **Recommended**: Perform initial configuration (audit logs, quotas) via CLI/REST API, then use NetApp Console<!-- allow:naming --> (System Manager) for day-to-day monitoring and management. This hybrid approach is the most practical.
 
 > **Security best practices**:
 > - Store `fsxadmin` password in AWS Secrets Manager
@@ -547,22 +548,22 @@ The Explorer view supports CSV download:
 
 ## 8. Security and Availability Considerations
 
-### 8.1 Providing AWS Credentials to NetApp Console
+### 8.1 Providing AWS Credentials to NetApp Console<!-- allow:naming -->
 
-Security model when registering AWS credentials with NetApp Console:
+Security model when registering AWS credentials with NetApp Console<!-- allow:naming -->:
 
 | Aspect | Details |
 |--------|---------|
 | **Auth method** | IAM Role AssumeRole (same trust model as Datadog AWS Integration) |
-| **Data NetApp Console accesses** | FSx for ONTAP metadata (file system ID, capacity, SVM list, etc.) |
-| **Data NetApp Console does NOT access** | File data, audit log contents, user data |
+| **Data NetApp Console<!-- allow:naming --> accesses** | FSx for ONTAP metadata (file system ID, capacity, SVM list, etc.) |
+| **Data NetApp Console<!-- allow:naming --> does NOT access** | File data, audit log contents, user data |
 | **Least privilege recommendation** | `fsx:Describe*` + `ec2:Describe*` only (read-only) |
 
-> **Comparison**: Datadog AWS Integration also assumes an IAM Role to collect metrics. NetApp Console uses the same trust model. If granting read/write permissions, understand the scope of management operations enabled.
+> **Comparison**: Datadog AWS Integration also assumes an IAM Role to collect metrics. NetApp Console<!-- allow:naming --> uses the same trust model. If granting read/write permissions, understand the scope of management operations enabled.
 
-### 8.2 NetApp Console Availability and Dependencies
+### 8.2 NetApp Console<!-- allow:naming --> Availability and Dependencies
 
-| Component | During NetApp Console Outage | Impact |
+| Component | During NetApp Console<!-- allow:naming --> Outage | Impact |
 |-----------|------------------------------|--------|
 | System Manager GUI | ❌ Unavailable | GUI management operations blocked |
 | ONTAP CLI (SSH) | ✅ Unaffected | All ONTAP operations available |
@@ -570,15 +571,15 @@ Security model when registering AWS credentials with NetApp Console:
 | Audit log delivery pipeline | ✅ Unaffected | Lambda uses S3 AP directly |
 | EMS Webhook | ✅ Unaffected | ONTAP sends directly to API Gateway |
 
-> **Conclusion**: NetApp Console is a convenience layer for GUI access but is NOT in the critical path. This project's audit log delivery pipeline has zero dependency on NetApp Console.
+> **Conclusion**: NetApp Console<!-- allow:naming --> is a convenience layer for GUI access but is NOT in the critical path. This project's audit log delivery pipeline has zero dependency on NetApp Console<!-- allow:naming -->.
 
 ### 8.3 Link Lambda Permissions and Communication
 
-The Link Lambda bridges NetApp Console and the FSx for ONTAP management endpoint:
+The Link Lambda bridges NetApp Console<!-- allow:naming --> and the FSx for ONTAP management endpoint:
 
 | Aspect | Details |
 |--------|---------|
-| **Communication targets** | NetApp Console backend + FSx for ONTAP management IP |
+| **Communication targets** | NetApp Console<!-- allow:naming --> backend + FSx for ONTAP management IP |
 | **Data sent** | ONTAP REST API responses (metadata, configuration) |
 | **Data NOT sent** | File data, audit log contents |
 | **Encryption** | All communication over HTTPS (TLS 1.2+) |
@@ -628,7 +629,7 @@ Operations phase (automatic):
 | Aspect | GUI (System Manager) | CLI/REST API |
 |--------|---------------------|-------------|
 | Initial setup | Intuitive | Scriptable, reproducible |
-| During outages | Depends on NetApp Console | Direct access (no dependency) |
+| During outages | Depends on NetApp Console<!-- allow:naming --> | Direct access (no dependency) |
 | IaC integration | Not possible | CloudFormation compatible |
 
 **Recommended**: Day 1 — CLI for initial setup (reproducible). Day 2+ — GUI for status checks.

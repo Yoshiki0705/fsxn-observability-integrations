@@ -2,7 +2,9 @@
 
 ## エグゼクティブサマリ
 
-本ガイドでは、Amazon FSx for NetApp ONTAP に対する自動脅威封じ込め（ユーザーブロック、IP ブロック、保護 Snapshot）を、AWS ネイティブの検知サービスと ONTAP REST API の応答アクションを組み合わせて実装する方法を解説します。専用のストレージセキュリティ製品と同等の封じ込め能力を、AWS エコシステムとサードパーティ Observability プラットフォーム内で実現します。
+本ガイドでは、Amazon FSx for NetApp ONTAP に対する自動ストレージ層アクセス遮断（ユーザーブロック、IP ブロック、保護 Snapshot）を、AWS ネイティブの検知サービスと ONTAP REST API の応答アクションを組み合わせて実装する方法を解説します。専用のストレージセキュリティ製品と同等の封じ込めフェーズの能力を、AWS エコシステムとサードパーティ Observability プラットフォーム内で実現します。
+
+> **スコープに関する注記**: 本モジュールが自動化するのは NIST SP 800-61 における「封じ込め（Containment）」フェーズのうち、ストレージ層でのアクセス遮断と証拠保全のみです。侵害端末の隔離、マルウェア除去、認証情報のローテーション、他システムへの横展開の遮断（根絶・復旧フェーズ）は範囲外であり、引き続き人間の判断または他の IR ツールが必要です。
 
 **主要機能:**
 - ONTAP name-mapping による SMB ユーザーブロック（全ボリュームでアクセス拒否）
@@ -344,6 +346,7 @@ aws sns publish \
 |-----------|---------|------------|
 | `contain_smb_threat` | Snapshot → ユーザーブロック → セッション切断 | 侵害された AD ユーザーを検知 |
 | `contain_nfs_threat` | Snapshot → IP ブロック | 不審な NFS クライアント活動 |
+| `contain_multiprotocol_threat` | Snapshot → SMB ユーザーブロック → NFS IP ブロック → セッション切断 | SMB と NFS の両方でアクセスされるボリューム — 単一プロトコルのブロックのみでは攻撃者がプロトコルを切り替えて回避できるため不十分 |
 
 ---
 
@@ -476,6 +479,12 @@ export-policy rule delete -vserver <svm> -policyname <policy> -ruleindex <index>
 | Lambda エラー | CloudWatch Lambda メトリクス | 5 分で > 0 |
 | 応答レイテンシ | Lambda Duration メトリクス | p95 > 10s |
 | アクティブブロック数 | カスタムメトリクス（オプション） | トラッキングのみ |
+| 保護対象アカウントへのブロック試行 | CloudWatch Logs フィルタ `Cannot block protected account`（`_validate_username` からの HTTP 403） | > 0 — 即時調査 |
+| ブロック発生率（プロトコル問わず） | Lambda 呼び出し回数からのカスタムメトリクス | 想定インシデント発生率を超えたらアラーム — [自動応答セキュリティ補遺](automated-response-security-addendum.md)の「10. レート制限 & スケーラビリティ」セクションを参照 |
+
+> **インシデント対応 lens**: 保護対象アカウント（`fsxadmin`、`administrator`、または `PROTECTED_ACCOUNTS_EXTRA` に登録されたエントリ）へのブロック試行が拒否された場合、それ自体が調査に値する信号です。誤った ID を指す検知ルールの設定ミス、または攻撃者が応答パイプライン自体を悪用して正当な管理者をロックアウトしようとしている可能性を示唆します。ログに記録するだけでなく、この状態にアラートを設定してください。
+>
+> **信頼性 lens**: 過剰に反応する自動応答システムは、それ自体が自己誘発型のサービス拒否ベクターになり得ます（例: ノイズの多い検知ルールが短時間で多数のユーザーに対して `contain_smb_threat` を発火させる）。失敗だけでなく呼び出し/ブロック発生率にもアラームを設定し、暴走した検知ソースが大量のユーザーをロックアウトする前に検知できるようにしてください。
 
 ---
 
@@ -486,7 +495,7 @@ export-policy rule delete -vserver <svm> -policyname <policy> -ruleindex <index>
 - **監査証跡**: 全アクションは CloudWatch Logs に相関 ID 付きで記録。
 - **クールダウン保護**: Snapshot 作成に設定可能なクールダウン（デフォルト 15 分）を適用し、持続的攻撃時のストレージ枯渇を防止。
 - **マーカーベースのクリーンアップ**: 全応答ルールに `fsxn_auto_response` マーカーを含め、安全な識別と一括削除を実現。
-- **時間制限付きブロック**: 設定可能な期間後にブロックを自動解除するスケジュール Lambda の実装を推奨（専用製品の時間制限付きアクセス制限と同等）。
+- **時間制限付きブロック**: 付随する [`automated-response-ttl.yaml`](../../shared/templates/automated-response-ttl.yaml) スタックをデプロイすると、EventBridge Scheduler により設定可能な期間後にブロックを自動解除できます。未デプロイの場合、ブロックは手動で解除するまで残り続けます — この挙動が環境として許容できるか、デプロイ計画時に判断してください。
 
 ---
 
@@ -582,7 +591,7 @@ aws lambda delete-layer-version --layer-name fsxn-shared-python --version-number
 ## FAQ
 
 **Q: これは DII Storage Workload Security を完全に置き換えますか？**
-A: 同じ *封じ込めアクション*（ブロック/Snapshot/切断）を提供します。検知インテリジェンスは異なります: DII は内蔵のユーザー別 ML ベースラインを使用し、本アプローチは利用者が選択した SIEM の分析機能を使用します。既存の SIEM 投資がある組織では、組み合わせアプローチにより、ストレージ単体の検知よりも広い文脈（ネットワーク + アプリケーション + ストレージ）を提供できます。
+A: ストレージ層での同じ *封じ込めフェーズのアクション*（ブロック/Snapshot/切断）を提供します。検知インテリジェンスは異なります: DII は内蔵のユーザー別 ML ベースラインを使用し、本アプローチは利用者が選択した SIEM の分析機能を使用します。本モジュールも DII も根絶・復旧（侵害端末の隔離、マルウェア除去、認証情報のローテーション）は行いません — どちらも封じ込めフェーズのツールであり、インシデント対応ライフサイクルの残りの部分には引き続き人間または別の IR ツールが必要です。既存の SIEM 投資がある組織では、組み合わせアプローチにより、ストレージ単体の検知よりも広い検知文脈（ネットワーク + アプリケーション + ストレージ）を提供できます。
 
 **Q: Lambda が ONTAP に到達できない場合はどうなりますか？**
 A: 実行が失敗し、メッセージが DLQ に入り、DLQ アラームが発火します。ネットワーク接続性（Security Group、ルートテーブル、ONTAP 管理 LIF の状態）を調査してください。
@@ -601,13 +610,15 @@ EventBridge / SIEM Alert
        -> Notify: "3 SVM でユーザーをブロック"
 ```
 
-CLI ヘルパーでのループ:
+`automated-response-multi-svm-cli.sh` ラッパーを使用すると、複数 SVM へのファンアウト、SVM ごとの成功/失敗の報告、いずれかの SVM が失敗した場合の非ゼロ終了コードが得られます:
+
 ```bash
-for SVM in svm-prod-01 svm-prod-02 svm-dr-01; do
-  ./shared/scripts/automated-response-cli.sh contain-smb \
-    --svm "$SVM" --domain CORP --user jdoe \
-    --volume vol_data --reason "ARP detection - multi-SVM block"
-done
+export RESPONSE_TOPIC_ARN="arn:aws:sns:ap-northeast-1:123456789012:fsxn-automated-response-trigger"
+
+./shared/scripts/automated-response-multi-svm-cli.sh contain-smb \
+  --svms "svm-prod-01,svm-prod-02,svm-dr-01" \
+  --domain CORP --user jdoe --volume vol_data \
+  --reason "ARP detection - multi-SVM block"
 ```
 
 **Q: ブロックはどのくらいの速さで有効になりますか？**

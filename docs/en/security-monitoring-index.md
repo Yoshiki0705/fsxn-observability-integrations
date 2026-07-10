@@ -20,9 +20,9 @@ This index provides navigation across all security-related documentation in this
 ### Security Analyst / SOC
 | Need | Document | Key Section |
 |------|----------|-------------|
-| Understand automated containment actions | [Automated Response Guide](automated-response-guide.md) | How Blocking Works |
+| Understand automated storage-layer blocking | [Automated Response Guide](automated-response-guide.md) | How Blocking Works |
 | Run the full demo for evaluation | [Demo Runbook](demo-automated-response.md) | All phases |
-| Compare with dedicated security products | [Automated Response Guide](automated-response-guide.md) | Comparison table |
+| Compare with dedicated security products (e.g., DII Storage Workload Security) | [Automated Response Guide](automated-response-guide.md) | Comparison table, FAQ |
 | Review detection latency | [EMS Detection Capabilities](ems-detection-capabilities.md) | Delivery Latency Comparison |
 
 ### Cloud Architect / DevOps

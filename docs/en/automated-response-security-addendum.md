@@ -46,7 +46,7 @@ For volumes accessed via BOTH NFS and SMB (multiprotocol), execute both containm
 {"action": "contain_nfs_threat", "svm_name": "svm-prod", "client_ip": "10.0.5.99", "volume_name": "vol_data"}
 ```
 
-> **Architecture consideration**: A future `contain_multiprotocol_threat` composite action could combine both in a single message. Currently, publish two messages to achieve full multi-protocol containment.
+> **Simpler alternative**: The `contain_multiprotocol_threat` composite action combines both blocks (plus snapshot and session disconnect) in a single message, instead of publishing the two messages shown above. See [Automated Response Guide — Composite Actions](automated-response-guide.md#supported-actions).
 
 ---
 

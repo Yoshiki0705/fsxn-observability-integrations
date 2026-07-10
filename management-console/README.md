@@ -47,16 +47,16 @@ The Management Console is a **2-layer architecture** deployed entirely within yo
 
 ## Value Proposition
 
-**30-second summary**: This console gives FSx for ONTAP operators a unified view of storage performance + management operations within their VPC, without sending data to external SaaS platforms. It reduces MTTR for storage issues by combining real-time metrics with one-click remediation actions in a single pane of glass.
+**30-second summary**: This console gives FSx for ONTAP operators a unified view of storage performance + management operations within their VPC, without sending data to external SaaS platforms. It aims to reduce MTTR for storage issues by combining real-time metrics with one-click remediation actions in a single pane of glass — validate this target against your own baseline before relying on it.
 
-### Customer Question → Pattern → Business Outcome
+### Common Questions → Pattern → Expected Outcome
 
-| Customer Question | Pattern | Expected Outcome |
+| Common Question | Pattern | Expected Outcome |
 |-------------------|---------|-----------------|
-| "How do I monitor FSx for ONTAP without NetApp Cloud SaaS?" | Harvest + AMP + AMG (Layer 1) | Real-time visibility into 50+ ONTAP metrics, 20+ dashboards, no data leaves VPC |
-| "How do I manage volumes/snapshots without ONTAP CLI?" | Appsmith/ToolJet + ONTAP REST API (Layer 2) | Self-service storage operations via web UI, 80% reduction in CLI dependency |
+| "How do I monitor FSx for ONTAP without an external SaaS platform?" | Harvest + AMP + AMG (Layer 1) | Real-time visibility into 50+ ONTAP metrics, 20+ dashboards, no data leaves VPC |
+| "How do I manage volumes/snapshots without ONTAP CLI?" | Appsmith/ToolJet + ONTAP REST API (Layer 2) | Self-service storage operations via web UI, reduced day-to-day CLI dependency |
 | "How do I unify authentication across monitoring and management?" | Cognito + ALB authenticate action | Single login for all console components, MFA support, no custom auth code |
-| "How do I comply with data residency requirements?" | VPC-internal deployment, no external SaaS | All data stays within customer's AWS account and VPC |
+| "How do I meet a data residency requirement?" | VPC-internal deployment, no external SaaS | All data stays within your own AWS account and VPC |
 
 ### Success Metrics (PoC Criteria)
 
@@ -65,30 +65,38 @@ The Management Console is a **2-layer architecture** deployed entirely within yo
 | Deployment time | Time from `deploy.sh` start to all stacks CREATE_COMPLETE | < 30 minutes |
 | Metrics visibility | Time from deployment to first Grafana dashboard with data | < 5 minutes after Harvest starts |
 | Operation latency | Time from UI action to ONTAP API response displayed | < 5 seconds (P95) |
-| MTTR improvement | Time to identify + resolve a capacity issue (before vs after) | 50% reduction vs CLI-only workflow |
+| MTTR improvement | Time to identify + resolve a capacity issue (before vs after) | Measure against your own CLI-only baseline; no fixed target — report the observed delta |
+
+> **Sample run vs production estimate** (Observability Engineer lens): The deployment-time and latency figures above reflect the validation environment described in this repository (Stacks 1-3, single Region, low ONTAP management-call volume). They are not guaranteed service limits. Re-measure in your own account before using them for capacity planning or SLA commitments.
 
 ## When to Choose This Approach
 
-| Requirement | NetApp DII/BlueXP | System Manager | **This Solution** |
+Each option below suits different requirements. None is universally preferable — the right choice depends on data residency, customization needs, and operating cost tolerance.
+
+| Requirement | NetApp DII<!-- allow:naming -->/BlueXP<!-- allow:naming --> (SaaS) | System Manager (ONTAP built-in) | This Self-Hosted Console |
 |-------------|-------------------|----------------|-------------------|
-| VPC-internal (no external data egress) | ❌ SaaS | ✅ Built-in | ✅ |
-| 20+ custom dashboards | ✅ | ❌ Limited | ✅ (Harvest + AMG) |
-| AWS-native auth (Cognito/IAM) | ❌ Proprietary | ❌ ONTAP local | ✅ |
-| Storage operations GUI | ✅ | ✅ | ✅ (Low-code) |
-| Custom workflows | ❌ | ❌ | ✅ (Appsmith/ToolJet) |
-| Operating cost | SaaS monthly | Free (built-in) | ~$250/month (24/7) |
+| VPC-internal (no external data egress) | Requires external SaaS | Built-in | Built-in |
+| 20+ custom dashboards | Available | Limited | Available (Harvest + AMG) |
+| AWS-native auth (Cognito/IAM) | Uses NetApp's own auth | Uses ONTAP local auth | Available |
+| Storage operations GUI | Available | Available | Available (low-code) |
+| Custom UI workflows | Not customizable | Not customizable | Available (Appsmith/ToolJet) |
+| Operating cost | SaaS subscription | Free (built-in) | ~$250/month (24/7 estimate) |
 | Setup time | Minutes (SaaS) | Instant (built-in) | ~30 minutes |
 
-**Choose this solution when:**
-- Data residency requirements prevent sending data to external SaaS
-- You need AWS Cognito/IAM unified authentication
+**This self-hosted console fits when:**
+- A data residency requirement prevents sending data to external SaaS
+- You want AWS Cognito/IAM unified authentication
 - You need custom UI workflows tailored to your operations
-- You want to integrate with existing AWS Observability stack (AMP/AMG)
+- You want to integrate with an existing AWS Observability stack (AMP/AMG)
 
-**Choose NetApp standard tools when:**
-- No data residency requirements
-- Standard features are sufficient without customization
-- You want to avoid additional AWS resource costs
+**NetApp's own tools (System Manager or DII<!-- allow:naming -->/BlueXP<!-- allow:naming -->) fit when:**
+- No data residency requirement blocks external SaaS
+- Standard built-in features are sufficient without customization
+- You prefer to avoid running and paying for additional AWS resources
+
+> **Combining both** (Storage Specialist lens): These options are not mutually exclusive. A common pattern is to keep System Manager for day-to-day ad hoc checks (it is free and always available) while using this self-hosted console for automated workflows, custom dashboards, or environments where a data residency requirement rules out any external SaaS call.
+
+> 🔍 **Ransomware / incident response note**: The comparison above covers day-to-day management and monitoring. If you're specifically evaluating DII<!-- allow:naming --> Storage Workload Security's containment capabilities (automated user/IP blocking on anomaly detection), see the [Automated Incident Response Guide](../docs/en/automated-response-guide.md) for an AWS-native alternative that implements the same ONTAP REST API blocking actions, triggerable from any detection source (this console's alerts, a SIEM, or a manual CLI call) rather than DII's own ML detection.
 
 | Layer | Purpose | Components |
 |-------|---------|------------|

@@ -308,10 +308,10 @@ Blocks should not persist indefinitely. The TTL stack automatically removes expi
 
 ---
 
-## Scenario 10: ARP Detection → End-to-End Auto-Containment
+## Scenario 10: ARP Detection → End-to-End Auto-Block
 
 ### Story
-The complete chain: ONTAP ARP detects ransomware-like behavior → EMS Webhook → Observability platform → SIEM monitor fires → SNS → Response Lambda → User blocked + Snapshot + Sessions disconnected. Total time: ~65 seconds from detection to containment.
+The complete chain: ONTAP ARP detects ransomware-like behavior → EMS Webhook → Observability platform → SIEM monitor fires → SNS → Response Lambda → User blocked + Snapshot + Sessions disconnected. Total time: ~65 seconds from detection to storage-layer block. This automates the containment phase only — eradication (e.g., removing the attacker's foothold) and recovery are not covered and still require human follow-up.
 
 ### Steps
 
@@ -332,8 +332,8 @@ The complete chain: ONTAP ARP detects ransomware-like behavior → EMS Webhook �
    - Email notification received
 
 ### Expected Result
-- Complete automated containment in ~65 seconds
-- Zero manual intervention required
+- Storage-layer block and evidence preservation complete in ~65 seconds
+- Zero manual intervention required for the blocking step
 - Evidence preserved (snapshot + audit logs)
 
 > Full procedure: [Automated Response Demo Runbook](demo-automated-response.md) Phase 4
