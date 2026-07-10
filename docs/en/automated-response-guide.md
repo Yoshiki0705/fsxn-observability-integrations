@@ -115,9 +115,9 @@ Dedicated storage security products (such as DII Storage Workload Security) prov
 | Integration with SIEM | Limited export | Native (detection originates from SIEM) |
 | Cost model | Per-node license | Pay-per-use (Lambda invocations) |
 
-> **Storage Operations lens**: The underlying ONTAP mechanisms are identical — both approaches use the same REST API endpoints. The difference is where detection intelligence lives. Dedicated products embed ML in their SaaS; this approach delegates detection to your chosen observability platform.
+> **Operational note**: The underlying ONTAP mechanisms are identical — both approaches use the same REST API endpoints. The difference is where detection intelligence lives. Dedicated products embed ML in their SaaS; this approach delegates detection to your chosen observability platform.
 
-> **Security Architect lens**: AWS-native detection provides broader attack context (VPC Flow Logs, CloudTrail, GuardDuty findings) that storage-only solutions cannot correlate. For organizations with existing SIEM investments, this is a natural extension of their security operations workflow.
+> **Security-architecture note**: AWS-native detection provides broader attack context (VPC Flow Logs, CloudTrail, GuardDuty findings) that storage-only solutions cannot correlate. For organizations with existing SIEM investments, this is a natural extension of their security operations workflow.
 
 ---
 
@@ -410,7 +410,7 @@ aws sns publish \
 | severity | No (recommended) | `critical` / `high` / `medium` / `low` |
 | trigger_id | No | SNS MessageId or upstream correlation ID |
 
-> **Compliance lens (HIPAA/FISC/SOC2)**: For regulated environments, always include `incident_id`, `detection_source`, and `severity`. These fields are passed through to CloudWatch Logs and notification messages, forming the audit trail.
+> **Compliance note (HIPAA/FISC/SOC2)**: For regulated environments, always include `incident_id`, `detection_source`, and `severity`. These fields are passed through to CloudWatch Logs and notification messages, forming the audit trail.
 
 ---
 
@@ -519,9 +519,9 @@ export-policy rule delete -vserver <svm> -policyname <policy> -ruleindex <index>
 | Protected-account block attempts | CloudWatch Logs filter on `Cannot block protected account` (HTTP 403 from `_validate_username`) | > 0 — investigate immediately |
 | Block rate (any protocol) | Custom metric from Lambda invocation count | Alarm above your expected incident rate — see the "10. Rate Limits & Scalability" section in the [Security Addendum](automated-response-security-addendum.md) |
 
-> **Incident Response lens**: A rejected attempt to block a protected account (`fsxadmin`, `administrator`, or an entry in `PROTECTED_ACCOUNTS_EXTRA`) is a signal worth investigating on its own — it can indicate a misconfigured detection rule pointing at the wrong identity, or an attacker attempting to use the response pipeline itself to lock out legitimate admins. Alert on this condition rather than only logging it.
+> **Incident-response note**: A rejected attempt to block a protected account (`fsxadmin`, `administrator`, or an entry in `PROTECTED_ACCOUNTS_EXTRA`) is a signal worth investigating on its own — it can indicate a misconfigured detection rule pointing at the wrong identity, or an attacker attempting to use the response pipeline itself to lock out legitimate admins. Alert on this condition rather than only logging it.
 >
-> **Reliability lens**: An automated response system that blocks too aggressively becomes a self-inflicted denial-of-service vector (e.g., a noisy detection rule triggering `contain_smb_threat` against many users in a short window). Set an alarm on invocation/block rate, not just on failures, so a runaway detection source is caught before it locks out a large population.
+> **Reliability note**: An automated response system that blocks too aggressively becomes a self-inflicted denial-of-service vector (e.g., a noisy detection rule triggering `contain_smb_threat` against many users in a short window). Set an alarm on invocation/block rate, not just on failures, so a runaway detection source is caught before it locks out a large population.
 
 ---
 
