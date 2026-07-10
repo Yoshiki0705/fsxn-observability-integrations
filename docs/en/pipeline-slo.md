@@ -1,5 +1,7 @@
 # Pipeline SLO Definitions
 
+🌐 [日本語](../ja/pipeline-slo.md) | **English** (this page)
+
 ## Overview
 
 This document defines Service Level Objectives (SLOs) for the FSx for ONTAP observability pipeline. These SLOs apply to all vendor integrations and provide measurable targets for operational health.

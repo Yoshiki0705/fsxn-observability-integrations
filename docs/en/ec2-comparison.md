@@ -1,5 +1,7 @@
 # Comparison: EC2-Based Pattern vs Serverless Pattern
 
+🌐 [日本語](../ja/ec2-comparison.md) | **English** (this page)
+
 ## Overview
 
 This document compares two architecture patterns for delivering FSx for ONTAP audit logs to Splunk.

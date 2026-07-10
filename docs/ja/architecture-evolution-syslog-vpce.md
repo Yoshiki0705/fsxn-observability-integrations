@@ -1,5 +1,7 @@
 # アーキテクチャ進化: CloudWatch Logs Syslog VPCE による管理監査ログ配信
 
+🌐 **日本語**（このページ） | [English](../en/architecture-evolution-syslog-vpce.md)
+
 > **ステータス**: 検証中（2026-06-28）
 > **関連**: [AWS 発表 — CloudWatch Logs supports managed syslog ingestion](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-cloudwatch-syslog-ingestion/)
 > **参考**: [Classmethod ブログ](https://dev.classmethod.jp/articles/amazon-fsx-for-netapp-ontap-security-audit-log-syslog-to-cw-logs/)

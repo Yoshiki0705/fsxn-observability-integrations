@@ -1,5 +1,7 @@
 # OTel Collector PII Redaction Cookbook
 
+🌐 [日本語](../ja/pii-redaction-cookbook.md) | **English** (this page)
+
 ## Overview
 
 This cookbook provides ready-to-use OTel Collector processor configurations for redacting, pseudonymizing, or generalizing PII fields in FSx for ONTAP audit logs before they reach your observability backend.

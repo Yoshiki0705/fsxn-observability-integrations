@@ -1,5 +1,7 @@
 # Runbook: Checkpoint Staleness
 
+🌐 [日本語](../../ja/runbooks/checkpoint-stale.md) | **English** (this page)
+
 ## Trigger
 
 Custom CloudWatch Alarm: `*-checkpoint-stale` fires when the SSM Parameter Store checkpoint has not been updated for > 15 minutes (3 missed schedule intervals).

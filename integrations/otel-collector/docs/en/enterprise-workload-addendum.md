@@ -1,5 +1,7 @@
 # Enterprise Workload Addendum
 
+🌐 [日本語](../ja/enterprise-workload-addendum.md) | **English** (this page)
+
 ## Applicability to SAP, VMware, and Mission-Critical Operations
 
 This OTel Collector pattern applies when enterprise operations teams need to distribute FSx for ONTAP telemetry to multiple operational domains:

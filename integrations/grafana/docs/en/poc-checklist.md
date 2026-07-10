@@ -1,5 +1,7 @@
 # PoC Success Criteria — Grafana Cloud Integration
 
+🌐 [日本語](../ja/poc-checklist.md) | **English** (this page)
+
 Use this checklist to validate a Proof of Concept deployment before presenting results to stakeholders.
 
 ## Functional Validation

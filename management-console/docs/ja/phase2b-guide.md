@@ -1,5 +1,7 @@
 # FSx for ONTAP Management Console Phase 2B ガイド
 
+🌐 **日本語**（このページ） | [English](../en/phase2b-guide.md)
+
 Phase 2B は既存の Management Console（Phase 2A）を拡張し、カスタムドメイン対応、ロールベースアクセス制御（RBAC）、ダッシュボード自動プロビジョニングを追加します。
 
 ## 目次

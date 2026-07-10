@@ -1,5 +1,7 @@
 # Security Review Checklist
 
+🌐 [日本語](../ja/security-review-checklist.md) | **English** (this page)
+
 This checklist supports security teams reviewing the FSx for ONTAP observability pipeline before deployment in production or regulated environments.
 
 ## IAM Roles and Permissions

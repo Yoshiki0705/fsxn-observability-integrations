@@ -1,5 +1,7 @@
 # Datadog Setup Guide
 
+🌐 [日本語](../ja/setup-guide.md) | **English** (this page)
+
 ## Overview
 
 Setup guide for the serverless integration that ships Amazon FSx for NetApp ONTAP audit logs to Datadog Logs.

@@ -1,5 +1,7 @@
 # Event Sources Guide
 
+🌐 [日本語](../ja/event-sources.md) | **English** (this page)
+
 ## Overview
 
 This project supports **four event sources** from FSx for ONTAP.

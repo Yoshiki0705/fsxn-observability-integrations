@@ -1,5 +1,7 @@
 # Automated Response — Security & Incident Response Addendum
 
+🌐 [日本語](../ja/automated-response-security-addendum.md) | **English** (this page)
+
 ## Purpose
 
 This addendum addresses advanced security considerations for the automated incident response module, organized by topic area. It complements the main [Automated Response Guide](automated-response-guide.md) with depth required for enterprise security reviews, compliance assessments, and incident response planning.

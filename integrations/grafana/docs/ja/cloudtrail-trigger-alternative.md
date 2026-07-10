@@ -1,5 +1,7 @@
 # FSx for ONTAP S3 Access Points の代替トリガーとしての CloudTrail データイベント
 
+🌐 **日本語**（このページ） | [English](../en/cloudtrail-trigger-alternative.md)
+
 ## サマリー
 
 **CloudTrail データイベントは FSx for ONTAP S3 Access Points で動作します。** これにより、プライマリ統合で使用しているポーリングパターンに代わるイベント駆動型の代替手段が提供されます。

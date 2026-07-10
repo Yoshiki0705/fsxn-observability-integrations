@@ -1,5 +1,7 @@
 # Vendor Comparison
 
+🌐 [日本語](../ja/vendor-comparison.md) | **English** (this page)
+
 ## Supported Vendors
 
 | Vendor | Delivery Method | Auth Method | Max Batch Size | Firehose Support |

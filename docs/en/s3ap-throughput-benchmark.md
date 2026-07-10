@@ -1,5 +1,7 @@
 # S3 Access Point Read Throughput Benchmark
 
+🌐 [日本語](../ja/s3ap-throughput-benchmark.md) | **English** (this page)
+
 ## Purpose
 
 This document provides a benchmark methodology and reference results for reading FSx for ONTAP audit logs via S3 Access Points. Use these results as a **sizing reference, not a service limit**.

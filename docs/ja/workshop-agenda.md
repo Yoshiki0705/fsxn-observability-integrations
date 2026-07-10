@@ -1,5 +1,7 @@
 # ワークショップアジェンダ: FSx for ONTAP サーバーレス Observability
 
+🌐 **日本語**（このページ） | [English](../en/workshop-agenda.md)
+
 ## ワークショップ概要
 
 | 項目 | 詳細 |

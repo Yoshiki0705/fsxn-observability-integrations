@@ -1,5 +1,7 @@
 # Security Monitoring & Incident Response — Document Navigation Index
 
+🌐 [日本語](../ja/security-monitoring-index.md) | **English** (this page)
+
 ## Overview
 
 This index provides navigation across all security-related documentation in this project. Use it to find the right document for your role and task.

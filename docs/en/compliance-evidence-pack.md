@@ -1,5 +1,7 @@
 # Compliance Evidence Pack Template
 
+🌐 [日本語](../ja/compliance-evidence-pack.md) | **English** (this page)
+
 ## Overview
 
 This template helps organizations assemble compliance evidence for FSx for ONTAP observability pipelines. It maps pipeline controls to regulatory frameworks and provides a checklist for audit preparation.

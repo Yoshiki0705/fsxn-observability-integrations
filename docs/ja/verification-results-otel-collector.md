@@ -1,5 +1,7 @@
 # OTel Collector 統合 E2E 検証結果
 
+🌐 **日本語**（このページ） | [English](../en/verification-results-otel-collector.md)
+
 ## 検証概要
 
 | 項目 | 値 |

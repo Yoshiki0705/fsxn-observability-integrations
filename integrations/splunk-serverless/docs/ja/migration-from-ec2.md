@@ -1,5 +1,7 @@
 # 移行ガイド: EC2 ベース Splunk → サーバーレス
 
+🌐 **日本語**（このページ） | [English](../en/migration-from-ec2.md)
+
 ## 概要
 
 [EC2 ベースの Splunk 統合](https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on-amazon-fsx-for-netapp-ontap-using-splunk/)（syslog-ng + Universal Forwarder）から、サーバーレス Lambda + HEC パターンへの移行ガイドです。

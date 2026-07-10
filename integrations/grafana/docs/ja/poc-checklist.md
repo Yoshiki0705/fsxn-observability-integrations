@@ -1,5 +1,7 @@
 # PoC 成功基準 — Grafana Cloud 統合
 
+🌐 **日本語**（このページ） | [English](../en/poc-checklist.md)
+
 ステークホルダーへの報告前に、Proof of Concept デプロイメントを検証するためのチェックリストです。
 
 ## 機能検証

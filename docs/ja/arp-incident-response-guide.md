@@ -1,5 +1,7 @@
 # ARP（Autonomous Ransomware Protection）インシデント対応ガイド
 
+🌐 **日本語**（このページ） | [English](../en/arp-incident-response-guide.md)
+
 ## 概要
 
 ONTAP の Autonomous Ransomware Protection (ARP) がランサムウェア攻撃の疑いを検知した場合のインシデント対応手順を定義します。本ガイドは、EMS Webhook 経由で Observability プラットフォーム（Datadog 等）にアラートが到着した後のアクションフローを対象とします。

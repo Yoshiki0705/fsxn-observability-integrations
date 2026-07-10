@@ -1,5 +1,7 @@
 # バックエンドパリティマトリクス
 
+🌐 **日本語**（このページ） | [English](../en/backend-parity-matrix.md)
+
 ## 検証済み属性の可視性 (2026-05-19)
 
 | Attribute | Datadog | Grafana Cloud (Loki) | Honeycomb |

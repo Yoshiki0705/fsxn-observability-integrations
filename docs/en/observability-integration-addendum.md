@@ -1,5 +1,7 @@
 # Observability Integration Addendum — Advanced Patterns & Reference
 
+🌐 [日本語](../ja/observability-integration-addendum.md) | **English** (this page)
+
 ## Purpose
 
 Advanced observability integration patterns, decision guides, and reference tables that complement the main documentation. Addresses: detection strategy selection, MITRE ATT&CK mapping, OTel semantic conventions, cost modeling, cross-account patterns, and vendor portability.

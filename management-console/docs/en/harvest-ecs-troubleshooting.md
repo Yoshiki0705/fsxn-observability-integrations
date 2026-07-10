@@ -1,5 +1,7 @@
 # Harvest ECS Fargate Troubleshooting Guide
 
+🌐 [日本語](../ja/harvest-ecs-troubleshooting.md) | **English** (this page)
+
 ## Issue: Harvest Container ExitCode 1 on ECS Fargate
 
 ### Symptoms

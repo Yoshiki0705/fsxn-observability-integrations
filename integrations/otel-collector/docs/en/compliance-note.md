@@ -1,5 +1,7 @@
 # Compliance Evidence Note: OTel Collector
 
+🌐 [日本語](../ja/compliance-note.md) | **English** (this page)
+
 ## Collector as Distribution Layer (NOT Evidence Authority)
 
 > **Critical distinction**: The OTel Collector is a **distribution and routing layer**, NOT the authoritative source of compliance evidence. Raw audit logs (EVTX/XML) stored in S3 remain the single source of truth.

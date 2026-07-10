@@ -1,5 +1,7 @@
 # コスト比較: 直接送信 vs OTel Collector パス
 
+🌐 **日本語**（このページ） | [English](../en/cost-comparison.md)
+
 ## 概要
 
 FSx for ONTAP 監査ログをバックエンドに配信する2つのアーキテクチャパターンのコスト比較です。

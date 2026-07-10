@@ -1,5 +1,7 @@
 # EMS イベント検知機能 — リファレンスガイド
 
+🌐 **日本語**（このページ） | [English](../en/ems-detection-capabilities.md)
+
 ## エグゼクティブサマリ
 
 ONTAP EMS (Event Management System) は、FSx for ONTAP からのニアリアルタイムのイベント通知を提供します。本ガイドでは、検知可能なイベント、配信レイテンシ、配信メカニズム、および本プロジェクトで利用可能な統合パターンを体系的に整理します。

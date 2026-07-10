@@ -1,5 +1,7 @@
 # PoC チェックリスト: OTel Collector 統合
 
+🌐 **日本語**（このページ） | [English](../en/poc-checklist.md)
+
 ## 5 フェーズ PoC 構造
 
 ```

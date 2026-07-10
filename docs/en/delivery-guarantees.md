@@ -1,5 +1,7 @@
 # Delivery Guarantee Patterns
 
+🌐 [日本語](../ja/delivery-guarantees.md) | **English** (this page)
+
 This document describes the delivery guarantee tiers available across all vendor integrations in this project. Choose the tier that matches your reliability requirements and operational complexity budget.
 
 ## Decision Matrix

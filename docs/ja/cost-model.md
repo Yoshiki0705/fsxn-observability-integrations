@@ -1,5 +1,7 @@
 # コストモデル — Direct Send vs Collector vs Firehose
 
+🌐 **日本語**（このページ） | [English](../en/cost-model.md)
+
 ## コストモデルの入力値
 
 デプロイの月額コストを見積もるために、以下の値を収集してください:

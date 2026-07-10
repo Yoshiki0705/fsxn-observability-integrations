@@ -1,5 +1,7 @@
 # Runbook: CloudWatch Log Alarm Triggered
 
+🌐 [日本語](../../ja/runbooks/log-alarm-triggered.md) | **English** (this page)
+
 > **Applies to**: `fsxn-sensitive-file-access-*`, `fsxn-failed-access-*`, `fsxn-bulk-delete-*`, `fsxn-user-activity-*` alarms
 > **First responder**: Security operations / SRE / Storage administrators
 > **Target**: MTTA < 5 min, root cause identification < 30 min

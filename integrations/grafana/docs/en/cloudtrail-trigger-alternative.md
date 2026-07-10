@@ -1,5 +1,7 @@
 # CloudTrail Data Events as an Alternative Trigger for FSx for ONTAP S3 Access Points
 
+🌐 [日本語](../ja/cloudtrail-trigger-alternative.md) | **English** (this page)
+
 ## Summary
 
 **CloudTrail data events DO work with FSx for ONTAP S3 Access Points.** This provides an event-driven alternative to the polling pattern used in the primary integration.

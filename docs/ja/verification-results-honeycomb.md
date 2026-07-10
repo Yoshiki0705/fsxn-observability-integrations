@@ -1,5 +1,7 @@
 # Honeycomb 統合 動作確認結果
 
+🌐 **日本語**（このページ） | [English](../en/verification-results-honeycomb.md)
+
 ## 実施概要
 
 - **検証日時**: 2026-05-24T09:24:00+09:00

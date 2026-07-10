@@ -1,5 +1,7 @@
 # Normalized Event Schema
 
+🌐 [日本語](../ja/normalized-event-schema.md) | **English** (this page)
+
 ## Overview
 
 All vendor integrations normalize ONTAP audit events into a common internal schema before mapping to vendor-specific formats. This ensures consistent field naming across all observability platforms.

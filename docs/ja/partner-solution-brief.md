@@ -1,5 +1,7 @@
 # パートナーソリューション概要: FSx for ONTAP サーバーレス Observability
 
+🌐 **日本語**（このページ） | [English](../en/partner-solution-brief.md)
+
 ## 顧客の課題
 
 Amazon FSx for NetApp ONTAP を運用するエンタープライズ顧客は、ファイルアクセス監査ログを既存の SIEM/Observability プラットフォームに配信する必要があります。現在のアプローチでは、syslog-ng やベンダー固有のフォワーダーを実行する EC2 インスタンスが必要であり、運用オーバーヘッド、パッチ適用負荷、固定月額コストが発生します。

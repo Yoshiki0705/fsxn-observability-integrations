@@ -1,5 +1,7 @@
 # OTel Collector 統合セットアップガイド
 
+🌐 **日本語**（このページ） | [English](../en/setup-guide.md)
+
 FSx for ONTAP 監査ログを OpenTelemetry Collector 経由で Grafana Cloud（Loki）と Honeycomb に同時配信するためのセットアップ手順です。
 
 ## 前提条件

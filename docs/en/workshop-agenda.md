@@ -1,5 +1,7 @@
 # Workshop Agenda: FSx for ONTAP Serverless Observability
 
+🌐 [日本語](../ja/workshop-agenda.md) | **English** (this page)
+
 ## Workshop Overview
 
 | Item | Detail |

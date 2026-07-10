@@ -1,5 +1,7 @@
 # Observability 統合補遺 — 高度なパターン & リファレンス
 
+🌐 **日本語**（このページ） | [English](../en/observability-integration-addendum.md)
+
 ## 目的
 
 メインドキュメントを補完する高度な Observability 統合パターン、判断ガイド、リファレンステーブル。検知戦略の選択、MITRE ATT&CK マッピング、OTel セマンティック規約、コストモデル、クロスアカウントパターン、ベンダーポータビリティをカバー。

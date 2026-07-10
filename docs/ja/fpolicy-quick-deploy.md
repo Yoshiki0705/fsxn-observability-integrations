@@ -1,5 +1,7 @@
 # FPolicy パイプライン — クイックデプロイガイド
 
+🌐 **日本語**（このページ） | [English](../en/fpolicy-quick-deploy.md)
+
 FPolicy ファイルアクティビティパイプラインを4ステップでデプロイします。
 
 ## 前提条件

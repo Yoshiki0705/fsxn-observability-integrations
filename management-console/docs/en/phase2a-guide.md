@@ -1,5 +1,7 @@
 # FSx for ONTAP Management Console — Phase 2A Guide
 
+🌐 [日本語](../ja/phase2a-guide.md) | **English** (this page)
+
 This guide covers the Phase 2A features added to the FSx for ONTAP Management Console: ARP (Anti-Ransomware Protection) dashboard, snapshot restore workflow, FlexClone management, and multi-poller support for monitoring multiple FSx for ONTAP file systems.
 
 ## Table of Contents

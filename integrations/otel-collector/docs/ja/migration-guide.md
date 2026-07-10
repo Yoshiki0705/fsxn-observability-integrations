@@ -1,5 +1,7 @@
 # マイグレーションガイド: ベンダー直接送信 → OTel Collector パス
 
+🌐 **日本語**（このページ） | [English](../en/migration-guide.md)
+
 ## 概要
 
 既存のベンダー直接送信（Datadog/New Relic/Splunk 等）から OTel Collector パスへの移行手順です。ゼロダウンタイムで移行できます。

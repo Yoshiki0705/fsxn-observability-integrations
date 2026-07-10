@@ -1,5 +1,7 @@
 # OTel Semantic Mapping Guide
 
+🌐 [日本語](../ja/otel-semantic-mapping.md) | **English** (this page)
+
 ## Attribute Classification
 
 ### Standard / Well-Known Attributes

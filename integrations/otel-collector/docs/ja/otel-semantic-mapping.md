@@ -1,5 +1,7 @@
 # OTel セマンティックマッピングガイド
 
+🌐 **日本語**（このページ） | [English](../en/otel-semantic-mapping.md)
+
 ## 属性の分類
 
 ### 標準 / Well-Known 属性

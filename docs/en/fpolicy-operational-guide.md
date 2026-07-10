@@ -1,5 +1,7 @@
 # FPolicy Pipeline Operational Guide
 
+🌐 [日本語](../ja/fpolicy-operational-guide.md) | **English** (this page)
+
 ## Health Model
 
 The FPolicy pipeline has four health layers. Monitor all four for production readiness.

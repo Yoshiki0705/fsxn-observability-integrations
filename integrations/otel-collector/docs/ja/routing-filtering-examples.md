@@ -1,5 +1,7 @@
 # ルーティングとフィルタリングの例: OTel Collector
 
+🌐 **日本語**（このページ） | [English](../en/routing-filtering-examples.md)
+
 ## Filter プロセッサー: セキュリティイベントのみ
 
 セキュリティ関連イベント（削除、権限変更、アクセス失敗）のみを抽出:

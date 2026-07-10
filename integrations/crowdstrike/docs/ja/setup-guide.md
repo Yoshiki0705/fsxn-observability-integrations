@@ -1,5 +1,7 @@
 # CrowdStrike Falcon LogScale セットアップガイド
 
+🌐 **日本語**（このページ） | [English](../en/setup-guide.md)
+
 ## 前提条件
 
 - CrowdStrike Falcon LogScale アカウント (Cloud or Self-hosted)

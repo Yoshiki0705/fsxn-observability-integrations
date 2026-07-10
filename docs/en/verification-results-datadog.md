@@ -1,5 +1,7 @@
 # Datadog Integration Verification Results
 
+🌐 [日本語](../ja/verification-results-datadog.md) | **English** (this page)
+
 - **Verification Date**: 2026-05-16T21:33:03+09:00
 - **Verifier**: Yoshiki Fujiwara / Solutions Architect
 

@@ -1,5 +1,7 @@
 # New Relic Integration Verification Results
 
+🌐 [日本語](../ja/verification-results-new-relic.md) | **English** (this page)
+
 ## Overview
 
 - **Verification Date**: 2026-05-24T00:00:00+09:00

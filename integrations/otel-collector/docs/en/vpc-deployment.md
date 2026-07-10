@@ -1,5 +1,7 @@
 # VPC Deployment Guide — OTel Collector on ECS Fargate
 
+🌐 [日本語](../ja/vpc-deployment.md) | **English** (this page)
+
 This document describes deploying the OTel Collector on ECS Fargate within a VPC, enabling Lambda functions to forward logs to external backends through a centralized collector.
 
 ## Architecture Overview

@@ -1,5 +1,7 @@
 # S3 Access Points for FSx for ONTAP — Knowledge Base
 
+🌐 [日本語](../ja/s3-access-points-knowledge.md) | **English** (this page)
+
 **Created**: 2026-05-16
 **Purpose**: Consolidate knowledge about S3 Access Points configuration for FSx for ONTAP
 

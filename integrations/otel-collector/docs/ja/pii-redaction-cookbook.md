@@ -1,5 +1,7 @@
 # OTel Collector PII 墨消しクックブック
 
+🌐 **日本語**（このページ） | [English](../en/pii-redaction-cookbook.md)
+
 ## 概要
 
 このクックブックでは、FSx for ONTAP 監査ログ内の PII フィールドを Observability バックエンドに到達する前に墨消し、仮名化、または一般化するための、すぐに使える OTel Collector プロセッサ設定を提供します。

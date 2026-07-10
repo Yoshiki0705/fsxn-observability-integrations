@@ -1,5 +1,7 @@
 # Cost Comparison: Direct Send vs OTel Collector Path
 
+🌐 [日本語](../ja/cost-comparison.md) | **English** (this page)
+
 ## Overview
 
 A cost comparison of two architecture patterns for delivering FSx for ONTAP audit logs to observability backends.

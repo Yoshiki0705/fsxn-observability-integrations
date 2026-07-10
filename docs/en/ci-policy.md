@@ -1,5 +1,7 @@
 # CI Policy and Quality Gates
 
+🌐 [日本語](../ja/ci-policy.md) | **English** (this page)
+
 ## Current CI Jobs
 
 | Job | Tool | Blocking | Purpose |

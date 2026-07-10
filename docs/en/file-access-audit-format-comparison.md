@@ -1,5 +1,7 @@
 # File Access Audit Log — Format Comparison & Architecture Options
 
+🌐 [日本語](../ja/file-access-audit-format-comparison.md) | **English** (this page)
+
 ## Overview
 
 This document clarifies the differences between FSx for ONTAP and FSx for Windows File Server regarding file access audit log format, CloudWatch Logs integration, and architecture options for large-volume log processing.

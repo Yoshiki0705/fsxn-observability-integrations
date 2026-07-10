@@ -1,5 +1,7 @@
 # Storage Service Selection Note
 
+🌐 [日本語](../ja/storage-service-selection.md) | **English** (this page)
+
 ## Context
 
 This project generates telemetry FROM FSx for ONTAP. It does not prescribe FSx for ONTAP as the storage layer for all logs or telemetry data.

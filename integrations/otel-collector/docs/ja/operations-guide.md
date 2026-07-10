@@ -1,5 +1,7 @@
 # OTel Collector 運用ガイド
 
+🌐 **日本語**（このページ） | [English](../en/operations-guide.md)
+
 ## Collector ヘルスモデル（4 レイヤー）
 
 | レイヤー | 監視対象 | 主要メトリクス |

@@ -1,5 +1,7 @@
 # CloudWatch Log Alarm — Direct Alarms from FSx for ONTAP Audit Logs
 
+🌐 [日本語](../ja/cloudwatch-log-alarm.md) | **English** (this page)
+
 > **Template**: `shared/templates/cloudwatch-log-alarm.yaml`
 > **Prerequisite**: FSx for ONTAP admin audit logs flowing to CloudWatch Logs ([Syslog VPC Endpoint Setup](./syslog-vpce-setup-guide.md))
 > **AWS Announcement**: 2026-07-01

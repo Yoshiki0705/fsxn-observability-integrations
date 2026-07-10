@@ -1,5 +1,7 @@
 # Syslog VPC Endpoint Setup Guide — FSx for ONTAP Admin Audit Logs → CloudWatch Logs
 
+🌐 [日本語](../ja/syslog-vpce-setup-guide.md) | **English** (this page)
+
 > **Time required**: ~15 minutes (CloudFormation deploy + ONTAP configuration)
 > **Prerequisite**: Running FSx for ONTAP file system
 > **Template**: `shared/templates/syslog-vpce-cloudwatch.yaml`

@@ -1,5 +1,7 @@
 # Existing Audit Tool Coexistence Guide
 
+🌐 [日本語](../ja/existing-audit-tool-coexistence.md) | **English** (this page)
+
 ## Overview
 
 This document describes how the serverless observability pipeline (Lambda + S3 Access Point + HEC/OTLP) coexists with existing batch-based audit log tools that may already be deployed in the environment.

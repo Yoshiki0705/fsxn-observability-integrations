@@ -1,5 +1,7 @@
 # 運用ガイド — Grafana Cloud 統合
 
+🌐 **日本語**（このページ） | [English](../en/operations.md)
+
 ## 推奨 CloudWatch アラーム
 
 パイプラインが配信するログだけでなく、パイプライン自体を監視してください:

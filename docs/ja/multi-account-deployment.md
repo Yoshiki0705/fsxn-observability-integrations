@@ -1,5 +1,7 @@
 # AWS Organizations を使用したマルチアカウントデプロイ
 
+🌐 **日本語**（このページ） | [English](../en/multi-account-deployment.md)
+
 ## 概要
 
 CloudFormation StackSets を使用して、複数の AWS アカウントに FSx for ONTAP Observability Pipeline をデプロイします。このパターンにより、監査ログパイプラインの一元管理を実現しつつ、データ処理は各アカウントのローカルで行います。

@@ -1,5 +1,7 @@
 # Backend Parity Matrix
 
+🌐 [日本語](../ja/backend-parity-matrix.md) | **English** (this page)
+
 ## Verified Attribute Visibility (2026-05-19)
 
 | Attribute | Datadog | Grafana Cloud (Loki) | Honeycomb |

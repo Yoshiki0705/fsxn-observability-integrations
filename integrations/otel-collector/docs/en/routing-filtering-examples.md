@@ -1,5 +1,7 @@
 # Routing and Filtering Examples: OTel Collector
 
+🌐 [日本語](../ja/routing-filtering-examples.md) | **English** (this page)
+
 ## Filter Processor: Security Events Only
 
 Extract only security-relevant events (delete, permission change, failed access):

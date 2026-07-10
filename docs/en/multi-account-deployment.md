@@ -1,5 +1,7 @@
 # Multi-Account Deployment with AWS Organizations
 
+🌐 [日本語](../ja/multi-account-deployment.md) | **English** (this page)
+
 ## Overview
 
 Deploy FSx for ONTAP observability pipelines across multiple AWS accounts using CloudFormation StackSets. This pattern enables centralized management of audit log pipelines while keeping data processing local to each account.

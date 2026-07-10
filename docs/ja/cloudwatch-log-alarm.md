@@ -1,5 +1,7 @@
 # CloudWatch Log Alarm — FSx for ONTAP 監査ログからのダイレクトアラーム
 
+🌐 **日本語**（このページ） | [English](../en/cloudwatch-log-alarm.md)
+
 > **テンプレート**: `shared/templates/cloudwatch-log-alarm.yaml`
 > **前提**: FSx for ONTAP 管理監査ログが CloudWatch Logs に配信済み（[Syslog VPC Endpoint セットアップ](./syslog-vpce-setup-guide.md) 参照）
 > **AWS 発表日**: 2026-07-01

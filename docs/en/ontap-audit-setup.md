@@ -1,5 +1,7 @@
 # ONTAP Audit Setup Guide
 
+🌐 [日本語](../ja/ontap-audit-setup.md) | **English** (this page)
+
 This guide covers the complete setup of ONTAP file access auditing on Amazon FSx for NetApp ONTAP, including audit volume creation, audit configuration, log rotation, and verification.
 
 > **Reference**: [AWS Documentation — File access auditing](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html)

@@ -1,5 +1,7 @@
 # EMS Webhook セキュリティガイド
 
+🌐 **日本語**（このページ） | [English](../en/webhook-security.md)
+
 ## 概要
 
 ONTAP EMS Webhook はイベント通知を HTTPS エンドポイントに配信します。本ガイドでは、これらのイベントを受信する API Gateway エンドポイントのセキュリティ対策について説明します。

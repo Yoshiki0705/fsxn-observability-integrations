@@ -1,5 +1,7 @@
 # Architecture Evolution: Admin Audit Log Delivery via CloudWatch Logs Syslog VPCE
 
+🌐 [日本語](../ja/architecture-evolution-syslog-vpce.md) | **English** (this page)
+
 > **Status**: Under verification (2026-06-28)
 > **Related**: [AWS Announcement — CloudWatch Logs supports managed syslog ingestion](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-cloudwatch-syslog-ingestion/)
 > **Reference**: [Classmethod Blog](https://dev.classmethod.jp/articles/amazon-fsx-for-netapp-ontap-security-audit-log-syslog-to-cw-logs/)

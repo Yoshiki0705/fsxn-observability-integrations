@@ -1,5 +1,7 @@
 # FSx for ONTAP Management & Monitoring Decision Tree
 
+🌐 [日本語](../ja/decision-tree-management-monitoring.md) | **English** (this page)
+
 ## Overview
 
 This document guides you through choosing the optimal management and monitoring architecture for FSx for ONTAP based on your requirements.

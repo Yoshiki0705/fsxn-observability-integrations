@@ -1,5 +1,7 @@
 # Cost Model: OTel Collector Integration
 
+🌐 [日本語](../ja/cost-model.md) | **English** (this page)
+
 ## Cost Formula
 
 ```

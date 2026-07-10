@@ -1,5 +1,7 @@
 # New Relic 統合 動作確認結果
 
+🌐 **日本語**（このページ） | [English](../en/verification-results-new-relic.md)
+
 ## 実施概要
 
 - **検証日時**: 2026-05-24T00:00:00+09:00

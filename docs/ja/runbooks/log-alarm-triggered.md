@@ -1,5 +1,7 @@
 # Runbook: CloudWatch Log Alarm 発火時の対応手順
 
+🌐 **日本語**（このページ） | [English](../../en/runbooks/log-alarm-triggered.md)
+
 > **対象**: `fsxn-sensitive-file-access-*`, `fsxn-failed-access-*`, `fsxn-bulk-delete-*`, `fsxn-user-activity-*` アラーム
 > **想定初動者**: セキュリティ運用チーム / SRE / ストレージ管理者
 > **対応目標**: MTTA < 5 分、原因特定 < 30 分

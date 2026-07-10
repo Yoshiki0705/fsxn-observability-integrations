@@ -1,5 +1,7 @@
 # Runbook: DLQ リプレイ
 
+🌐 **日本語**（このページ） | [English](../../en/runbooks/dlq-replay.md)
+
 ## トリガー
 
 CloudWatch Alarm: `*-dlq-depth` — Scheduler DLQ または Lambda 失敗先の `ApproximateNumberOfMessagesVisible > 0` で発火。

@@ -1,5 +1,7 @@
 # 設定ガバナンスガイド: OTel Collector
 
+🌐 **日本語**（このページ） | [English](../en/config-governance.md)
+
 ## 設定ファイルオーナーシップ
 
 | ファイル | オーナー | 承認要件 |

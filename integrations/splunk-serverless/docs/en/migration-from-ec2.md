@@ -1,5 +1,7 @@
 # Migration Guide: EC2-Based Splunk to Serverless
 
+🌐 [日本語](../ja/migration-from-ec2.md) | **English** (this page)
+
 ## Overview
 
 This guide helps you migrate from the [EC2-based Splunk integration](https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on-amazon-fsx-for-netapp-ontap-using-splunk/) (syslog-ng + Universal Forwarder) to the serverless Lambda + HEC pattern.

@@ -1,5 +1,7 @@
 # Cost Validation: Estimated vs Actual
 
+🌐 [日本語](../ja/cost-validation.md) | **English** (this page)
+
 ## Purpose
 
 This document tracks the comparison between estimated costs (from vendor READMEs and the cost model) and actual AWS billing data after production deployment. Use this to validate cost assumptions and refine estimates for future deployments.

@@ -1,5 +1,7 @@
 # ローカル開発・UI/UX 検証ガイド
 
+🌐 **日本語**（このページ） | [English](../en/local-dev-guide.md)
+
 FSx for ONTAP Management Console の UI/UX をローカル環境で検証するための手順書です。
 
 ## 目次

@@ -1,5 +1,7 @@
 # ONTAP Telemetry Source of Truth
 
+🌐 [日本語](../ja/ontap-telemetry-source-of-truth.md) | **English** (this page)
+
 ## Telemetry Authority Hierarchy
 
 ONTAP generates multiple telemetry streams. Understanding which source is authoritative for compliance, investigation, and operations is critical.

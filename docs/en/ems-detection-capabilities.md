@@ -1,5 +1,7 @@
 # EMS Event Detection Capabilities — Reference Guide
 
+🌐 [日本語](../ja/ems-detection-capabilities.md) | **English** (this page)
+
 ## Executive Summary
 
 ONTAP EMS (Event Management System) provides near-real-time event notifications from FSx for ONTAP. This guide catalogs the detectable events, delivery latency, delivery mechanisms, and integration patterns available in this project.

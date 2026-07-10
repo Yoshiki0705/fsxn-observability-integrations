@@ -1,5 +1,7 @@
 # Data Classification Guide for FSx for ONTAP Audit Logs
 
+🌐 [日本語](../ja/data-classification.md) | **English** (this page)
+
 ## Overview
 
 FSx for ONTAP audit logs contain information that may be classified as Personally Identifiable Information (PII) or sensitive business data. This guide identifies which fields require attention and provides recommended handling patterns.

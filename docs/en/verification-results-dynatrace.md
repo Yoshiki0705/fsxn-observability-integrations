@@ -1,5 +1,7 @@
 # Dynatrace Integration Verification Results
 
+🌐 [日本語](../ja/verification-results-dynatrace.md) | **English** (this page)
+
 ## Overview
 
 - **Verification Date**: 2026-05-24T11:47:00+09:00

@@ -1,5 +1,7 @@
 # FPolicy パイプライン運用ガイド
 
+🌐 **日本語**（このページ） | [English](../en/fpolicy-operational-guide.md)
+
 ## ヘルスモデル
 
 FPolicy パイプラインには 4 つのヘルスレイヤーがあります。本番運用に向けて 4 つすべてを監視してください。

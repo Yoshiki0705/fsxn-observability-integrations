@@ -1,5 +1,7 @@
 # アーキテクチャ判断記録: Direct Send vs OTel Collector
 
+🌐 **日本語**（このページ） | [English](../en/architecture-decision.md)
+
 ## 判断マトリクス
 
 | 評価軸 | Direct Send | OTel Collector |

@@ -1,5 +1,7 @@
 # ONTAP System Manager GUI Operations Guide
 
+🌐 [日本語](../ja/system-manager-gui-guide.md) | **English** (this page)
+
 ## Overview
 
 This document provides step-by-step instructions for operations teams to use **ONTAP System Manager (GUI)** for:

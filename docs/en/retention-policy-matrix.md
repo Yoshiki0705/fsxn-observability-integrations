@@ -1,5 +1,7 @@
 # Retention Policy Matrix
 
+🌐 [日本語](../ja/retention-policy-matrix.md) | **English** (this page)
+
 ## Overview
 
 This matrix maps regulatory retention requirements to vendor-specific configuration. Use it to determine the minimum retention period for your FSx for ONTAP audit logs based on applicable regulations.

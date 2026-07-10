@@ -1,5 +1,7 @@
 # Migration Guide: Vendor Direct Send → OTel Collector Path
 
+🌐 [日本語](../ja/migration-guide.md) | **English** (this page)
+
 ## Overview
 
 Step-by-step instructions for migrating from direct vendor delivery (Datadog/New Relic/Splunk etc.) to the OTel Collector path. Zero-downtime migration is achievable.

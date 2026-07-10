@@ -1,5 +1,7 @@
 # Runbook: Lambda エラーアラーム
 
+🌐 **日本語**（このページ） | [English](../../en/runbooks/lambda-errors.md)
+
 ## トリガー
 
 CloudWatch Alarm: `*-lambda-errors` — Lambda Errors が 10 分間で 5 回を超えた場合に発火。

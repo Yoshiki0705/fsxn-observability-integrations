@@ -1,5 +1,7 @@
 # FSx for ONTAP Management Console セットアップガイド
 
+🌐 **日本語**（このページ） | [English](../en/setup-guide.md)
+
 Amazon FSx for NetApp ONTAP 向けセルフホスト管理コンソールのデプロイ手順書です。
 
 ## 目次

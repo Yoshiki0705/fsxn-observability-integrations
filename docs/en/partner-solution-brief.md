@@ -1,5 +1,7 @@
 # Partner Solution Brief: FSx for ONTAP Serverless Observability
 
+🌐 [日本語](../ja/partner-solution-brief.md) | **English** (this page)
+
 ## Customer Challenge
 
 Enterprise customers running Amazon FSx for NetApp ONTAP need to ship file access audit logs to their existing SIEM/Observability platform. The current approach requires EC2 instances running syslog-ng and vendor-specific forwarders — adding operational overhead, patching burden, and fixed monthly costs.

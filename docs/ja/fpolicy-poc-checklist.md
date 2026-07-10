@@ -1,5 +1,7 @@
 # FPolicy PoC チェックリスト
 
+🌐 **日本語**（このページ） | [English](../en/fpolicy-poc-checklist.md)
+
 ## 目的
 
 FPolicy ファイルアクティビティパイプラインの E2E 検証: ONTAP ファイル操作 → ECS Fargate → SQS → Lambda → Datadog

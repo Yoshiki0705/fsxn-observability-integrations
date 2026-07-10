@@ -1,5 +1,7 @@
 # Runbook: DLQ Replay
 
+🌐 [日本語](../../ja/runbooks/dlq-replay.md) | **English** (this page)
+
 ## Trigger
 
 CloudWatch Alarm: `*-dlq-depth` fires when `ApproximateNumberOfMessagesVisible > 0` for the Scheduler DLQ or Lambda failure destination.

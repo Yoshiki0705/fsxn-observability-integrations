@@ -1,5 +1,7 @@
 # PoC 提案テンプレート: FSx for ONTAP Observability 統合
 
+🌐 **日本語**（このページ） | [English](../en/poc-proposal-template.md)
+
 > このテンプレートをコピーし、各エンゲージメントで顧客固有の詳細を記入してください。
 
 ---

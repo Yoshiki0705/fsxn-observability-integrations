@@ -1,5 +1,7 @@
 # Cost Model — Direct Send vs Collector vs Firehose
 
+🌐 [日本語](../ja/cost-model.md) | **English** (this page)
+
 ## Cost Model Inputs
 
 To estimate monthly cost for your deployment, gather these values:

@@ -1,5 +1,7 @@
 # 運用ガイド
 
+🌐 **日本語**（このページ） | [English](../en/operational-guide.md)
+
 ## 概要
 
 FSx for ONTAP Observability パイプラインの日常運用（監視、トラブルシューティング、メンテナンス）をカバーするガイドです。

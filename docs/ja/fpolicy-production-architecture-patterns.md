@@ -1,5 +1,7 @@
 # FPolicy 本番アーキテクチャパターン
 
+🌐 **日本語**（このページ） | [English](../en/fpolicy-production-architecture-patterns.md)
+
 ## 概要
 
 本ドキュメントは FPolicy ファイルアクティビティパイプラインの本番アーキテクチャパターンを説明します。[Part 4 ブログ記事](https://dev.to/aws-builders/fpolicy-file-activity-pipeline-ontap-to-datadog-via-ecs-fargate)では単一 Fargate タスクで E2E パスを検証しました。本番デプロイでは HA、IP 安定性、障害復旧の追加設計が必要です。

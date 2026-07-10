@@ -1,5 +1,7 @@
 # PoC Checklist: OTel Collector Integration
 
+🌐 [日本語](../ja/poc-checklist.md) | **English** (this page)
+
 ## 5-Phase PoC Structure
 
 ```

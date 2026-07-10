@@ -1,5 +1,7 @@
 # EMS Webhook Security Guide
 
+🌐 [日本語](../ja/webhook-security.md) | **English** (this page)
+
 ## Overview
 
 ONTAP EMS webhooks deliver event notifications to an HTTPS endpoint. This guide covers securing the API Gateway endpoint that receives those events.

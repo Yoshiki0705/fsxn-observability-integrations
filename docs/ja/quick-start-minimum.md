@@ -1,5 +1,7 @@
 # 最小テストパス
 
+🌐 **日本語**（このページ） | [English](../en/quick-start-minimum.md)
+
 最もシンプルな構成で監査イベントを Datadog に送信します。
 
 ## 必要なもの

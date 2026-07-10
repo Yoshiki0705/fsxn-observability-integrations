@@ -1,5 +1,7 @@
 # Elastic Integration Verification Results
 
+🌐 [日本語](../ja/verification-results-elastic.md) | **English** (this page)
+
 ## Overview
 
 - **Verification Date**: 2026-05-24T10:51:00+09:00

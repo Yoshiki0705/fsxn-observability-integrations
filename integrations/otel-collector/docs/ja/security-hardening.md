@@ -1,5 +1,7 @@
 # セキュリティハードニングガイド: OTel Collector
 
+🌐 **日本語**（このページ） | [English](../en/security-hardening.md)
+
 ## Collector を信頼境界として
 
 OTel Collector はログプロデューサー（Lambda）と外部バックエンド間の信頼境界として機能する。すべての認証情報、ルーティング判断、データ変換がこのレイヤーに集約される。

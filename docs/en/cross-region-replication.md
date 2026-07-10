@@ -1,5 +1,7 @@
 # Cross-Region Replication for Audit Log DR
 
+🌐 [日本語](../ja/cross-region-replication.md) | **English** (this page)
+
 ## Overview
 
 This document describes patterns for replicating FSx for ONTAP audit log pipeline state and data across AWS regions for disaster recovery (DR) and business continuity.

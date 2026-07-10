@@ -1,5 +1,7 @@
 # はじめに
 
+🌐 **日本語**（このページ） | [English](../en/getting-started.md)
+
 ## 前提条件
 
 - AWS アカウント

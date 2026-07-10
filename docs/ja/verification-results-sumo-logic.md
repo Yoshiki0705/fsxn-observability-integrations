@@ -1,5 +1,7 @@
 # Sumo Logic 統合 動作確認結果
 
+🌐 **日本語**（このページ） | [English](../en/verification-results-sumo-logic.md)
+
 ## 実施概要
 
 - **検証日時**: 2026-05-24T13:13:00+09:00

@@ -1,5 +1,7 @@
 # FSx for ONTAP Management Console — Setup Guide
 
+🌐 [日本語](../ja/setup-guide.md) | **English** (this page)
+
 This guide covers the deployment, configuration, and maintenance of the FSx for ONTAP Management Console. The console provides a self-hosted observability and management solution for Amazon FSx for NetApp ONTAP, combining Harvest metrics collection with a ToolJet-based management UI.
 
 ## Table of Contents

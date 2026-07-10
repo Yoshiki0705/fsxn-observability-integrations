@@ -1,5 +1,7 @@
 # ONTAP Telemetry Delivery Matrix
 
+🌐 [日本語](../ja/ontap-telemetry-delivery-matrix.md) | **English** (this page)
+
 ## Delivery Path Overview
 
 ONTAP telemetry can reach observability backends via two paths:

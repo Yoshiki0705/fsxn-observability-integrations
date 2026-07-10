@@ -1,5 +1,7 @@
 # OTel Collector Integration E2E Verification Results
 
+🌐 [日本語](../ja/verification-results-otel-collector.md) | **English** (this page)
+
 ## Verification Overview
 
 | Item | Value |

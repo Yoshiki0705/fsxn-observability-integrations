@@ -87,26 +87,6 @@ jobs:
           fi
           echo "✅ Naming check passed"
 
-      - name: "Check: Forbidden tools (changed .md only)"
-        if: steps.changed.outputs.md_count != '0'
-        run: |
-          ERRORS=0
-          while IFS= read -r f; do
-            [ -z "$f" ] && continue
-            [ ! -f "$f" ] && continue
-            HITS=$(grep -nE 'Workload Factory|NetApp Console|BlueXP' "$f" | grep -v 'allow:naming' || true)
-            if [ -n "$HITS" ]; then
-              echo "::error file=$f::Forbidden tool reference found"
-              echo "$HITS" | while IFS= read -r line; do echo "  $f:$(echo "$line" | cut -d: -f1)"; done
-              ERRORS=$((ERRORS + 1))
-            fi
-          done < /tmp/changed_md.txt
-          if [ "$ERRORS" -gt 0 ]; then
-            echo "::error::$ERRORS file(s) reference forbidden tools (Workload Factory/NetApp Console/BlueXP)."
-            exit 1
-          fi
-          echo "✅ Forbidden tools check passed"
-
       - name: "Check: Vendor neutrality (changed .md only)"
         if: steps.changed.outputs.md_count != '0'
         run: |

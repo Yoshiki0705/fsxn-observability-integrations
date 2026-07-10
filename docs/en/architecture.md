@@ -1,5 +1,7 @@
 # Architecture
 
+🌐 [日本語](../ja/architecture.md) | **English** (this page)
+
 ## Overview
 
 ```

@@ -1,5 +1,7 @@
 # FSx for ONTAP S3 Access Points Specification
 
+🌐 [日本語](../ja/s3ap-fsxn-specification.md) | **English** (this page)
+
 ## Overview
 
 Specification, constraints, and troubleshooting knowledge for FSx for ONTAP S3 Access Points used in this project.

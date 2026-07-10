@@ -1,5 +1,7 @@
 # FSx for ONTAP Management Console — Phase 2B Guide
 
+🌐 [日本語](../ja/phase2b-guide.md) | **English** (this page)
+
 This guide covers the Phase 2B features added to the FSx for ONTAP Management Console: custom domain support (Route 53 + ACM), role-based access control (RBAC) via Cognito groups, and automated Grafana dashboard provisioning.
 
 ## Table of Contents

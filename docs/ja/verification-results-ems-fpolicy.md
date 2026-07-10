@@ -1,5 +1,7 @@
 # EMS/FPolicy E2E 動作確認結果
 
+🌐 **日本語**（このページ） | [English](../en/verification-results-ems-fpolicy.md)
+
 ## 検証情報
 
 | 項目 | 値 |

@@ -1,5 +1,7 @@
 # Config Governance Guide: OTel Collector
 
+🌐 [日本語](../ja/config-governance.md) | **English** (this page)
+
 ## Config File Ownership
 
 | File | Owner | Approval Required |

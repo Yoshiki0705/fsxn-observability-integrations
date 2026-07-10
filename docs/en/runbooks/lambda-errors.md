@@ -1,5 +1,7 @@
 # Runbook: Lambda Errors Alarm
 
+🌐 [日本語](../../ja/runbooks/lambda-errors.md) | **English** (this page)
+
 ## Trigger
 
 CloudWatch Alarm: `*-lambda-errors` fires when Lambda Errors > 5 in 10 minutes.

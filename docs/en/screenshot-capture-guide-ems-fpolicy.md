@@ -1,5 +1,7 @@
 # EMS/FPolicy Screenshot Capture Guide
 
+🌐 [日本語](../ja/screenshot-capture-guide-ems-fpolicy.md) | **English** (this page)
+
 ## Capture Procedure
 
 Capture the following screenshots and place them in `docs/screenshots/`.

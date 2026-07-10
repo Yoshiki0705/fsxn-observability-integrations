@@ -1,5 +1,7 @@
 # FSx for ONTAP 管理・監視 Decision Tree
 
+🌐 **日本語**（このページ） | [English](../en/decision-tree-management-monitoring.md)
+
 ## 概要
 
 本ドキュメントは、FSx for ONTAP の管理・監視方法について、ユーザーの要件に基づいて最適なアーキテクチャパスを案内する Decision Tree です。

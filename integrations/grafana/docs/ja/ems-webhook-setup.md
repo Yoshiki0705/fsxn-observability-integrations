@@ -1,5 +1,7 @@
 # EMS Webhook → Grafana Cloud Loki セットアップ
 
+🌐 **日本語**（このページ） | [English](../en/ems-webhook-setup.md)
+
 ## 概要
 
 ONTAP EMS (Event Management System) イベントを API Gateway 経由で Grafana Cloud Loki に転送する設定手順。

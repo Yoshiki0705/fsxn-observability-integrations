@@ -1,5 +1,7 @@
 # VPC デプロイメントガイド — OTel Collector on ECS Fargate
 
+🌐 **日本語**（このページ） | [English](../en/vpc-deployment.md)
+
 本ドキュメントでは、OTel Collector を ECS Fargate 上にデプロイし、VPC 内の Lambda から外部バックエンドへログを転送するアーキテクチャを説明します。
 
 ## アーキテクチャ概要

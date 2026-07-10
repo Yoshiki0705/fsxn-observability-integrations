@@ -1,5 +1,7 @@
 # Honeycomb Integration Verification Results
 
+🌐 [日本語](../ja/verification-results-honeycomb.md) | **English** (this page)
+
 ## Overview
 
 - **Verification Date**: 2026-05-24T09:24:00+09:00

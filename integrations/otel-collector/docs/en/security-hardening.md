@@ -1,5 +1,7 @@
 # Security Hardening Guide: OTel Collector
 
+🌐 [日本語](../ja/security-hardening.md) | **English** (this page)
+
 ## Collector as Trust Boundary
 
 The OTel Collector acts as a trust boundary between log producers (Lambda) and external backends. All credentials, routing decisions, and data transformations are centralized at this layer.

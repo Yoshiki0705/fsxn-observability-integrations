@@ -1,5 +1,7 @@
 # Lakehouse Monitoring Patterns
 
+🌐 [日本語](../ja/lakehouse-monitoring-patterns.md) | **English** (this page)
+
 ## Overview
 
 This document defines five operational monitoring patterns for FSx for ONTAP environments integrated with lakehouse architectures (referenced from [fsxn-lakehouse-integrations](https://github.com/Yoshiki0705/fsxn-lakehouse-integrations)). All patterns are vendor-neutral, built on Lambda + CloudWatch, with delivery paths to any observability backend via the OTLP/vendor-specific pipelines established in this project.

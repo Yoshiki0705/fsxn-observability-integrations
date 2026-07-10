@@ -1,5 +1,7 @@
 # Workshop Hands-On Guide (Half-Day, 3.5 Hours)
 
+🌐 [日本語](../ja/workshop-hands-on-half-day.md) | **English** (this page)
+
 ## Target Audience
 
 - Partners delivering FSx for ONTAP observability PoCs

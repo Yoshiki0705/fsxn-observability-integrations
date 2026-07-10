@@ -1,5 +1,7 @@
 # Pipeline SLO 定義
 
+🌐 **日本語**（このページ） | [English](../en/pipeline-slo.md)
+
 ## 概要
 
 本ドキュメントでは、FSx for ONTAP Observability Pipeline の Service Level Objectives（SLO）を定義します。これらの SLO はすべてのベンダー統合に適用され、運用健全性の測定可能な目標を提供します。

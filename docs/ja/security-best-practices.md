@@ -1,5 +1,7 @@
 # FSx for ONTAP Observability Integrations セキュリティベストプラクティス
 
+🌐 **日本語**（このページ） | [English](../en/security-best-practices.md)
+
 ## 概要
 
 本ドキュメントは、全ベンダー統合に共通するセキュリティ上の考慮事項をまとめたものです。どの Observability バックエンドを選択する場合でも、これらのプラクティスを適用してください。

@@ -1,5 +1,7 @@
 # EMS/FPolicy スクリーンショット撮影ガイド
 
+🌐 **日本語**（このページ） | [English](../en/screenshot-capture-guide-ems-fpolicy.md)
+
 ## 撮影手順
 
 以下のスクリーンショットを撮影し、`docs/screenshots/` に配置してください。

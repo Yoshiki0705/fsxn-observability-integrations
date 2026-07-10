@@ -1,5 +1,7 @@
 # Elastic 統合 動作確認結果
 
+🌐 **日本語**（このページ） | [English](../en/verification-results-elastic.md)
+
 ## 実施概要
 
 - **検証日時**: 2026-05-24T10:51:00+09:00

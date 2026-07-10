@@ -1,5 +1,7 @@
 # FPolicy 運用ノート
 
+🌐 **日本語**（このページ） | [English](../en/operational-notes-fpolicy.md)
+
 ## 概要
 
 本ドキュメントは、FPolicy External Engine (ECS Fargate + SQS + EventBridge) の

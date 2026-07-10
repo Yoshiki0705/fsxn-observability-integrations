@@ -1,5 +1,7 @@
 # Operations Runbook
 
+🌐 [日本語](../ja/operations-runbook.md) | **English** (this page)
+
 ## 4-Layer Health Model
 
 All operational scenarios are diagnosed using this layered model:

@@ -1,5 +1,7 @@
 # Datadog セットアップガイド
 
+🌐 **日本語**（このページ） | [English](../en/setup-guide.md)
+
 ## 概要
 
 Amazon FSx for NetApp ONTAP の監査ログを Datadog Logs に配信するサーバーレス統合のセットアップ手順です。

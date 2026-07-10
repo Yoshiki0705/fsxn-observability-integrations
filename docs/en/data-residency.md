@@ -1,5 +1,7 @@
 # Data Residency Matrix
 
+🌐 [日本語](../ja/data-residency.md) | **English** (this page)
+
 > This document provides technical guidance on data flow destinations. It does not constitute legal, compliance, or regulatory advice. Consult your legal/compliance team for authoritative guidance on cross-border data transfer requirements (GDPR, APPI, PDPA, etc.).
 
 ## What Data Is Sent

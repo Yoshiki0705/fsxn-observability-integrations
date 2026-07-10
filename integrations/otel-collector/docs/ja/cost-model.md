@@ -1,5 +1,7 @@
 # コストモデル: OTel Collector 統合
 
+🌐 **日本語**（このページ） | [English](../en/cost-model.md)
+
 ## コスト計算式
 
 ```

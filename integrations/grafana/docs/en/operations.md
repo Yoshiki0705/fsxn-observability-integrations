@@ -1,5 +1,7 @@
 # Operations Guide — Grafana Cloud Integration
 
+🌐 [日本語](../ja/operations.md) | **English** (this page)
+
 ## Recommended CloudWatch Alarms
 
 Monitor the pipeline itself, not just the logs it delivers:

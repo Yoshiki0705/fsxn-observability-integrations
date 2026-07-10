@@ -1,5 +1,7 @@
 # ONTAP 監査設定ガイド
 
+🌐 **日本語**（このページ） | [English](../en/ontap-audit-setup.md)
+
 本ガイドでは、Amazon FSx for NetApp ONTAP における ONTAP ファイルアクセス監査の完全なセットアップ手順を説明します。監査ボリュームの作成、監査設定、ログローテーション、検証までをカバーします。
 
 > **参考**: [AWS ドキュメント — ファイルアクセス監査](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/file-access-auditing.html)

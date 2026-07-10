@@ -1,5 +1,7 @@
 # Minimum Test Path
 
+🌐 [日本語](../ja/quick-start-minimum.md) | **English** (this page)
+
 Ship audit events to Datadog with the simplest possible configuration.
 
 ## Prerequisites

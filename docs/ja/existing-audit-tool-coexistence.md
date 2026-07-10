@@ -1,5 +1,7 @@
 # 既存監査ツールとの共存ガイド
 
+🌐 **日本語**（このページ） | [English](../en/existing-audit-tool-coexistence.md)
+
 ## 概要
 
 本ドキュメントでは、サーバーレスオブザーバビリティパイプライン（Lambda + S3 Access Point + HEC/OTLP）と、環境内に既にデプロイされている既存のバッチベース監査ログツールとの共存方法を説明する。

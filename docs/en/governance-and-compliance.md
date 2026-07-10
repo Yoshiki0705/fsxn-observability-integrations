@@ -1,5 +1,7 @@
 # Governance and Compliance Considerations
 
+🌐 [日本語](../ja/governance-and-compliance.md) | **English** (this page)
+
 ## Scope
 
 This repository provides observability pipeline patterns for FSx for ONTAP signals (audit logs, EMS events, FPolicy file operations). It does **not** replace workload-specific compliance controls, audit policy, backup, DR, or access governance.

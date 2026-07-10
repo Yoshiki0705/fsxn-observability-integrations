@@ -1,5 +1,7 @@
 # FPolicy → Grafana Cloud Loki Integration Setup
 
+🌐 [日本語](../ja/fpolicy-setup.md) | **English** (this page)
+
 ## Overview
 
 Setup procedure for forwarding real-time file operation events from ONTAP FPolicy External Engine to Grafana Cloud Loki.

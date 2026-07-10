@@ -1,5 +1,7 @@
 # Local Development & UI/UX Verification Guide
 
+🌐 [日本語](../ja/local-dev-guide.md) | **English** (this page)
+
 Step-by-step instructions for verifying the FSx for ONTAP Management Console UI/UX in a local environment.
 
 ## Table of Contents

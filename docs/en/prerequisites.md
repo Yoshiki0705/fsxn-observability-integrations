@@ -1,5 +1,7 @@
 # Prerequisites and Resource Deployment Guide
 
+🌐 [日本語](../ja/prerequisites.md) | **English** (this page)
+
 ## Overview
 
 Before deploying any vendor integration from this project, the following prerequisite resources are required.

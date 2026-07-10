@@ -1,5 +1,7 @@
 # DII Storage Workload Security — Capability Map & Parity Analysis
 
+🌐 [日本語](../ja/dii-capability-map.md) | **English** (this page)
+
 ## Why This Document Exists
 
 Prior additions to this repository referenced NetApp DII (Data Infrastructure Insights) Storage Workload Security in several places — a comparison table in the [Automated Response Guide](automated-response-guide.md), callouts in the root README, and a mention in the [NetApp Console<!-- allow:naming --> integration](../../integrations/netapp-console/). Each of those additions covered one slice of DII (mostly the *containment/response* side) without first laying out what DII actually does end-to-end. The result was piecemeal coverage: readers could find "how to block a user like DII does" but not "what does DII do overall, and which parts does this repo already cover vs. still need work."
@@ -7,6 +9,29 @@ Prior additions to this repository referenced NetApp DII (Data Infrastructure In
 This document fixes that by first mapping DII SWS's full capability set, then showing — phase by phase — what this repository already provides, what requires assembling existing pieces, and what is a genuine gap. Read this document first; it links out to the detailed how-to guides for each phase rather than duplicating them.
 
 > **Evidence tier**: DII SWS's capability descriptions below are drawn from NetApp's public documentation (linked per claim). This repo's "equivalent" column reflects functionality that exists and is E2E-verified in this codebase unless marked otherwise.
+
+## Where This Fits in Cyber Resilience: NIST CSF 2.0
+
+Before zooming into DII SWS's specific phases, it helps to place both DII and this repository inside a broader cyber-resilience frame. The [NIST Cybersecurity Framework (CSF) 2.0](https://www.nist.gov/cyberframework) organizes an organization's *entire* cybersecurity risk-management program into six functions — **Govern, Identify, Protect, Detect, Respond, Recover** — and NIST has published a dedicated ransomware profile against it, [NIST IR 8374r1 — Ransomware Risk Management: A Cybersecurity Framework 2.0 Community Profile](https://csrc.nist.gov/pubs/ir/8374/r1/final). Cloud and storage vendors commonly publish their own CSF mappings for the same reason this document exists — to show customers which functions their tooling covers and which remain an organizational responsibility. AWS publishes [Ransomware Risk Management on AWS Using the NIST CSF](https://docs.aws.amazon.com/whitepapers/latest/ransomware-risk-management-on-aws-using-nist-csf/technical-capabilities.html), which maps AWS services to technical capabilities (Backup, Event detection, Forensics and analytics, Mitigation and containment, and others) organized by CSF function. NetApp publishes a similar walk-through mapping BlueXP<!-- allow:naming -->, ONTAP, and DII SWS to each CSF function (source: [Fortify your cybersecurity defenses with NIST framework](https://www.netapp.com/it/blog/fortify-cybersecurity-nist-framework/)).
+
+### How CSF 2.0 Relates to the NIST SP 800-61 Mapping Below
+
+This document already maps DII SWS onto the NIST SP 800-61 incident-response lifecycle (Protect → Detect → Contain/Respond → Recover) because that is the more granular, operational lens for comparing containment mechanics. **CSF 2.0 and SP 800-61 are not competing frameworks — they operate at different altitudes.** CSF 2.0 is the organization-wide risk-management wheel that Govern sits above; SP 800-61 is the tactical incident-handling process that CSF's Detect/Respond/Recover functions delegate to during an actual event. Reading this document top-down: the CSF 2.0 table below tells you which organizational function each capability serves; the SP 800-61-based Capability Parity Table further down gives the operational detail within Detect/Respond/Recover.
+
+### CSF 2.0 Function Mapping
+
+| CSF 2.0 Function | Ransomware-Relevant Outcome | DII SWS Approach | This Repo's Approach | Status |
+|-------------------|------------------------------|-------------------|------------------------|--------|
+| **Govern (GV)** | Risk-management strategy, roles, policy, and oversight are established and communicated | Not a DII SWS capability — governance is an organizational function DII's tooling supports but doesn't provide | Not provided by this repo either — this is an observability/response *pipeline*, not a governance program. CloudFormation-as-code and CloudWatch Logs audit trails supply evidence artifacts (who deployed what, when a block fired and why) that a GV program can consume, but strategy, roles, and board-level reporting remain your organization's responsibility | ⚠️ Out of scope by design — see [Governance & Compliance](governance-and-compliance.md) and [Compliance Evidence Pack](compliance-evidence-pack.md) for the evidence layer |
+| **Identify (ID)** | Assets, data, and dependencies that matter are inventoried and understood | BlueXP<!-- allow:naming --> data classification scans and categorizes data across storage, mapping it to workload importance | [Data Classification Guide](data-classification.md) defines a field-level classification matrix (PII/Sensitive/Internal) for audit and FPolicy fields, but does not automatically scan/classify file *contents* the way BlueXP's classification service does | ⚠️ Requires assembly — schema-level classification exists; content-level discovery is a genuine gap |
+| **Protect (PR)** | Safeguards limit the likelihood and impact of an event | Per-user access baseline (passive monitoring); relies on ONTAP's own Snapshot/SnapLock immutability underneath | Proactive ONTAP-native controls (export-policy, name-mapping) plus the same underlying Snapshot/SnapLock immutability ONTAP provides — this is a shared ONTAP platform capability, not DII- or repo-specific | ✅ Full for storage-layer safeguards (shared ONTAP mechanism); IAM least-privilege and Secrets Manager rotation cover the pipeline's own attack surface — see [Security Considerations](automated-response-guide.md#security-considerations) |
+| **Detect (DE)** | Anomalies and adverse events are found through continuous monitoring | ML-based per-user behavioral anomaly detection (SaaS backend) plus ARP alert integration | ONTAP ARP (native ransomware signature/entropy detection) + EMS event catalog + delegated SIEM ML (Datadog Watchdog, Elastic ML Jobs, Splunk MLTK) | ⚠️ Requires assembly for behavioral ML (see Capability Parity Table below); ✅ Full for signature/entropy-based and quota-anomaly detection |
+| **Respond (RS)** | Actions are taken on a detected incident: analysis, mitigation, and reporting | Automated user/IP block + protective snapshot + admin alert, driven by DII's own ML detection | Same ONTAP blocking/snapshot mechanisms, triggerable from *any* detection source via SNS — see [Automated Response Guide](automated-response-guide.md); Forensics dashboards (this document) serve the RS.AN (analysis) sub-function | ✅ Full for mitigation and analysis tooling |
+| **Recover (RC)** | Systems and data are restored, and recovery is coordinated with stakeholders (CSF 2.0 splits this into RC.RP — Incident Recovery Plan Execution — and RC.CO — Incident Recovery Communication) | Automatic detection-time snapshot simplifies restoration; no published RC.CO tooling beyond alerts | Protective snapshot exists (RS phase), but this repo has **no tested, packaged restore runbook** — see Genuine Gaps below. SNS notification covers a minimal RC.CO signal, not stakeholder-level recovery coordination | ⚠️ Requires assembly for RC.RP; ❌ Gap for a *verified-clean* recovery point workflow |
+
+> **Resilience-maturity lens**: Industry analysis of CSF 2.0's RECOVER function (e.g., [Elastio's mapping of ransomware recovery to CSF 2.0](https://elastio.com/blog/mapping-ransomware-recovery-to-nist-csf-20)) makes a point worth internalizing here: a snapshot or backup existing is a **Protect** artifact, not evidence that RC.RP is operationally credible. RC.RP is only credible once you can point to a recovery point that has actually been tested and confirmed free of compromise — not merely a completed snapshot job. This repo's automated-response module creates protective snapshots (Respond phase) but does not yet verify they are clean or exercise a restore against them. Treat "snapshot created" and "verified clean recovery point, tested" as two different maturity levels; this repo currently delivers the former.
+
+The remainder of this document uses the more granular NIST SP 800-61 lifecycle (Protect/Detect/Respond/Recover/Forensics) already established below, since that is the appropriate resolution for comparing containment and investigation mechanics rather than organizational risk posture.
 
 ## DII Storage Workload Security: The Full Picture
 
@@ -134,8 +159,9 @@ Being direct about what this repo does **not** provide, so this document doesn't
 
 1. **No built-in per-user behavioral ML model.** DII SWS ships a trained anomaly-detection model; this repo requires you to configure and train your SIEM's ML feature (Datadog Watchdog, Elastic ML Jobs, Splunk MLTK) separately, or rely on threshold-based detection (see [Detection Use Cases](detection-use-cases.md)), which has different false-positive characteristics than behavioral baselining.
 2. **No single unified dashboard across all data.** DII presents one Forensics UI regardless of which storage system generated the event. This repo is inherently multi-vendor — if you ship to more than one SIEM, forensic investigation happens per-vendor, not in one pane of glass (the [OTel Collector integration](../../integrations/otel-collector/) reduces but does not eliminate this if you fan out to multiple backends).
-3. **No packaged snapshot-restore runbook.** The Respond phase creates a protective snapshot; actually restoring from it during a Recover phase is a manual ONTAP operation not yet wrapped in a script or guide in this repo.
+3. **No packaged snapshot-restore runbook, and no verified-clean recovery point workflow.** The Respond phase creates a protective snapshot; actually restoring from it during a Recover phase is a manual ONTAP operation not yet wrapped in a script or guide in this repo. More importantly (per the CSF 2.0 RECOVER discussion above), this repo does not verify that a given snapshot is free of compromise before treating it as a restore candidate — the snapshot's existence is not the same as a tested, confirmed-clean recovery point.
 4. **No cross-storage-system view.** DII SWS can span an on-prem + cloud fleet from one tenant. This repo is scoped to FSx for ONTAP; if you have other NetApp systems, they are not correlated here.
+5. **No Govern-function tooling and no content-level data classification/discovery.** Risk-management strategy, policy, and board-level reporting (CSF 2.0 Govern) are organizational responsibilities this repo does not attempt to automate. Similarly, this repo's [Data Classification Guide](data-classification.md) defines a schema-level field classification (which *fields* are PII) but does not scan file *contents* the way BlueXP's<!-- allow:naming --> data classification service does for the CSF 2.0 Identify function.
 
 ## FAQ
 
@@ -148,6 +174,9 @@ A: No. This document is explicit that the ML behavioral baseline is a genuine ga
 **Q: Why does the Forensics section reference the same NetApp KB limitations as this repo's own known gaps?**
 A: Because both DII SWS and this repo's FPolicy pipeline ultimately depend on the same ONTAP FPolicy mechanism. Any operation invisible to FPolicy (API-driven changes, NFS 4.1) is invisible to *both* systems — this is a shared platform limitation, not something either implementation solves differently.
 
+**Q: Where does CSF 2.0's Govern function fit, since this document doesn't cover it?**
+A: It doesn't — deliberately. Govern (risk-management strategy, roles, policy, board oversight) is an organizational responsibility that no storage-layer tool, DII SWS included, can automate on your behalf. This document's CSF 2.0 table marks Govern as out of scope by design and points to [Governance & Compliance](governance-and-compliance.md) and the [Compliance Evidence Pack](compliance-evidence-pack.md) for the evidence artifacts (audit trails, deployment-as-code, block/response logs) that a Govern program would consume as input, not as a substitute for the program itself.
+
 ## Related Documents
 
 - [Automated Response Guide](automated-response-guide.md) — Respond-phase implementation (this repo's most complete DII-parity area)
@@ -155,5 +184,17 @@ A: Because both DII SWS and this repo's FPolicy pipeline ultimately depend on th
 - [EMS Detection Capabilities](ems-detection-capabilities.md) — Detect-phase event catalog
 - [Detection Use Cases](detection-use-cases.md) — Source selection for Detect-phase configuration
 - [Normalized Event Schema](normalized-event-schema.md) — The shared field definitions underlying every Forensics implementation above
-- [Data Classification Guide](data-classification.md) — PII handling for the user/IP/path fields shown in Forensics dashboards
+- [Data Classification Guide](data-classification.md) — PII handling for the user/IP/path fields shown in Forensics dashboards, and the Identify-function schema classification referenced above
+- [Governance & Compliance](governance-and-compliance.md) — The Govern-function evidence layer this document defers to
+- [Compliance Evidence Pack](compliance-evidence-pack.md) — Audit-trail evidence artifacts for Govern/RC.CO reporting
 - [Security Monitoring Index](security-monitoring-index.md) — Role-based navigation across all security docs
+
+## External References
+
+- [NIST Cybersecurity Framework (CSF) 2.0](https://www.nist.gov/cyberframework)
+- [NIST IR 8374r1 — Ransomware Risk Management: A Cybersecurity Framework 2.0 Community Profile](https://csrc.nist.gov/pubs/ir/8374/r1/final)
+- [AWS — Ransomware Risk Management on AWS Using the NIST CSF](https://docs.aws.amazon.com/whitepapers/latest/ransomware-risk-management-on-aws-using-nist-csf/technical-capabilities.html)
+- [NetApp — Fortify your cybersecurity defenses with NIST framework](https://www.netapp.com/it/blog/fortify-cybersecurity-nist-framework/)
+- [NetApp — Data Infrastructure Insights Storage Workload Security](https://docs.netapp.com/us-en/ontap-technical-reports/ransomware-solutions/ransomware-DII-workload-security.html)
+- [NetApp — Forensics Activity FAQ](https://kb.netapp.com/Cloud/BlueXP/Cloud_Insights/FAQ:_Storage_Workload_Security_Forensics_Activity) <!-- allow:naming -->
+- [Elastio — Mapping Ransomware Recovery to NIST CSF 2.0](https://elastio.com/blog/mapping-ransomware-recovery-to-nist-csf-20)

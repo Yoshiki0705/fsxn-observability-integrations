@@ -1,5 +1,7 @@
 # ファイルアクセス監査ログ — フォーマット比較 & アーキテクチャ選択肢
 
+🌐 **日本語**（このページ） | [English](../en/file-access-audit-format-comparison.md)
+
 ## 概要
 
 FSx for ONTAP と FSx for Windows File Server のファイルアクセス監査ログのフォーマット、CloudWatch Logs 連携、大量ログ処理のアーキテクチャ選択肢を整理します。

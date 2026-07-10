@@ -1,5 +1,7 @@
 # ONTAP テレメトリ配信マトリクス
 
+🌐 **日本語**（このページ） | [English](../en/ontap-telemetry-delivery-matrix.md)
+
 ## 配信パスの概要
 
 ONTAP テレメトリは 2 つのパスでバックエンドに到達できる:

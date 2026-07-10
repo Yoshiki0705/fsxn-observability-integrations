@@ -1,5 +1,7 @@
 # CI ポリシーと品質ゲート
 
+🌐 **日本語**（このページ） | [English](../en/ci-policy.md)
+
 ## 現在の CI ジョブ
 
 | Job | Tool | Blocking | Purpose |

@@ -1,5 +1,7 @@
 # PoC Proposal Template: FSx for ONTAP Observability Integration
 
+🌐 [日本語](../ja/poc-proposal-template.md) | **English** (this page)
+
 > Copy this template and fill in customer-specific details for each engagement.
 
 ---

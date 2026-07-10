@@ -1,5 +1,7 @@
 # パートナーソリューション概要: FSx for ONTAP Observability Quickstart
 
+🌐 **日本語**（このページ） | [English](../en/partner-solution-brief.md)
+
 ## ターゲット顧客
 
 - エンタープライズファイルサービス（NAS 統合、ホームディレクトリ、共有ドライブ）で FSx for ONTAP を利用中のユーザー

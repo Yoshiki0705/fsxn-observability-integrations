@@ -1,5 +1,7 @@
 # OTel Collector Integration Setup Guide
 
+🌐 [日本語](../ja/setup-guide.md) | **English** (this page)
+
 This guide walks you through setting up the FSx for ONTAP audit log pipeline that delivers logs simultaneously to Grafana Cloud (Loki) and Honeycomb via an OpenTelemetry Collector.
 
 ## Prerequisites

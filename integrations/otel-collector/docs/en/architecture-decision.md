@@ -1,5 +1,7 @@
 # Architecture Decision Record: Direct Send vs OTel Collector
 
+🌐 [日本語](../ja/architecture-decision.md) | **English** (this page)
+
 ## Decision Matrix
 
 | Dimension | Direct Send | OTel Collector |

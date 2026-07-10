@@ -1,5 +1,7 @@
 # レイクハウス監視パターン
 
+🌐 **日本語**（このページ） | [English](../en/lakehouse-monitoring-patterns.md)
+
 ## 概要
 
 本ドキュメントは、レイクハウスアーキテクチャと統合された FSx for ONTAP 環境向けの5つの運用監視パターンを定義します（[fsxn-lakehouse-integrations](https://github.com/Yoshiki0705/fsxn-lakehouse-integrations) から参照）。全パターンはベンダー中立で、Lambda + CloudWatch をベースに、本プロジェクトで確立した OTLP/ベンダー固有パイプライン経由で任意のオブザーバビリティバックエンドに配信可能です。

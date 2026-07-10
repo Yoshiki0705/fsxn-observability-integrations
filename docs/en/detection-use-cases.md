@@ -1,5 +1,7 @@
 # Detection Use Cases
 
+🌐 [日本語](../ja/detection-use-cases.md) | **English** (this page)
+
 ## Event Source Selection Matrix
 
 | Detection Use Case | Best Source | Why | Latency |

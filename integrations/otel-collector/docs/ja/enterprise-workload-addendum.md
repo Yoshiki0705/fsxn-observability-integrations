@@ -1,5 +1,7 @@
 # エンタープライズワークロード補足
 
+🌐 **日本語**（このページ） | [English](../en/enterprise-workload-addendum.md)
+
 ## SAP、VMware、ミッションクリティカル運用への適用
 
 この OTel Collector パターンは、エンタープライズ運用チームが FSx for ONTAP のテレメトリを複数の運用ドメインに配信する必要がある場合に適用されます:

@@ -1,5 +1,7 @@
 # Partner Solution Brief: FSx for ONTAP Observability Quickstart
 
+🌐 [日本語](../ja/partner-solution-brief.md) | **English** (this page)
+
 ## Target Customers
 
 - FSx for ONTAP users running enterprise file services (NAS consolidation, home directories, shared drives)

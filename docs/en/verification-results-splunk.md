@@ -1,5 +1,7 @@
 # Splunk Serverless Integration Verification Results
 
+🌐 [日本語](../ja/verification-results-splunk.md) | **English** (this page)
+
 - **Verification Date**: <verification-date>
 - **Verifier**: <verifier-name> / <role>
 

@@ -1,5 +1,7 @@
 # Demo Scenarios
 
+🌐 [日本語](../ja/demo-scenarios.md) | **English** (this page)
+
 ## Overview
 
 Demo procedures and scenarios for each vendor integration. Use these during actual demo sessions.

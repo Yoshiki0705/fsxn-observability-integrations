@@ -1,5 +1,7 @@
 # FPolicy PoC Checklist
 
+🌐 [日本語](../ja/fpolicy-poc-checklist.md) | **English** (this page)
+
 ## Objective
 
 Validate the FPolicy file activity pipeline end-to-end: ONTAP file operation → ECS Fargate → SQS → Lambda → Datadog.

@@ -1,5 +1,7 @@
 # FPolicy Operational Notes
 
+🌐 [日本語](../ja/operational-notes-fpolicy.md) | **English** (this page)
+
 ## Overview
 
 This document summarizes operational knowledge gained from running the

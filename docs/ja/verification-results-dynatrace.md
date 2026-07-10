@@ -1,5 +1,7 @@
 # Dynatrace 統合 動作確認結果
 
+🌐 **日本語**（このページ） | [English](../en/verification-results-dynatrace.md)
+
 ## 実施概要
 
 - **検証日時**: 2026-05-24T11:47:00+09:00

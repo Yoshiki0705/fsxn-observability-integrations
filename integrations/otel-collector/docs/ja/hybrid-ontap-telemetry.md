@@ -1,5 +1,7 @@
 # Hybrid ONTAP Telemetry with OpenTelemetry Collector
 
+🌐 **日本語**（このページ） | [English](../en/hybrid-ontap-telemetry.md)
+
 ## Applicability
 
 The OTLP + Collector pattern demonstrated in this repository for FSx for ONTAP can be extended to other ONTAP deployment models:

@@ -1,5 +1,7 @@
 # FPolicy Production Architecture Patterns
 
+🌐 [日本語](../ja/fpolicy-production-architecture-patterns.md) | **English** (this page)
+
 ## Overview
 
 This document describes production architecture patterns for the FPolicy file activity pipeline. The [Part 4 blog article](https://dev.to/aws-builders/fpolicy-file-activity-pipeline-ontap-to-datadog-via-ecs-fargate) validates the end-to-end path with a single Fargate task. Production deployments require additional design for HA, IP stability, and failure recovery.

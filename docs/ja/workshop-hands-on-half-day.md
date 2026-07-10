@@ -1,5 +1,7 @@
 # Workshop Hands-On Guide（半日、3.5 時間）
 
+🌐 **日本語**（このページ） | [English](../en/workshop-hands-on-half-day.md)
+
 ## 対象者
 
 - FSx for ONTAP Observability PoC を提供するパートナー

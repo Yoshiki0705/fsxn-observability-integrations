@@ -1,5 +1,7 @@
 # ONTAP System Manager GUI 操作ガイド
 
+🌐 **日本語**（このページ） | [English](../en/system-manager-gui-guide.md)
+
 ## 概要
 
 本ドキュメントは、FSx for ONTAP の運用部門が **ONTAP System Manager（GUI）** を使用して、以下の操作を行うための手順書です。

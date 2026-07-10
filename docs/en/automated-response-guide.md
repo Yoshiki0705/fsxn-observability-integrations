@@ -1,5 +1,7 @@
 # Automated Incident Response Guide — User/IP Blocking via ONTAP REST API
 
+🌐 [日本語](../ja/automated-response-guide.md) | **English** (this page)
+
 ## Executive Summary
 
 This guide describes how to implement automated storage-layer access blocking for Amazon FSx for NetApp ONTAP using AWS-native detection services combined with ONTAP REST API response actions. The approach delivers the same containment-phase capabilities — user blocking, IP blocking, and protective snapshots — available in dedicated storage security products, while keeping detection and orchestration within the AWS ecosystem and third-party observability platforms.

@@ -1,5 +1,7 @@
 # OTel Collector Operations Guide
 
+🌐 [日本語](../ja/operations-guide.md) | **English** (this page)
+
 ## Collector Health Model (4 Layers)
 
 | Layer | What to Monitor | Key Metrics |

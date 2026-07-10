@@ -1,5 +1,7 @@
 # FPolicy Pipeline — Quick Deploy Guide
 
+🌐 [日本語](../ja/fpolicy-quick-deploy.md) | **English** (this page)
+
 Deploy the complete FPolicy file activity pipeline in 4 steps.
 
 ## Prerequisites

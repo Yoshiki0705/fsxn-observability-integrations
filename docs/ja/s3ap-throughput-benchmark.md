@@ -1,5 +1,7 @@
 # S3 Access Point 読み取りスループットベンチマーク
 
+🌐 **日本語**（このページ） | [English](../en/s3ap-throughput-benchmark.md)
+
 ## 目的
 
 本ドキュメントは、S3 Access Points 経由で FSx for ONTAP 監査ログを読み取る際のベンチマーク手法と参考結果を提供します。これらの結果は**サイジングの参考値であり、サービス上限ではありません**。

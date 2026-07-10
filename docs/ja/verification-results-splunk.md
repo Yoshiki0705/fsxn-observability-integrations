@@ -1,5 +1,7 @@
 # Splunk Serverless 統合 動作確認結果
 
+🌐 **日本語**（このページ） | [English](../en/verification-results-splunk.md)
+
 - **検証日時**: <検証日>
 - **検証者**: <検証者名> / <役職>
 

@@ -1,5 +1,7 @@
 # PoC Success Criteria
 
+🌐 [日本語](../ja/poc-success-criteria.md) | **English** (this page)
+
 Common success criteria for all FSx for ONTAP observability integrations. Use this document to define clear exit conditions for each stage of validation.
 
 ## Minimum Success (Level 1)

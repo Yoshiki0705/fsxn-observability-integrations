@@ -1,5 +1,7 @@
 # パートナー FAQ: FSx for ONTAP Observability Integrations
 
+🌐 **日本語**（このページ） | [English](../en/partner-faq.md)
+
 ## パートナー SA・デリバリーチーム向け
 
 顧客との会話でよくある質問と、推奨される回答をまとめています。

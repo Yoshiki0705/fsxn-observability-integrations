@@ -1,5 +1,7 @@
 # 自動インシデント対応ガイド — ONTAP REST API によるユーザー/IP ブロック
 
+🌐 **日本語**（このページ） | [English](../en/automated-response-guide.md)
+
 ## エグゼクティブサマリ
 
 本ガイドでは、Amazon FSx for NetApp ONTAP に対する自動ストレージ層アクセス遮断（ユーザーブロック、IP ブロック、保護 Snapshot）を、AWS ネイティブの検知サービスと ONTAP REST API の応答アクションを組み合わせて実装する方法を解説します。専用のストレージセキュリティ製品と同等の封じ込めフェーズの能力を、AWS エコシステムとサードパーティ Observability プラットフォーム内で実現します。

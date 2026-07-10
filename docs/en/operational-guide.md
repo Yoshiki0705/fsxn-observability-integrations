@@ -1,5 +1,7 @@
 # Operational Guide
 
+🌐 [日本語](../ja/operational-guide.md) | **English** (this page)
+
 ## Overview
 
 This guide covers day-to-day operations of the FSx for ONTAP observability pipeline, including monitoring, troubleshooting, and maintenance procedures.

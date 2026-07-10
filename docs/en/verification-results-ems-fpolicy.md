@@ -1,5 +1,7 @@
 # EMS/FPolicy E2E Verification Results
 
+🌐 [日本語](../ja/verification-results-ems-fpolicy.md) | **English** (this page)
+
 ## Verification Information
 
 | Item | Value |

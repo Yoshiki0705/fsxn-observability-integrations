@@ -1,5 +1,7 @@
 # Sumo Logic Integration Verification Results
 
+🌐 [日本語](../ja/verification-results-sumo-logic.md) | **English** (this page)
+
 ## Overview
 
 - **Verification Date**: 2026-05-24T13:13:00+09:00

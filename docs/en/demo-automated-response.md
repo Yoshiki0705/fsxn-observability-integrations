@@ -1,5 +1,7 @@
 # Automated Response Demo Runbook
 
+🌐 [日本語](../ja/demo-automated-response.md) | **English** (this page)
+
 ## Purpose
 
 Step-by-step procedure for demonstrating the automated incident response feature end-to-end. Covers: deploy → trigger detection → verify auto-block → confirm access denial → unblock → confirm restored access.

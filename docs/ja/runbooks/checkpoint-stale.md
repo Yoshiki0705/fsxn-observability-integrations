@@ -1,5 +1,7 @@
 # Runbook: Checkpoint 滞留
 
+🌐 **日本語**（このページ） | [English](../../en/runbooks/checkpoint-stale.md)
+
 ## トリガー
 
 カスタム CloudWatch Alarm: `*-checkpoint-stale` — SSM Parameter Store の Checkpoint が 15 分以上更新されていない場合（スケジュール間隔 3 回分の未更新）に発火。

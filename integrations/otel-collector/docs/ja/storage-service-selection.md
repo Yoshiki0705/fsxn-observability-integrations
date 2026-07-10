@@ -1,5 +1,7 @@
 # ストレージサービス選択ノート
 
+🌐 **日本語**（このページ） | [English](../en/storage-service-selection.md)
+
 ## コンテキスト
 
 本プロジェクトは FSx for ONTAP からテレメトリを生成します。すべてのログやテレメトリデータのストレージレイヤーとして FSx for ONTAP を規定するものではありません。
