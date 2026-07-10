@@ -2,21 +2,31 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   FSx for ONTAP Content-Level PII Classification Scanner (CSF 2.0 Identify).
   Scans files via an S3 Access Point using Amazon Comprehend
-  DetectPiiEntities. Deploy standalone (internet-origin access point, no
-  VpcId) or with VpcId set to scan a VPC-scoped access point (e.g., from
-  restore-verification.yaml) — see VpcId parameter and README for details.
+  DetectPiiEntities. QUICK START: leave VpcId empty to deploy outside any
+  VPC — this is the simplest path and requires only an internet-origin S3
+  Access Point (check with `aws s3control get-access-point --account-id
+  <id> --name <ap-name> --query NetworkOrigin`; "Internet" works with the
+  default parameters below, "VPC" requires setting VpcId/SubnetIds/
+  SecurityGroupId/RouteTableIds to the VPC the access point is bound to).
+  No FSx control-plane API calls are made by this stack, so it has no
+  dependency on any FSx Interface VPC Endpoint even when VpcId is set.
   Stack name pattern: fsxn-content-classification
 
 Parameters:
   VpcId:
     Type: String
     Description: >-
-      VPC ID to run the scanner Lambda inside. REQUIRED if the
-      access_point_arn you plan to scan is VPC-scoped (e.g., from
-      restore-verification.yaml's AttachAccessPoint step) — a VPC-scoped
-      access point cannot be reached from a Lambda outside its bound VPC.
-      Leave empty to deploy the scanner outside any VPC, which only works
-      against internet-origin access points.
+      VPC ID to run the scanner Lambda inside. Leave empty (default) to
+      deploy outside any VPC — the simplest path, and the only requirement
+      is that the access_point_arn you invoke with is an Internet-origin
+      S3 Access Point (verify with `aws s3control get-access-point
+      --account-id <account-id> --name <ap-name> --query NetworkOrigin`).
+      Set this ONLY if the access_point_arn you plan to scan is VPC-scoped
+      (NetworkOrigin=VPC, e.g., one created by restore-verification.yaml's
+      AttachAccessPoint step) — a VPC-scoped access point has no route from
+      outside its bound VPC, so the Lambda must run inside that same VPC.
+      When set, also set SubnetIds/SecurityGroupId/RouteTableIds below to
+      match that VPC.
     Default: ''
     AllowedPattern: '^(vpc-[0-9a-f]{8,17})?$'
 
@@ -51,11 +61,18 @@ Parameters:
       When VpcId is set, create VPC Endpoints for S3 and DynamoDB (Gateway)
       plus Comprehend and SNS (Interface) so the in-VPC scanner Lambda can
       reach the access point, report table, PII detection API, and
-      notifications. Set to 'false' if your VPC already has all four
-      endpoints (e.g., reusing restore-verification.yaml's VPC — note that
-      stack does not create Comprehend/DynamoDB/SNS endpoints, so leave this
-      'true' unless you've added those separately). Ignored if VpcId is
-      empty.
+      notifications. Set to 'false' if your VPC already has all four —
+      check first with `aws ec2 describe-vpc-endpoints --filters
+      Name=vpc-id,Values=<your-vpc-id>` (a second Interface Endpoint for a
+      service that already has one fails with a PrivateDnsEnabled conflict
+      and rolls back this whole stack). If reusing restore-verification.
+      yaml's VPC: that stack creates Secrets Manager/STS/FSx/S3-Gateway
+      endpoints, none of which overlap with this stack's Comprehend/
+      DynamoDB/SNS/S3-Gateway set except S3 — if that stack's
+      CreateS3GatewayEndpoint was 'true', check for that existing S3
+      Gateway Endpoint before setting this to 'true' (a second S3 Gateway
+      Endpoint bound to the same route tables is rejected as a duplicate).
+      Ignored if VpcId is empty.
     Default: 'true'
     AllowedValues: ['true', 'false']
 

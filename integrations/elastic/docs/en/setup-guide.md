@@ -82,4 +82,4 @@ Add a **Lens** bar chart breaking down `event.action` (operation type) for the c
 
 Discover's **Share → CSV Reports** (or **Generate CSV** in newer Kibana versions) exports the current filtered view, scoped to whatever time range you've selected — equivalent to DII SWS's 31-day filtered CSV export, without the fixed 31-day ceiling (retention is governed by your ILM policy above instead).
 
-See [DII Capability Map](../../../docs/en/dii-capability-map.md) for the full phase-by-phase comparison this implements, including known data-source caveats (FPolicy vs audit log coverage gaps, PII handling via the [Data Classification Guide](../../../docs/en/data-classification.md)).
+See [Cyber Resilience Capability Map](../../../docs/en/cyber-resilience-capability-map.md#respond-rs) for the full CSF 2.0 function coverage this implements, including known data-source caveats (FPolicy vs audit log coverage gaps, PII handling via the [Data Classification Guide](../../../docs/en/data-classification.md)).

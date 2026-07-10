@@ -4,7 +4,7 @@
 
 ## Executive Summary
 
-The [DII Capability Map](dii-capability-map.md) is explicit about a gap this repository did not previously address: a protective snapshot existing is a **Protect**-phase artifact, not evidence that the snapshot is actually clean and restorable. NIST CSF 2.0's **RC.RP** (Incident Recovery Plan Execution) subcategory is only credible once a recovery point has been tested and confirmed free of compromise — not merely confirmed to exist.
+The [Cyber Resilience Capability Map](cyber-resilience-capability-map.md#recover-rc) is explicit about a gap this repository did not previously address: a protective snapshot existing is a **Protect**-phase artifact, not evidence that the snapshot is actually clean and restorable. NIST CSF 2.0's **RC.RP** (Incident Recovery Plan Execution) subcategory is only credible once a recovery point has been tested and confirmed free of compromise — not merely confirmed to exist.
 
 This guide implements that missing verification step using AWS-native services only:
 
@@ -191,7 +191,53 @@ Which Lambdas run inside the VPC depends on what each one calls, not on a unifor
 | `RecordVerdict` | DynamoDB + SNS only | ❌ No | Neither API requires VPC access |
 | `Cleanup` | Both the ONTAP REST API directly (volume delete) **and** the FSx control-plane API (`DetachAndDeleteS3AccessPoint`) | ✅ Yes | Needs the management-IP route for the ONTAP call; the FSx API call from inside the VPC requires the FSx Interface Endpoint |
 
-> **Critical: VPC Endpoints**. `CreateFlexClone`/`Cleanup` need Secrets Manager + STS reachable from the VPC (for ONTAP credentials); `Cleanup` additionally needs the **FSx Interface Endpoint** (for `DetachAndDeleteS3AccessPoint`); `ScanForIndicators` needs the **S3 Gateway Endpoint** bound to your route tables (`RouteTableIds` parameter) — without it, the scan step cannot reach the VPC-scoped access point at all, and the workflow will fail at that state every time, not intermittently. Set `CreateVpcEndpoints=true` (the default) unless your VPC already has all four endpoints — Secrets Manager, STS, FSx, and the S3 Gateway Endpoint. Deploying this stack alongside [`automated-response.yaml`](automated-response-guide.md) only covers Secrets Manager and STS from that stack's own endpoints; it does **not** create the FSx or S3 endpoints this stack additionally needs, so leave `CreateVpcEndpoints=true` unless you've added those two separately.
+> **Critical: VPC Endpoints**. `CreateFlexClone`/`Cleanup` need Secrets Manager + STS reachable from the VPC (for ONTAP credentials); `Cleanup` additionally needs the **FSx Interface Endpoint** (for `DetachAndDeleteS3AccessPoint`); `ScanForIndicators` needs the **S3 Gateway Endpoint** bound to your route tables (`RouteTableIds` parameter) — without it, the scan step cannot reach the VPC-scoped access point at all, and the workflow will fail at that state every time, not intermittently. Each of these four endpoints has its own `CreateXxxEndpoint` parameter (`CreateSecretsManagerEndpoint`/`CreateStsEndpoint`/`CreateFsxEndpoint`/`CreateS3GatewayEndpoint`, all default `true`) — set the ones your VPC already has to `false` rather than treating this as an all-or-nothing choice. See "Before You Deploy" immediately below for how to check what your VPC already has before choosing these four values.
+
+---
+
+## Before You Deploy: Check Existing VPC Endpoints
+
+This is the single most common deployment failure for this stack, and it fails in a way that is easy to misdiagnose on a first read of the error: CloudFormation rejects a **second** Interface VPC Endpoint for a service that already has one in the same VPC with `PrivateDnsEnabled: true`, because both endpoints would try to register the same private DNS domain (e.g., `secretsmanager.<region>.amazonaws.com`) inside the VPC. The error message names the conflicting DNS domain, not the resource that already registered it, so it's easy to spend time looking in the wrong place.
+
+**Run this before choosing your `CreateXxxEndpoint` parameter values:**
+
+```bash
+aws ec2 describe-vpc-endpoints \
+  --filters "Name=vpc-id,Values=<your-vpc-id>" \
+  --query "VpcEndpoints[].{Service:ServiceName,Type:VpcEndpointType,State:State}" \
+  --output table
+```
+
+Match what you see against this table:
+
+| If output shows... | Set this parameter to... |
+|---------------------|---------------------------|
+| `com.amazonaws.<region>.secretsmanager` (Interface) | `CreateSecretsManagerEndpoint=false` |
+| `com.amazonaws.<region>.sts` (Interface) | `CreateStsEndpoint=false` |
+| `com.amazonaws.<region>.fsx` (Interface) | `CreateFsxEndpoint=false` |
+| `com.amazonaws.<region>.s3` (Gateway) **and** it's already associated with the same route tables you're passing as `RouteTableIds` | `CreateS3GatewayEndpoint=false` |
+| None of the above present | Leave all four at their `true` default |
+
+If you're deploying this stack into the same VPC as [`automated-response.yaml`](automated-response-guide.md), that stack does not create any VPC Endpoints of its own — it relies on whatever your VPC already had before either stack was deployed. So the check above still applies in full; do not assume `automated-response.yaml` having been deployed first means any of these four endpoints already exist.
+
+> **Route53-private-hosted-zone note**: Some organizations run FSx for ONTAP and other AWS services inside a VPC that is itself a "spoke" attached to a shared-services VPC via Transit Gateway, VPC peering, or a Virtual Private Gateway, with Interface VPC Endpoints created centrally in that shared-services VPC and their private hosted zones associated (via `AssociateVPCWithHostedZone`) to every spoke VPC that needs to resolve them. If your VPC is a spoke in this kind of topology, `describe-vpc-endpoints` run against the spoke VPC will show **no** endpoints even though `secretsmanager.<region>.amazonaws.com` (for example) already resolves inside that VPC via the shared-services VPC's endpoint — because the endpoint resource itself lives in a different VPC, while only its Route 53 private hosted zone association reaches yours. In this topology, creating this stack's own Interface Endpoint with `PrivateDnsEnabled: true` fails with the same DNS-domain-conflict error, but `describe-vpc-endpoints` alone won't have warned you. If `describe-vpc-endpoints` shows nothing but you suspect a shared-services topology, additionally check `aws route53 list-hosted-zones-by-vpc --vpc-id <your-vpc-id> --vpc-region <region>` for a private hosted zone matching the AWS service domain (e.g., `secretsmanager.<region>.amazonaws.com.`) before assuming `CreateXxxEndpoint=true` is safe — a matching zone means the service already resolves privately in your VPC via a centrally-managed endpoint, and this stack's own endpoint attempt for that service will fail the same way a literal duplicate would. This is not a hypothetical: it is the exact failure mode this project's own verification deployment hit against a shared-services VPC with FSx-, Secrets Manager-, SSM-, and SNS-related private hosted zones already associated from outside the VPC.
+
+**If you deploy anyway and hit the conflict**: the stack rolls back automatically (`ROLLBACK_COMPLETE`), and CloudFormation does not let you retry a `deploy`/`create-stack` against a stack in that state — you must delete it first:
+
+```bash
+# Confirm the failure and see which resource conflicted
+aws cloudformation describe-stack-events \
+  --stack-name fsxn-restore-verification \
+  --query "StackEvents[?ResourceStatus=='CREATE_FAILED'].{Resource:LogicalResourceId,Reason:ResourceStatusReason}" \
+  --output table
+
+# Delete the rolled-back stack (safe — it never reached a working state,
+# so there is no verification history in the ledger table to lose)
+aws cloudformation delete-stack --stack-name fsxn-restore-verification
+aws cloudformation wait stack-delete-complete --stack-name fsxn-restore-verification
+
+# Re-deploy with the correct CreateXxxEndpoint values per the table above
+```
 
 ---
 
@@ -212,17 +258,23 @@ aws cloudformation deploy \
     SecurityGroupId=<sg-id> \
     RouteTableIds=<route-table-1>,<route-table-2> \
     NotificationTopicArn=<optional-sns-topic-arn> \
+    CreateSecretsManagerEndpoint=<true-or-false> \
+    CreateStsEndpoint=<true-or-false> \
+    CreateFsxEndpoint=<true-or-false> \
+    CreateS3GatewayEndpoint=<true-or-false> \
   --capabilities CAPABILITY_NAMED_IAM
 ```
+
+Set the four `CreateXxxEndpoint` values per the table in [Before You Deploy](#before-you-deploy-check-existing-vpc-endpoints) above — do not deploy with the defaults unchanged without first running the `describe-vpc-endpoints` check.
 
 The stack creates:
 - Step Functions state machine (`{stack-name}-workflow`)
 - 5 Lambda functions (create-clone, attach-ap, scan, record-verdict, cleanup)
 - DynamoDB ledger table (`{stack-name}-ledger`)
 - CloudWatch Logs for the state machine (365-day retention) and each Lambda (90-day, except record-verdict at 365-day since it doubles as compliance evidence)
-- VPC Endpoints for Secrets Manager, STS, and FSx (Interface), plus an S3 Gateway Endpoint bound to `RouteTableIds` (if `CreateVpcEndpoints=true`, the default) — see [Network Access](#network-access) above for which Lambda needs which endpoint
+- Whichever of the Secrets Manager/STS/FSx (Interface) and S3 Gateway VPC Endpoints you left at `true` — see [Network Access](#network-access) above for which Lambda needs which endpoint, and [Before You Deploy](#before-you-deploy-check-existing-vpc-endpoints) for choosing each one independently
 
-> **Change-management note**: For a change-advisory process, note what this deployment does and doesn't touch: it creates new, additive resources (a new Step Functions state machine, new Lambdas, a new DynamoDB table, and optionally new VPC Endpoints) — it does not modify the FSx for ONTAP file system, existing ONTAP volumes, or any pre-existing VPC networking. The blast radius of a bad deploy is contained to these new resources; a `cloudformation delete-stack` rollback removes them without touching production storage. The one shared-state risk worth flagging in a change ticket: if `CreateVpcEndpoints=true` and the target VPC already has an Interface Endpoint for Secrets Manager, STS, or FSx from another stack (e.g., `automated-response.yaml`), this deploy will fail on a duplicate-endpoint conflict rather than silently reusing the existing one — verify existing endpoints first, or set `CreateVpcEndpoints=false` per the Network Access guidance above.
+> **Change-management note**: For a change-advisory process, note what this deployment does and doesn't touch: it creates new, additive resources (a new Step Functions state machine, new Lambdas, a new DynamoDB table, and whichever VPC Endpoints you opted into) — it does not modify the FSx for ONTAP file system, existing ONTAP volumes, or any pre-existing VPC networking. The blast radius of a bad deploy is contained to these new resources; a `cloudformation delete-stack` rollback removes them without touching production storage. The one shared-state risk worth flagging in a change ticket: if any `CreateXxxEndpoint` parameter is left `true` for a service the target VPC already has an Interface Endpoint for (e.g., from `automated-response.yaml`'s VPC, or a centrally-managed shared-services VPC — see the Route53-private-hosted-zone note above), this deploy fails on a duplicate-endpoint DNS conflict and rolls back the whole stack rather than silently reusing the existing one. Run the [Before You Deploy](#before-you-deploy-check-existing-vpc-endpoints) check as part of the change ticket's pre-deployment validation, not as an afterthought if the first attempt fails.
 
 > **Resource-tagging note**: Only `VerificationLedgerTable` carries the `Project`/`Purpose` tag pair in this stack's CloudFormation template — the five Lambda functions and the Step Functions state machine have no `Tags` property at all. If your organization relies on cost-allocation tags or resource-group tags to attribute spend or enforce tagging policy (e.g., AWS Config's `required-tags` rule, or a Service Control Policy denying untagged resource creation), this stack as shipped will either fail that enforcement or silently escape cost attribution for its Lambda/Step Functions spend, even though the DynamoDB table is correctly tagged. Add equivalent `Tags` blocks to the Lambda `AWS::Lambda::Function` resources and the `AWS::StepFunctions::StateMachine` resource before deploying into an account with tagging governance enforced.
 
@@ -277,11 +329,11 @@ aws dynamodb query \
 - **No production data path**: The FlexClone shares blocks with its parent via copy-on-write, but the S3 Access Point only exposes the *clone*, not the parent volume. Deleting the clone at cleanup does not affect the parent volume or the original snapshot.
 - **VPC-scoped access point**: The access point is bound to the VPC at creation time and cannot be reached from outside it. This is a stronger guarantee than an internet-origin access point restricted only by policy — see [AWS's network-origin comparison](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html). This is also why `ScanForIndicators` (the Lambda that lists the access point's objects) *must* run inside the bound VPC with a route to S3 (the S3 Gateway Endpoint this stack creates) — there is no policy-only way to reach a VPC-scoped access point from outside its VPC, unlike an internet-origin one.
 
-> **Data-residency note**: Every resource this workflow creates — the FlexClone (same Region as the parent FSx for ONTAP file system, by definition), the S3 Access Point, the DynamoDB ledger table, and the Lambda functions themselves — stays within the single AWS Region you deploy this stack into. There is no cross-Region data movement anywhere in this workflow, which is a relevant point to confirm affirmatively for a data-residency questionnaire rather than leaving it as an inference. If your organization operates this workflow across multiple Regions (one stack per Region, per the [Multi-Account Deployment](multi-account-deployment.md) pattern referenced in the DII Capability Map), each Region's ledger is independent — there is no built-in cross-Region replication or aggregation of verification history, so a residency-driven multi-Region deployment also means a per-Region evidence trail unless you build your own aggregation layer.
+> **Data-residency note**: Every resource this workflow creates — the FlexClone (same Region as the parent FSx for ONTAP file system, by definition), the S3 Access Point, the DynamoDB ledger table, and the Lambda functions themselves — stays within the single AWS Region you deploy this stack into. There is no cross-Region data movement anywhere in this workflow, which is a relevant point to confirm affirmatively for a data-residency questionnaire rather than leaving it as an inference. If your organization operates this workflow across multiple Regions (one stack per Region, per the [Multi-Account Deployment](multi-account-deployment.md) pattern referenced in the Cyber Resilience Capability Map), each Region's ledger is independent — there is no built-in cross-Region replication or aggregation of verification history, so a residency-driven multi-Region deployment also means a per-Region evidence trail unless you build your own aggregation layer.
 - **Least privilege for `fsx:*S3AccessPoint*` actions**: These actions do not currently support resource-level permissions or condition keys as fine-grained as other FSx actions; the IAM policy in this stack scopes them to `Resource: '*'` with a documented rationale. Revisit this if AWS adds resource-level support.
 
 > **IAM-design note**: `VerificationLambdaRole` is a single shared role attached to all five Lambdas (see the CloudFormation template), rather than five distinct roles scoped to each function's actual needs — `ScanForIndicators` (which only needs `s3:ListBucket`/`s3:GetObject`) can technically assume the same broad `Resource: '*'` `fsx:*S3AccessPoint*` permissions that `AttachAccessPoint`/`Cleanup` actually use, even though it never calls those APIs. This is a common, reasonable tradeoff for a single-purpose stack (fewer roles to audit, no cross-role `iam:PassRole` complexity), but it does mean a compromised `ScanForIndicators` execution environment has more IAM reach than its own code requires. If your organization's IAM standard requires role-per-function least privilege even within a single workflow, split `VerificationLambdaRole` into per-Lambda roles scoped to exactly the policy statements each function's code path calls.
-- **Verdict ledger as evidence, not a substitute for governance**: The DynamoDB ledger supplies auditable evidence (who verified what, when, with what result) that a CSF 2.0 Govern program can consume — see the [DII Capability Map](dii-capability-map.md#where-this-fits-in-cyber-resilience-nist-csf-20)'s Govern-function discussion for why this repo does not attempt to automate the governance program itself.
+- **Verdict ledger as evidence, not a substitute for governance**: The DynamoDB ledger supplies auditable evidence (who verified what, when, with what result) that a CSF 2.0 Govern program can consume — see the [Cyber Resilience Capability Map](cyber-resilience-capability-map.md#govern-gv)'s Govern-function discussion for why this repo does not attempt to automate the governance program itself.
 - **The ledger table has no delete protection by default**: `VerificationLedgerTable` is created with Point-in-Time Recovery enabled but without `DeletionProtectionEnabled` or an explicit `DeletionPolicy: Retain`. If this table is your primary evidence of periodic restore testing (see the cyber-insurance evidence note below), add `DeletionProtectionEnabled: true` and consider a `DeletionPolicy: Retain` override before relying on it for audit purposes — an accidental `aws cloudformation delete-stack` should not be able to erase your evidence history.
 
 > **Encryption-at-rest note**: `VerificationLedgerTable`'s `SSESpecification` enables encryption with `SSEEnabled: true` but does not set `SSEType`/`KMSMasterKeyId`, which means it encrypts with the AWS-owned DynamoDB key rather than a customer-managed KMS key. This is a reasonable default for most workloads and meets "encrypted at rest," but if your organization's key-management policy requires customer-managed KMS keys (for independent rotation control, cross-account key policies, or a specific compliance mapping), add `SSEType: KMS` and `KMSMasterKeyId: <your-key-arn>` explicitly — the current template does not expose this as a parameter. The same applies to the state machine's and Lambdas' CloudWatch Log Groups, which are also encrypted with the AWS-owned CloudWatch Logs key by default (no `KmsKeyId` set on any `AWS::Logs::LogGroup` resource in this stack).
@@ -326,7 +378,7 @@ python3 -m pytest shared/python/tests/test_restore_verification.py -v
 
 ## Related Documents
 
-- [DII Capability Map](dii-capability-map.md) — the Remaining Gaps and CSF 2.0 RECOVER discussion this guide implements a fix for
+- [Cyber Resilience Capability Map](cyber-resilience-capability-map.md#recover-rc) — the Recover-function discussion this guide implements a fix for
 - [Automated Response Guide](automated-response-guide.md) — the Respond-phase blocking and protective snapshot creation that typically precedes running this workflow
 - [ARP Incident Response Guide](arp-incident-response-guide.md) — the live-volume entropy detection this workflow's scan complements but does not replace
 - [Content-Level PII Classification Scanner](content-classification-scanner.md) — a related content-scanning capability for the CSF 2.0 Identify function (data classification), built on the same FlexClone + S3 Access Point pattern
@@ -354,7 +406,7 @@ A: Yes. `verify_snapshot()` / the Step Functions input only need `svm_name`, `vo
 A: Check the Step Functions execution's current state in the console or via `describe-execution` first — "never finishes" almost always means it's stuck in a specific state, not silently hung everywhere. If it's stuck in `AttachAccessPoint` or `ScanForIndicators`, the most common cause is a VPC networking gap (see Network Access above — e.g., the S3 Gateway Endpoint missing for `ScanForIndicators`, which fails deterministically every time, not intermittently). If it's stuck in `CreateFlexClone`, check whether the ONTAP volume/SVM name in the request actually exists and whether the ONTAP job it's polling shows progress via `GET /api/cluster/jobs/{uuid}` directly against the management endpoint. Each Lambda has a `StepTimeoutSeconds` bound (default 180s), so a true hang should surface as a Step Functions `States.Timeout` error within that window rather than running indefinitely — if you see an execution that's been "running" for much longer than `StepTimeoutSeconds` × 5, that itself is worth escalating as an anomaly, since it suggests the timeout mechanism itself isn't functioning as expected.
 
 **Q: We're migrating an existing FSx for ONTAP fleet to this verification workflow — where do we start?**
-A: Deploy this stack against one volume first, and run `verify_snapshot()` manually against an existing scheduled snapshot before wiring it into any automated trigger — this confirms the ONTAP permissions, VPC networking, and FSx S3 Access Point support actually work against your specific environment (ONTAP version, VPC configuration) before you depend on it. Existing snapshots created before this workflow existed work without any special handling; there's no metadata or tagging this workflow requires a snapshot to have retroactively. Once validated on one volume, expand to your full fleet using the same [Multi-Account Deployment](multi-account-deployment.md) StackSets pattern referenced in the DII Capability Map, rather than manually deploying per-volume or per-account.
+A: Deploy this stack against one volume first, and run `verify_snapshot()` manually against an existing scheduled snapshot before wiring it into any automated trigger — this confirms the ONTAP permissions, VPC networking, and FSx S3 Access Point support actually work against your specific environment (ONTAP version, VPC configuration) before you depend on it. Existing snapshots created before this workflow existed work without any special handling; there's no metadata or tagging this workflow requires a snapshot to have retroactively. Once validated on one volume, expand to your full fleet using the same [Multi-Account Deployment](multi-account-deployment.md) StackSets pattern referenced in the Cyber Resilience Capability Map, rather than manually deploying per-volume or per-account.
 
 **Q: A "suspicious" verdict was recorded in the DynamoDB ledger, but no one received an SNS notification — is that expected?**
 A: Check CloudWatch Logs for the `RecordVerdict` Lambda for a `"Verdict notification failed"` warning before assuming the notification pipeline is broken end-to-end. The SNS `publish` call is wrapped in a try/except that logs and continues rather than failing the workflow (see the SNS-delivery note under Security Considerations above) — this is intentional, so a notification-delivery problem never blocks the verdict from being recorded, but it also means notification failures are silent unless you're watching for that specific log line. If you rely on this notification as an incident-response trigger, add a CloudWatch Alarm on that log pattern rather than treating "no alert received" as equivalent to "nothing suspicious happened."

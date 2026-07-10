@@ -91,4 +91,4 @@ PUT _ilm/policy/fsxn-audit-policy
 
 Discover の **Share → CSV Reports**（新しい Kibana では **Generate CSV**）で、選択した時間範囲に絞った現在のフィルタビューをエクスポートできます — DII SWS の 31 日フィルタ付き CSV エクスポート相当ですが、31 日固定の上限はありません（保持期間は上記 ILM ポリシーで管理されます）。
 
-この実装が対応する DII との全体的なフェーズ別比較、および既知のデータソース上の注意点（FPolicy と audit log のカバレッジ差異、[データ分類ガイド](../../../docs/en/data-classification.md) 経由の PII 取り扱い）については [DII 機能マップ](../../../docs/ja/dii-capability-map.md) を参照してください。
+この実装が対応する CSF 2.0 機能全体のカバレッジ、および既知のデータソース上の注意点（FPolicy と audit log のカバレッジ差異、[データ分類ガイド](../../../docs/en/data-classification.md) 経由の PII 取り扱い）については [サイバーレジリエンス機能マップ](../../../docs/ja/cyber-resilience-capability-map.md#respond対応) を参照してください。

@@ -260,7 +260,7 @@ Two browser-based options exist for GUI-driven management (audit config, quota, 
 - [Cost Validation Template](cost-validation.md)
 
 ### Security & Compliance
-- [DII Capability Map](dii-capability-map.md) — full DII Storage Workload Security capability map (Protect/Detect/Respond/Recover/Forensics) against this repo, including per-vendor forensic investigation dashboards (user/IP/file-path/action)
+- [Cyber Resilience Capability Map](cyber-resilience-capability-map.md) — NIST CSF 2.0 function mapping (Govern/Identify/Protect/Detect/Respond/Recover) for this repo's FSx for ONTAP implementation, with alternative AWS-native/SaaS implementation paths per function, including per-vendor forensic investigation dashboards (user/IP/file-path/action)
 - [Automated Incident Response Guide](automated-response-guide.md) — user/IP blocking, snapshot, session disconnect (ONTAP REST API)
   > 🔍 Looking for AD-integrated user/IP-level storage-layer access blocking, similar to what dedicated storage security products (e.g., DII Storage Workload Security) provide? See the comparison table and FAQ in this guide. Scope: storage-layer blocking and evidence preservation only — host isolation, malware removal, and credential rotation are out of scope.
 - [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md) — FlexClone + isolated S3 Access Point scan to verify a snapshot is clean before restoring (CSF 2.0 RC.RP)

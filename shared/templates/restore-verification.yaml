@@ -2,18 +2,19 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: |
   FSx for ONTAP Verified-Clean Recovery Point Workflow (CSF 2.0 RC.RP).
 
-  Closes the gap documented in the DII Capability Map: a protective snapshot
-  existing is a Protect-phase artifact, not evidence that the snapshot is
-  actually clean and restorable (RC.RP — Incident Recovery Plan Execution).
+  A protective snapshot existing is a Protect-phase artifact, not evidence
+  it is actually clean and restorable. Step Functions orchestrates:
+  FlexClone -> S3 Access Point attach -> ransomware-indicator scan -> verdict
+  (DynamoDB) -> guaranteed cleanup, for any candidate snapshot.
 
-  Step Functions orchestrates: FlexClone creation -> S3 Access Point
-  attachment -> ransomware-indicator scan -> verdict recording (DynamoDB) ->
-  guaranteed cleanup (S3 AP + FlexClone deletion), for any candidate snapshot
-  (typically one created by the automated-response.yaml stack's
-  create_snapshot action).
+  Deploy alongside automated-response.yaml, in the same VPC/subnets.
 
-  Deploy alongside automated-response.yaml. Requires a VPC with connectivity
-  to the ONTAP management endpoint (same VPC/subnets as that stack).
+  BEFORE YOU DEPLOY: run `aws ec2 describe-vpc-endpoints` against your VPC
+  and check which of Secrets Manager/STS/FSx/S3-Gateway endpoints already
+  exist, then set the four CreateXxxEndpoint parameters accordingly — a
+  second Interface Endpoint for a service that already has one fails with a
+  PrivateDnsEnabled conflict and rolls back the whole stack. See "Before You
+  Deploy" in the Verified-Clean Recovery Point Guide for the full command.
 
   Stack name pattern: fsxn-restore-verification
 
@@ -49,11 +50,13 @@ Parameters:
     Type: CommaDelimitedList
     Description: >-
       Route table IDs associated with SubnetIds. Used to attach the S3
-      Gateway VPC Endpoint that ScanForIndicators needs to reach the
-      VPC-scoped S3 Access Point from inside the VPC. Required even if
-      CreateVpcEndpoints=false is chosen for Secrets Manager/STS/FSx — pass
-      the route tables regardless (the parameter has no effect when the S3
-      Gateway Endpoint already exists; see CreateVpcEndpoints).
+      Gateway VPC Endpoint (only if CreateS3GatewayEndpoint=true) that
+      ScanForIndicators needs to reach the VPC-scoped S3 Access Point from
+      inside the VPC. Still required as an input even if
+      CreateS3GatewayEndpoint=false — the value itself is simply unused by
+      CloudFormation in that case (no resource references it), but the
+      parameter has no default, so pass your route table IDs regardless of
+      which CreateXxxEndpoint values you choose.
 
   UnixUser:
     Type: String
@@ -97,30 +100,87 @@ Parameters:
       output from automated-response.yaml). Leave empty to skip notifications.
     Default: ''
 
-  CreateVpcEndpoints:
+  CreateSecretsManagerEndpoint:
     Type: String
     Description: >-
-      Create VPC Endpoints for Secrets Manager, STS, FSx, and an S3 Gateway
-      Endpoint. Set to 'false' if your VPC already has these endpoints (e.g.,
-      from the automated-response.yaml stack in the same VPC — note that
-      stack does not create an FSx or S3 endpoint, so if reusing its VPC,
-      leave this 'true' unless you have separately added FSx/S3 endpoints).
-      Lambda in VPC CANNOT reach AWS APIs without VPC Endpoints or a NAT
-      Gateway. The S3 Gateway Endpoint specifically is required for
-      ScanForIndicators to reach the VPC-scoped S3 Access Point — a
-      VPC-scoped access point has no route from outside the bound VPC (see
-      Security Considerations).
+      Create an Interface VPC Endpoint for Secrets Manager (com.amazonaws.
+      <region>.secretsmanager). Set to 'false' if your VPC already has one —
+      a second Interface Endpoint for the SAME service with PrivateDnsEnabled
+      fails to create (CloudFormation error: "private-dns-enabled cannot be
+      set because there is already a conflicting DNS domain..."). This is
+      the single most common deployment failure for this stack: if you are
+      layering this template onto a VPC that already runs
+      automated-response.yaml, or any other stack/console action that
+      created a Secrets Manager endpoint, set this to 'false'. Check first —
+      see "Before You Deploy" in the Verified-Clean Recovery Point Guide for
+      the exact `aws ec2 describe-vpc-endpoints` command.
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+
+  CreateStsEndpoint:
+    Type: String
+    Description: >-
+      Create an Interface VPC Endpoint for STS (com.amazonaws.<region>.sts).
+      Set to 'false' if your VPC already has one, for the same
+      PrivateDnsEnabled-conflict reason described under
+      CreateSecretsManagerEndpoint. STS is used by the AWS SDK's default
+      credential chain in some configurations; most deployments do need this
+      endpoint unless one already exists.
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+
+  CreateFsxEndpoint:
+    Type: String
+    Description: >-
+      Create an Interface VPC Endpoint for the FSx control-plane API
+      (com.amazonaws.<region>.fsx), required by Cleanup's
+      DetachAndDeleteS3AccessPoint call from inside the VPC. Set to 'false'
+      if your VPC already has one. Note this is a DIFFERENT DNS domain than
+      the per-file-system domain FSx for ONTAP itself registers
+      (fs-xxxx.fsx.<region>.amazonaws.com for the management endpoint) — that
+      per-file-system domain existing does NOT mean the FSx control-plane API
+      endpoint already exists; check explicitly with the command in "Before
+      You Deploy" in the guide rather than assuming from the presence of one
+      or the other.
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+
+  CreateS3GatewayEndpoint:
+    Type: String
+    Description: >-
+      Create an S3 Gateway VPC Endpoint, required for ScanForIndicators to
+      reach the VPC-scoped S3 Access Point — a VPC-scoped access point has
+      no route from outside the bound VPC (see Security Considerations in
+      the Verified-Clean Recovery Point Guide). Set to 'false' if your VPC
+      already has an S3 Gateway Endpoint bound to RouteTableIds (Gateway
+      Endpoints are commonly shared across stacks since, unlike Interface
+      Endpoints, they don't set PrivateDnsEnabled and rarely conflict — but
+      confirm your route tables are covered; a Gateway Endpoint bound to a
+      DIFFERENT route table than RouteTableIds will not help this stack).
     Default: 'true'
     AllowedValues: ['true', 'false']
 
 Conditions:
   HasNotificationTopic: !Not [!Equals [!Ref NotificationTopicArn, '']]
-  ShouldCreateVpcEndpoints: !Equals [!Ref CreateVpcEndpoints, 'true']
+  ShouldCreateSecretsManagerEndpoint: !Equals [!Ref CreateSecretsManagerEndpoint, 'true']
+  ShouldCreateStsEndpoint: !Equals [!Ref CreateStsEndpoint, 'true']
+  ShouldCreateFsxEndpoint: !Equals [!Ref CreateFsxEndpoint, 'true']
+  ShouldCreateS3GatewayEndpoint: !Equals [!Ref CreateS3GatewayEndpoint, 'true']
+  ShouldCreateAnyInterfaceEndpoint: !Or
+    - !Condition ShouldCreateSecretsManagerEndpoint
+    - !Condition ShouldCreateStsEndpoint
+    - !Condition ShouldCreateFsxEndpoint
 
 Resources:
   # ================================================================
-  # VPC Endpoints — only created if the shared VPC doesn't already have
-  # them (e.g., first deployment without automated-response.yaml).
+  # VPC Endpoints — each created independently based on its own
+  # CreateXxxEndpoint parameter, so you can reuse whichever endpoints your
+  # VPC already has (e.g., from automated-response.yaml in the same VPC)
+  # and only create the ones that are missing. See "Before You Deploy" in
+  # the Verified-Clean Recovery Point Guide for the discovery command to
+  # run before choosing these four parameters — guessing wrong fails fast
+  # with a clear CloudFormation error (PrivateDnsEnabled conflict), but
+  # triggers a full stack rollback, so it's faster to check first.
   #
   # Four Lambdas run inside the VPC (CreateClone, AttachAccessPoint, Scan,
   # Cleanup) — see the per-Lambda comments below for which endpoint each one
@@ -139,7 +199,7 @@ Resources:
   # ================================================================
   SecretsManagerVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
-    Condition: ShouldCreateVpcEndpoints
+    Condition: ShouldCreateSecretsManagerEndpoint
     Properties:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.secretsmanager'
@@ -151,7 +211,7 @@ Resources:
 
   StsVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
-    Condition: ShouldCreateVpcEndpoints
+    Condition: ShouldCreateStsEndpoint
     Properties:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.sts'
@@ -163,7 +223,7 @@ Resources:
 
   FsxVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
-    Condition: ShouldCreateVpcEndpoints
+    Condition: ShouldCreateFsxEndpoint
     Properties:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.fsx'
@@ -175,7 +235,7 @@ Resources:
 
   S3GatewayVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
-    Condition: ShouldCreateVpcEndpoints
+    Condition: ShouldCreateS3GatewayEndpoint
     Properties:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
@@ -186,9 +246,12 @@ Resources:
       # endpoint policy); tighten with a Condition on aws:sourceVpce if your
       # organization requires endpoint-level restriction in addition to IAM.
 
+  # Shared by whichever Interface Endpoints are actually created above —
+  # created once if at least one of Secrets Manager/STS/FSx is being
+  # created, regardless of which specific combination.
   VpcEndpointSecurityGroup:
     Type: AWS::EC2::SecurityGroup
-    Condition: ShouldCreateVpcEndpoints
+    Condition: ShouldCreateAnyInterfaceEndpoint
     Properties:
       GroupDescription: Allow Lambda to access Interface VPC Endpoints (Secrets Manager, STS, FSx)
       VpcId: !Ref VpcId

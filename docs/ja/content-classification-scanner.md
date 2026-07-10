@@ -4,7 +4,7 @@
 
 ## エグゼクティブサマリ
 
-[DII Capability Map](dii-capability-map.md) では、Identify 機能におけるギャップを明確に指摘していました。本リポジトリの [データ分類ガイド](data-classification.md) はスキーマレベルの分類（`UserName`、`ObjectName` といった *フィールド* のどれが PII か）を定義していますが、NetApp のデータ分類ツールが CSF 2.0 の Identify 機能に対して行うような、ファイル *内容* のスキャンは行っていませんでした。
+[サイバーレジリエンス機能マップ](cyber-resilience-capability-map.md#identify識別) では、Identify 機能におけるギャップを明確に指摘していました。本リポジトリの [データ分類ガイド](data-classification.md) はスキーマレベルの分類（`UserName`、`ObjectName` といった *フィールド* のどれが PII か）を定義していますが、NetApp のデータ分類ツールが CSF 2.0 の Identify 機能に対して行うような、ファイル *内容* のスキャンは行っていませんでした。
 
 本ガイドは、Amazon Comprehend のマネージド PII エンティティ検出を使い、既存の S3 Access Point 経由でファイルを読み取るスタンドアロンの Lambda 関数として、このコンテンツレベルのスキャンを実装します。
 
@@ -259,6 +259,52 @@ aws lambda invoke \
 
 > **この連結パターンにはデプロイモード2（VPC 内）が必須です**: `AttachAccessPoint` は常に VPC 限定の Access Point を作成し、本スキャナーはそれに到達するために同じ VPC 内で実行される必要があります — 上記[前提条件](#既存の-s3-access-point)のネットワーク起点に関する注記を参照してください。本スタックをスタンドアロンモード（`VpcId` 未指定）で連結先の FlexClone Access Point に対してデプロイすると、`ListObjectsV2` の呼び出しで毎回確実に失敗します。ネットワーク経路自体が存在しないため、間欠的な失敗ではありません。
 
+### 動作確認（Quick Validation）
+
+本スキャナーを実データに向ける前に、合成ファイルを使ってエンドツーエンドで動作するか確認してください — 以下の手順は、本プロジェクト自身の E2E 検証で実際に使用したものと同一です（デプロイモード1: スタンドアロン、`VpcId` 未指定に対して実施）:
+
+```bash
+# 1. 合成 PII ファイルを作成する — 実在の個人情報は含まない。
+#    一時的な場所に置き、テスト後は即座に削除する
+cat > /tmp/pii-test-sample.txt <<'EOF'
+Customer Support Ticket #48213
+Name: John Sample Doe
+Email: john.sample.doe@example.com
+Phone: 555-0142-9981
+SSN: 078-05-1120
+Address: 123 Example Street, Springfield, IL 62704
+EOF
+
+# 2. FSx for ONTAP ボリュームへの書き込み権限を持つ S3 Access Point 経由で
+#    アップロードする（読み取り専用の Access Point しかない場合、
+#    PutObject は拒否されます — 読み取り専用/読み書き可能な Access Point
+#    の違いは上記の前提条件を参照）
+aws s3api put-object \
+  --bucket <your-access-point-arn> \
+  --key validation/pii-test-sample.txt \
+  --body /tmp/pii-test-sample.txt
+
+# 3. スキャナーを直接 invoke する（後で構成する EventBridge/Step Functions
+#    のトリガーを経由せず、Lambda + Comprehend のパスだけを単体で確認できる）
+aws lambda invoke \
+  --function-name fsxn-content-classification-scanner \
+  --payload '{"access_point_arn":"<your-access-point-arn>","max_files":50}' \
+  --cli-binary-format raw-in-base64-out \
+  /tmp/scan-response.json
+cat /tmp/scan-response.json
+
+# 4. Lambda のレスポンスだけでなく、台帳にも記録されたことを確認する
+aws dynamodb get-item \
+  --table-name fsxn-content-classification-reports \
+  --key '{"access_point_arn":{"S":"<your-access-point-arn>"},"started_at":{"S":"<手順3のレスポンスのstarted_at>"}}'
+
+# 5. 合成ファイルを削除し、本番ストレージに残さないようにする
+aws s3api delete-object --bucket <your-access-point-arn> --key validation/pii-test-sample.txt
+rm -f /tmp/pii-test-sample.txt /tmp/scan-response.json
+```
+
+成功した実行では `"files_with_pii": 1`（Access Point 配下に他のスキャン対象ファイルが既にあれば、それ以上の値）が報告され、`findings` に `pii-test-sample.txt` が含まれ、`NAME`/`EMAIL`/`PHONE`/`SSN`/`ADDRESS` のエンティティタイプが、整形されたフィールド（`EMAIL`、`PHONE`、`SSN`、`ADDRESS`）では通常 0.9 を超える確信度で、`NAME` ではそれより低い確信度で（Comprehend の氏名検出の確信度は、他のタイプよりも周辺の文脈に依存して変動しやすいため）検出されているはずです。手順3がタイムアウトするか、代わりにアクセス拒否エラーが返る場合は、[前提条件](#既存の-s3-access-point)を再確認してください — 最も多い原因は、スタンドアロン（VPC 外）デプロイから VPC 限定の Access Point ARN を呼び出している、またはその逆のケースです。
+
 ---
 
 ## 設定リファレンス
@@ -323,7 +369,7 @@ python3 -m pytest shared/python/tests/test_content_classifier.py -v
 
 ## 関連ドキュメント
 
-- [DII Capability Map](dii-capability-map.md) — 本スキャナーが対応する Identify 機能の「残存するギャップ」
+- [サイバーレジリエンス機能マップ](cyber-resilience-capability-map.md#identify識別) — 本スキャナーが対応する Identify 機能のギャップ
 - [データ分類ガイド](data-classification.md) — 本スキャナーがコンテンツレベルで補完する、スキーマレベル（フィールド名）の分類
 - [検証済みクリーン復旧ポイントガイド](verified-recovery-point-guide.md) — 本スキャナーが連結でき、本番への影響ゼロでスキャンできる FlexClone + S3 Access Point パターン
 - [自動インシデント対応ガイド](automated-response-guide.md) — 保護 Snapshot が復旧検証ワークフロー経由での自然なスキャン対象となる、封じ込めフェーズのモジュール
