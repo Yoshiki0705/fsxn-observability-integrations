@@ -27,6 +27,8 @@
 - 定期的な保護 Snapshot / スケジュール Snapshot に対して定期実行し、復旧レディネスの継続チェックとして
 - 計画的な DR テストやコンプライアンス監査の前に、手動で「テスト済み」の復旧ポイントであることのエビデンスを取得するために
 
+> **Sales Engineer/Pre-Sales Solutions Architect の視点**: ランサムウェアレジリエンスのために FSx for ONTAP を評価している顧客に本ガイドを説明する際、正確な一文での位置づけは「人間がリストアサイクルを無駄にする前に、明らかに侵害された Snapshot を除外する自動化された事前フィルタであり、Snapshot がマルウェアを含まないことの証明書ではない」です。顧客との対話や RFP 回答において、「clean」判定を完全なフォレンジック証明と同等のものとして提示しないでください — 本ガイド内の他の Resilience-maturity や Threat Intelligence Analyst の視点が、その位置づけがなぜ機能を過大に見せることになるかを正確に説明しています。正確でありながら十分に説得力のある主張は、自動化とエビデンストレイル自体です — これは、以前は存在しなかったギャップ（検証済みでクリーンな復旧ポイントのワークフローがなかった）を AWS ネイティブサービスと DynamoDB の監査証跡で解消するものであり、スキャンの深さを過剰に売り込む必要のない、正当な差別化要因です。
+
 ---
 
 ## アーキテクチャ
@@ -82,6 +84,8 @@ POST /api/storage/volumes
 
 これは非同期ジョブを返します。Lambda は `GET /api/cluster/jobs/{uuid}` を `state: success` になるまでポーリングし、その後クリーンアップ用にクローンの ONTAP ボリューム UUID を解決します。
 
+> **Concurrency/Race-Condition Engineer の視点**: `clone_name` は `verify_{volume_name}_{timestamp}` から生成され、`timestamp` は 1 秒単位の精度です（`%Y%m%d_%H%M%S`）。同じ `volume_name` に対して同じ 1 秒以内に開始された 2 つの Step Functions 実行 — 例えばスケジュール実行と手動トリガーが同時に発火した場合 — は、同一名の ONTAP ボリュームを作成しようとし、2 回目の `POST /storage/volumes` 呼び出しは処理を継続できずに名前の衝突エラーで失敗します。本ワークフローには、これを防ぐための実行レベルのロック（DynamoDB の条件付き書き込みや Step Functions の名前重複排除など）はありません。実際にはこの衝突ウィンドウは狭く、トリガーパターンとしても頻度は高くありませんが、同じボリュームに対して複数の独立したトリガー（例: スケジュールと SOAR プレイブックの両方）から本ワークフローを呼び出す場合は、同一秒での衝突を避けるため、識別用のサフィックス（短いランダムトークンや呼び出し元の実行 ID など）を追加することを検討してください。
+
 ### ステップ2: S3 Access Point の接続
 
 クローンは [VPC 限定の S3 Access Point](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-vpc.html) 経由で公開されます（インターネット起点ではありません）。そのため、リクエストは接続先 VPC 内の Interface VPC Endpoint を経由する必要があります:
@@ -110,6 +114,8 @@ Access Point は `CREATING` → `AVAILABLE`（エラー時は `FAILED`/`MISCONFI
 - 疑わしい比率が `SuspiciousRatioThreshold`（デフォルト 5%）以上
 
 > **レジリエンス成熟度の視点**: これは意図的に粗く高速な事前フィルタであり、攻撃発生中に本番ボリュームに対して動作する [ONTAP ARP](arp-incident-response-guide.md) のファイル内容エントロピー分析の代替ではありません。本スキャンが答えるのは、より狭く、より後段の問いです — 「この特定の Snapshot は、ランサムウェアによってリネームされたファイルが多数を占めるボリュームを捉えているように見えるか」。ここでの「clean」判定は RC.RP のエビデンスにはなりますが、汎用的なマルウェアスキャンではなく、ファイルの *内容* は検査しません（データ分類を目的とした補完的な内容スキャン機能については、[コンテンツレベル PII 分類スキャナー](content-classification-scanner.md)を参照してください — こちらはランサムウェア検知ではなく別の課題に対応するものです）。
+
+> **Threat Intelligence Analyst の視点**: `SUSPICIOUS_EXTENSIONS` は、既知のランサムウェアファミリーに歴史的に関連付けられている拡張子（`.locky`、`.wcry`、`.cerber` など）の固定リストです。これはシグネチャベースのアプローチであり、シグネチャベースならではの盲点を引き継いでいます — ランダムまたは被害者固有の拡張子を付与するランサムウェア（拡張子ベースの検知を回避するために、まさにこの目的で最近の攻撃キャンペーンで増加傾向にあるパターン）は、このリストのどの項目にも一致しないため、そのようなバリアントによって暗号化された Snapshot でも、本スキャン単独では「clean」判定を受ける可能性があります。このリストは新しいランサムウェアファミリーに合わせて自動的に更新される仕組みではありません — 出荷時のリストを網羅的なものとして扱わず、最新の脅威インテリジェンス（SIEM ベンダーの脅威フィードやメンテナンスされている公開リストなど）と照らし合わせて `SUSPICIOUS_EXTENSIONS` を定期的に見直し・拡張してください。これは、ここでの「clean」判定が事前フィルタであり保証ではない、（上記で既に述べた理由に加えた）2 つ目の独立した理由です — [ONTAP ARP](arp-incident-response-guide.md) のエントロピーベース検知は特定の拡張子を認識することに依存しないため、まさにこの盲点に対する意味のある補完となります。
 
 ### ステップ4: 判定結果の記録
 
@@ -141,6 +147,8 @@ Cleanup Lambda は設計上べき等的に振る舞います。`access_point_nam
 
 - **FlexClone REST API**（`clone.is_flexclone`）: ONTAP 9.8+ で利用可能
 - **ボリューム作成/削除 REST API**: ONTAP 9.6+ で利用可能
+
+> **Vulnerability/Patch Management Specialist の視点**: 本ガイドが示すのは各 API が必要とする*最低*バージョンであり、実行を*推奨*するバージョンではありません。本ワークフローは、ONTAP 管理エンドポイントに触れる他のどのコンポーネントとも同様に扱ってください — 稼働中の ONTAP バージョンについて [NetApp のセキュリティアドバイザリ](https://security.netapp.com/)を追跡し、組織の通常のサイクルでパッチを適用してください。`secretsmanager:GetSecretValue` 権限を持つ認証情報で ONTAP REST API を自ら呼び出す検証ワークフローだからといって、他の ONTAP API 利用者と同じパッチ管理の規律から免除されるわけではありません。別の観点として、Lambda ランタイム（`python3.12`）とその `boto3`/`botocore`/`urllib3` 依存関係（CloudFormation テンプレートのインライン `ZipFile` コード参照）は、本スタック内で特定バージョンに固定されていません — Lambda はデプロイ時点で利用可能な最新の `python3.12` マネージドランタイムとそこに同梱された SDK バージョンを解決するため、AWS の Lambda ランタイム廃止スケジュールを追跡し、一度デプロイしたら永続的に最新の状態が保たれると想定せず、定期的に再デプロイしてください。
 
 ### AWS 権限
 
@@ -208,6 +216,8 @@ aws cloudformation deploy \
 - ステートマシン用 CloudWatch Logs（365 日保持）、各 Lambda 用 CloudWatch Logs（90 日保持。record-verdict はコンプライアンスエビデンスも兼ねるため 365 日保持）
 - Secrets Manager・STS・FSx 用の Interface Endpoint、および `RouteTableIds` に紐づく S3 Gateway Endpoint（`CreateVpcEndpoints=true`、デフォルトの場合）— どの Lambda がどの Endpoint を必要とするかは上記[ネットワークアクセス](#ネットワークアクセス)を参照
 
+> **Change Management/CAB の視点**: 変更承認プロセス向けに、本デプロイが触れるものと触れないものを明確にしておきます — 本デプロイは新規かつ追加的なリソース（新しい Step Functions ステートマシン、新しい Lambda 群、新しい DynamoDB テーブル、任意で新しい VPC Endpoint）のみを作成し、FSx for ONTAP ファイルシステム本体、既存の ONTAP ボリューム、あるいは既存の VPC ネットワーク構成は一切変更しません。デプロイ失敗時の影響範囲はこれらの新規リソースに限定され、`cloudformation delete-stack` によるロールバックは本番ストレージに一切触れずにこれらを削除します。変更チケットで明記すべき唯一の共有状態リスクは次の点です: `CreateVpcEndpoints=true` で、対象 VPC に既に別のスタック（例: `automated-response.yaml`）による Secrets Manager・STS・FSx の Interface Endpoint が存在している場合、本デプロイは既存の Endpoint を暗黙的に再利用するのではなく、重複 Endpoint の競合で失敗します — 事前に既存の Endpoint を確認するか、上記のネットワークアクセスのガイダンスに従って `CreateVpcEndpoints=false` に設定してください。
+
 ### 検証実行の開始
 
 ```bash
@@ -222,6 +232,8 @@ aws stepfunctions start-execution \
 ```
 
 [自動インシデント対応ガイド](automated-response-guide.md)の `create_snapshot` アクションの後段に本ワークフローを連結するには、SOAR プレイブックまたは Step Functions ファンアウト（同ガイドの FAQ 参照）から、封じ込め完了後に新規作成された Snapshot 名を指定してこのステートマシンを呼び出してください。
+
+> **Capacity Planning Engineer の視点**: 本ワークフローは `ReservedConcurrentExecutions` や `MaxConcurrency` をどこにも設定していません — 各 Step Functions 実行は、アカウント/リージョンで共有される未予約の同時実行プールに対して、それぞれ 5 つの Lambda 呼び出しを行います。多数の Snapshot がほぼ同時に検証される大規模フリート（例: 数百のボリュームに対するスケジュールされた一斉スイープ、または多数の `create_snapshot` アクションを一度に発火させる大規模インシデントシナリオ）では、検証実行の同時実行バーストが、`automated-response.yaml` のレスポンスハンドラーを含むアカウント内の他の全 Lambda 関数と同じプールを争うことになります。大規模フリートに対して本ワークフローをスケジュールする前に、想定される同時検証実行数をアカウントの Lambda 同時実行数の上限と比較検討し、実行をファンアウトする仕組み（EventBridge Scheduler、Step Functions の `Map` ステート、または SOAR ツール）側に `MaxConcurrency` の上限を設定することを検討してください。アカウント全体の上限を暗黙のスロットルとして依存するのではなく。
 
 ### 台帳のクエリ
 
@@ -246,13 +258,19 @@ aws dynamodb query \
 
 > **FinOps/Cost Optimization Engineer の視点**: 1 回の検証実行あたりの主なコスト要因は、Lambda の実行時間（5 つの短命な関数、それぞれ数秒程度）、DynamoDB のオンデマンド書き込み（`PAY_PER_REQUEST` テーブルへの `PutItem`/`UpdateItem` 呼び出しが実行あたり 2〜3 回）、そして `CreateVpcEndpoints=true` の場合は Interface VPC Endpoint（Secrets Manager、STS、FSx）の時間課金とデータ処理量あたりの課金です。S3 Gateway Endpoint 自体には時間課金はありません。これらはいずれも、コンテンツレベル PII 分類スキャナーの [Amazon Comprehend の課金](https://aws.amazon.com/comprehend/pricing/)のようにスキャン対象オブジェクト単位で課金されるものではなく、コストは*実行頻度*に応じて増減します（ボリュームサイズには依存しません）。そのため、大規模なフリート内の全 Snapshot に対して 1 時間おきに本ワークフローを実行するのと、インシデントごとに一度だけ実行するのとでは、コストの規模が大きく異なります。同じ VPC 内で本スタックと `automated-response.yaml` の Interface VPC Endpoint を共用し（`CreateVpcEndpoints=false`）、重複課金を避けてください。
 
+> **Green Software/Sustainability Engineer の視点**: これは計算炭素の観点から見て根本的に軽量なワークロードです — 1 回の実行あたり 5 つの短命な Lambda 呼び出しがあり、それぞれ持続的な CPU バウンドの計算ではなく I/O バウンドの作業（ONTAP REST 呼び出し、S3 一覧取得、DynamoDB 書き込み）を行い、実行間にアイドリングする永続的なコンピュート（常時起動の EC2 やコンテナ）もありません。上記の FinOps の視点と同じ観察が、単位を変えてここにも当てはまります — 消費エネルギーにとって重要なレバーは*実行頻度*であり、ボリュームサイズではありません。これは `ScanForIndicators` がファイルの内容を読むのではなくオブジェクトキーを一覧化するだけ（`ListObjectsV2`）であるためです。大規模フリートの全 Snapshot に対して 1 時間おきに本ワークフローをスケジュールすると、呼び出し回数（したがってエネルギー消費）はスケジュール頻度に線形に比例して増加します。目的がインシデント後の検証ではなく定期的な復旧レディネスチェックであれば、フリート全体を毎時スキャンするよりも、代表的なボリュームに対して日次または週次のケイデンスで実行する方が、有意に少ない総エネルギー消費で同じ目的を達成できる可能性が高いです。
+
 ---
 
 ## セキュリティ考慮事項
 
 - **本番データへの経路なし**: FlexClone は copy-on-write で親ボリュームとブロックを共有しますが、S3 Access Point が公開するのは *クローン* のみで、親ボリュームは公開されません。クリーンアップ時にクローンを削除しても、親ボリュームや元の Snapshot には影響しません。
 - **VPC 限定の Access Point**: Access Point は作成時に VPC に束縛され、VPC 外からは到達できません。これは、ポリシーのみで制御するインターネット起点の Access Point よりも強い保証です — 詳細は [AWS のネットワーク起点比較](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)を参照してください。この特性のため、Access Point のオブジェクトを一覧化する `ScanForIndicators` は、束縛された VPC 内で S3 へのルート（本スタックが作成する S3 Gateway Endpoint）を持って実行される*必要があります* — インターネット起点の Access Point とは異なり、VPC 限定の Access Point にはポリシーだけで VPC 外から到達する方法がありません。
+
+> **Data Residency/Sovereignty Specialist の視点**: 本ワークフローが作成する全てのリソース — FlexClone（定義上、親の FSx for ONTAP ファイルシステムと同じリージョン）、S3 Access Point、DynamoDB 台帳テーブル、Lambda 関数自体 — は、本スタックをデプロイした単一の AWS リージョン内に留まります。本ワークフロー内でリージョンを跨いだデータ移動は一切ありません。これはデータレジデンシーのアンケートに対して、推測に頼らず積極的に確認・肯定できる点です。組織が複数リージョンで本ワークフローを運用する場合（DII Capability Map で参照されている[マルチアカウントデプロイ](multi-account-deployment.md)パターンに従い、リージョンごとに 1 スタック）、各リージョンの台帳は独立しています — 検証履歴のリージョン横断レプリケーションや集約は組み込まれていないため、レジデンシー要件に基づくマルチリージョン展開では、独自の集約レイヤーを構築しない限り、リージョンごとに独立したエビデンストレイルになります。
 - **`fsx:*S3AccessPoint*` アクションの最小権限**: これらのアクションは現時点で、他の FSx アクションほど細かいリソースレベル権限や条件キーをサポートしていません。本スタックの IAM ポリシーではこれらを `Resource: '*'` にスコープし、その理由をドキュメント化しています。AWS がリソースレベルのサポートを追加した場合は見直してください。
+
+> **IAM Architect の視点**: `VerificationLambdaRole` は 5 つの Lambda 全てに割り当てられる単一の共有ロールであり（CloudFormation テンプレート参照）、各関数が実際に必要とする権限に絞った 5 つの個別ロールにはなっていません。`ScanForIndicators`（`s3:ListBucket`/`s3:GetObject` のみが必要）は、技術的には `AttachAccessPoint`/`Cleanup` が実際に使用している同じ広範な `Resource: '*'` の `fsx:*S3AccessPoint*` 権限も引き継いでいますが、これらの API を一切呼び出しません。これは単一目的のスタックにおいてよくある合理的なトレードオフです（監査対象のロール数が減り、ロール間の `iam:PassRole` の複雑さがない）が、`ScanForIndicators` の実行環境が侵害された場合、そのコード自体が必要とする範囲よりも広い IAM の到達範囲を持つことを意味します。組織の IAM 標準が単一ワークフロー内でも関数単位の最小権限を求める場合は、`VerificationLambdaRole` を各関数のコードパスが実際に呼び出すポリシーステートメントのみに絞った、関数別のロールに分割してください。
 - **判定結果台帳はエビデンスであり、ガバナンスの代替ではない**: DynamoDB 台帳は、誰が何をいつ検証し、どのような結果だったかという監査可能なエビデンスを提供し、CSF 2.0 の Govern プログラムが入力として利用できます — 本リポジトリがガバナンスプログラム自体を自動化しようとしない理由については、[DII Capability Map](dii-capability-map.md#サイバーレジリエンス全体での位置づけ-nist-csf-20) の Govern 機能に関する議論を参照してください。
 - **台帳テーブルにはデフォルトで削除保護がない**: `VerificationLedgerTable` は Point-in-Time Recovery を有効にして作成されますが、`DeletionProtectionEnabled` や明示的な `DeletionPolicy: Retain` は設定されていません。このテーブルを定期的なリストア検証の主要なエビデンスとして利用する場合（下記のサイバー保険/リスク移転の視点を参照）、監査目的で依拠する前に `DeletionProtectionEnabled: true` を追加し、`DeletionPolicy: Retain` の上書きも検討してください — うっかり `aws cloudformation delete-stack` を実行しても、エビデンスの履歴が消えてしまうことがないようにするためです。
 

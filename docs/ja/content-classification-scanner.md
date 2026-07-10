@@ -27,6 +27,8 @@
 - ランサムウェア検証の直後に、[FlexClone 検証用 Access Point](verified-recovery-point-guide.md) に対して実行し、同じ隔離クローンに対して両方のスキャンを組み合わせる
 - 新しい Observability/SIEM の配信先にボリュームを接続する前に、フォレンジックダッシュボードやエクスポートされたログサンプルが何を露出する可能性があるかを確認する
 
+> **Sales Engineer/Pre-Sales Solutions Architect の視点**: ここで正確な位置づけは「プレーンテキスト/構造化データ形式向けのコンテンツレベル PII 発見」であり、限定なしの「PII 発見」ではありません — 下記の[残存する限界](#残存する限界)節は、Office/PDF のコンテンツが現状スコープ外であることを明示しています。特に顧客のデータが Office ドキュメント中心の場合、顧客との対話ではスキーマレベルの[データ分類ガイド](data-classification.md)を完全対応レイヤーとして先に紹介し、本スキャナーはその対応形式についてのコンテンツレベルの補完として位置づけてください。本スキャナー単独で全ファイル形式に対する包括的なコンテンツレベル PII カバレッジを提供するかのような印象は避けてください。
+
 ---
 
 ## アーキテクチャ
@@ -82,6 +84,8 @@
 
 0 バイトのファイルはスキップされます。`DEFAULT_MAX_FILE_BYTES`（5 MB）を超えるファイルは全体スキップではなく **サンプリング** されます — S3 の Range `GetObject` により先頭 500 KB のみを読み取り、検出結果には `sampled: true` が記録されるため、結果が部分的であることが分かります。
 
+> **Green Software/Sustainability Engineer の視点**: サイズ超過ファイルに対する 500 KB のサンプリング上限（ファイル全体を読み取ってスキャンするのではなく）自体が、コスト抑制と同じくらいエネルギー節約のための設計選択です — `max_files` の上限とサンプリングの挙動が合わさって、1 回の実行あたりの Comprehend 推論負荷と S3 から読み取る総バイト数の両方を抑えています。下記の設定リファレンスにある FinOps の視点はこの挙動の金銭コストへの影響を扱っていますが、エネルギーへの影響も直接比例します。Comprehend の推論コストとその基盤となる計算量は、いずれも処理した文字数に応じて増減するためです。複数テラバイトのボリューム全体ではなく代表的なサブセットをスキャンすること（FAQ のコスト回避のガイダンス参照）は、コストを削減する割合とほぼ同じ割合でエネルギー使用量も削減します。
+
 ### Comprehend のサイズ上限に対応するチャンク分割
 
 [`DetectPiiEntities`](https://docs.aws.amazon.com/comprehend/latest/dg/how-pii.html) は 1 回の呼び出しあたり UTF-8 で 100 KB のサイズ上限を設けています。本スキャナーはファイル内容をその上限未満のチャンクに分割し、可能な限り行境界で分割します。これにより、エンティティ（例: メールアドレス）が不必要にチャンク境界で分断されることを避けます:
@@ -109,6 +113,8 @@ for chunk in _chunk_text(file_text, target_bytes=98_000):
 
 読み取り失敗（`AccessDenied`、`NoSuchKey`）、デコード失敗、Comprehend API エラー（`TextSizeLimitExceededException`、スロットリング）は、例外を発生させずにファイル単位の `error` フィールドに記録されます。問題のある 1 ファイルは記録されてスキップされ、ボリューム内の残りのファイルに対するスキャンは継続されます。
 
+> **Concurrency/Race-Condition Engineer の視点**: 検証済みクリーン復旧ポイントガイドの FlexClone ワークフロー（同じボリュームに対する同時実行が共有リソース名で衝突する可能性がある）とは異なり、本スキャナーにはそのような衝突リスクはありません — DynamoDB のキー（`access_point_arn` + マイクロ秒精度の `started_at`）により、同じ Access Point に対する複数の同時呼び出しでも、互いを上書きしたり競合したりせず、単に複数の独立したレポート行が生成されます。ここでより関連性の高い同時実行上の懸念は、上流側にあります — 異なる Access Point に対して複数のスキャナー呼び出しを並行実行すると、同時に発行される `DetectPiiEntities` の呼び出しが増え、[Comprehend のアカウントレベルの秒間トランザクション数上限](https://docs.aws.amazon.com/comprehend/latest/dg/guidelines-and-limits.html)に達する可能性があります。この場合、実行全体を失敗させるのではなく、上記の `TextSizeLimitExceededException`/スロットリングエラーとしてファイル単位で記録されます。スケジュールに従って本スキャナーを多数の Access Point に対して並行実行する場合は、CloudWatch で Comprehend のスロットリングを監視し、`error` フィールドが本当の読み取り失敗ではなくスロットリングによって蓄積している場合は、呼び出しをずらして実行してください。
+
 ---
 
 ## 比較: スキーマレベル vs コンテンツレベルの分類
@@ -133,8 +139,12 @@ for chunk in _chunk_text(file_text, target_bytes=98_000):
 
 1. **ドキュメント形式のパースを行わない。** Office ドキュメント（`.docx`、`.xlsx`、`.pdf`）はテキスト抽出されません — 本スキャナーは生のバイトを読み取り UTF-8 でデコードするだけであり、これはプレーンテキスト/構造化形式には有効ですが、バイナリの Office/PDF 形式では無意味な結果（有効な検出なし）になります。これを拡張するには、現時点では含まれていないドキュメントパースライブラリ（Lambda Layer 経由など）が必要です。
 2. **拡張子リストは形式ベースだが、コンテンツ検出は多言語対応。** `SCANNABLE_EXTENSIONS` によるフィルタは言語ではなく形式に基づいています。Comprehend 自体は `language_code` により 12 言語をサポートしますが、本スキャナーは 1 回の実行で 1 言語のみを処理します。複数言語が混在するボリュームには、`language_code` を変えた複数回の実行、または言語検出の前処理ステップ（未実装）が必要です。
+
+> **Vulnerability/Patch Management Specialist の視点**: `COMPREHEND_SUPPORTED_LANGUAGES` と本スキャナーが依拠する PII エンティティタイプのリストは、執筆時点の Comprehend の機能に対してハードコードされています — AWS は `DetectPiiEntities` の対応言語や PII エンティティタイプを定期的に追加しています。`content_classifier.py` と CloudFormation テンプレートのインライン Lambda コードの両方で `COMPREHEND_SUPPORTED_LANGUAGES` を更新しない限り、本スキャナーは新たに対応した言語を自動的には取り込みません。自社のデータに現在の 12 言語以外の言語が増えてきている場合は、[Comprehend の対応言語ページ](https://docs.aws.amazon.com/comprehend/latest/dg/supported-languages.html)と本スキャナーのハードコードされたリストを定期的に照合してください。
 3. **5 MB を超えるファイルは全体スキャンではなくサンプリング。** デフォルトでは大きなログ/CSV ファイルは先頭 500 KB のみスキャンされます — 大きなファイルの後半に現れる PII は検出されません。データの性質上これが問題になる場合は `DEFAULT_MAX_FILE_BYTES`/`sample_bytes` を増やしてください（Comprehend のコストは増加します）。
 4. **コストはファイル数とサイズに比例する。** Comprehend `DetectPiiEntities` は処理したテキスト量に応じて課金されます。スキャン対象ファイルが多い/大きい大規模ボリュームをスキャンすると、相応の Comprehend 費用が発生する可能性があります — `max_files` は、1 回の実行あたりのこの費用を制限するために存在します。
+
+> **Capacity Planning Engineer の視点**: `max_files` は 1 回の実行あたりのコストと実行時間を制限しますが、これは件数の上限であり、スループットの上限ではありません — 本スキャナーは `DetectPiiEntities` を、チャンクごとに同期的に呼び出しており、スロットリング発生時にファイル単位の `error` として記録される以外に、明示的なレート制限やバックオフの仕組みはありません（上記のエラーハンドリング参照）。多数の Access Point に対してスケジュールに従って本スキャナーを同時実行する予定がある場合（上記の Concurrency/Race-Condition の視点参照）、`max_files` だけが同時実行全体の Comprehend スループットを制限してくれると想定せず、他の共有クォータを持つ AWS サービスと同様に、想定される同時呼び出し数を [Comprehend のアカウントレベルの TPS クォータ](https://docs.aws.amazon.com/comprehend/latest/dg/guidelines-and-limits.html)と比較検討してください。
 5. **ファイル変更時の自動再スキャンはない。** これはオンデマンド/スケジュール実行のスキャナーであり、イベント駆動ではありません。定期的な再分類が必要な場合は、[自動応答ガイドのデプロイ節](automated-response-guide.md#デプロイ)にある TTL クリーンアップスケジュールと同じパターンで、独自の EventBridge Scheduler ルールを組み合わせてください。
 6. **スキャン途中で Lambda がタイムアウトすると、未スキャン分だけでなく実行全体の検出結果が失われる。** 本スキャナーは `ListObjectsV2`/分類ループが完全に終わった後に一度だけ DynamoDB レポートを書き込みます — 途中経過をチェックポイントする仕組みはありません。大きなボリュームのスキャン途中で `LambdaTimeoutSeconds` を超えると、`put_item` の呼び出し前に Lambda が強制終了され、その実行に対するレポートは（部分的なものすら）一切記録されません。想定するファイル数と平均ファイルサイズに応じて `LambdaTimeoutSeconds` と `max_files` を余裕を持って設定し、「スキャンした結果 PII がなかった」のか「スキャンが完了しなかった」のかを見分けるために、DynamoDB テーブルだけでなく CloudWatch Logs も確認してください。
 
@@ -160,6 +170,8 @@ Lambda 実行ロールには以下が必要です:
 # 分類レポート台帳
 - dynamodb:PutItem (レポートテーブルにスコープ)
 ```
+
+> **IAM Architect の視点**: `ScannerLambdaRole` は `s3:ListBucket`/`s3:GetObject` を `arn:aws:s3:*:*:accesspoint/*` にスコープして許可しています — これはスキャン対象として意図した 1 つの Access Point だけでなく、アカウント/リージョン内の *全ての* Access Point を横断するワイルドカードです（CloudFormation テンプレート参照。これが必要な理由は、Access Point の ARN がデプロイ時ではなく呼び出し時にのみ判明するため、ロールの静的ポリシーではこれより絞った `Resource` を表現できないことにあります）。実運用上これが意味するのは、意図したものと異なる `access_point_arn` を指定して呼び出せば、このスキャナーの実行ロールはアカウント内の*任意の* S3 Access Point から読み取れるということです — 「この 1 つのスキャナー、この 1 つの Access Point」という想定より広い到達範囲になります。組織の IAM 標準が柔軟性を犠牲にしてもリソースレベルのスコープ設定を求める場合は、本スキャナーを呼び出す前に `access_point_arn` を許可リストと照合するラッパー Lambda や Step Functions タスクの追加を検討してください — IAM ポリシー単独ではこの制約を強制できないためです。
 
 ### 既存の S3 Access Point
 
@@ -217,6 +229,8 @@ aws cloudformation deploy \
 - CloudWatch Logs（365 日保持 — レポートがコンプライアンスエビデンスも兼ねるため）
 - `VpcId` が設定され `CreateVpcEndpoints=true`（デフォルト）の場合: S3 Gateway Endpoint、DynamoDB Gateway Endpoint、Comprehend Interface Endpoint、SNS Interface Endpoint
 
+> **Change Management/CAB の視点**: 検証済みクリーン復旧ポイントガイドのスタックと同様、本デプロイも純粋に追加的です — 新しい Lambda、新しい DynamoDB テーブル、（デプロイモード2の場合）新しい VPC Endpoint を作成するのみで、既存の FSx for ONTAP リソース、S3 Access Point、ネットワーク構成は一切変更しません。本スキャナーは S3 Access Point を自ら作成・管理することはなく（上記の前提条件参照）、指定された既存の Access Point から読み取るだけなので、デプロイ失敗時の影響範囲は本スタック自身のリソースに限定されます。ロールバックは `cloudformation delete-stack` により、スキャン対象の Access Point やボリュームに触れることなくこれらを削除します。復旧検証スタックと同様、デプロイモード2を、既にこれら 4 つの Endpoint のいずれかを他のスタックから持っている可能性がある VPC にデプロイする場合は、VPC Endpoint の重複競合リスクを変更チケットに明記してください。
+
 ### スキャナーの呼び出し
 
 ```bash
@@ -258,6 +272,8 @@ aws lambda invoke \
 - **スキャン対象ボリュームへの書き込みアクセスなし**: スキャナーは `s3:GetObject`/`s3:ListBucket` のみを呼び出します — スキャン対象のファイルを変更、マスキング、削除することはできません。
 - **レポートテーブルへのアクセスは制限すべき**: レポート自体には PII の値は含まれませんが、PII らしきデータが *どこで*（ファイルパス）*どの程度*見つかったかは含まれます — 機密データの所在に関する一覧と同様のアクセス制限を適用してください。
 - **Comprehend はリージョナルな AWS マネージドサービス**: `DetectPiiEntities` に送信されたテキストは、呼び出し先の AWS リージョン内で処理されます。サービス自体のデータ取り扱いに関するコミットメントについては、[Amazon Comprehend のデータプライバシードキュメント](https://docs.aws.amazon.com/comprehend/latest/dg/data-privacy.html)を参照してください。
+
+> **Data Residency/Sovereignty Specialist の視点**: 本スキャナーが読み取るファイルの内容は、スタックをデプロイした AWS リージョンの外に一切出ません — Lambda、`DetectPiiEntities` の呼び出し、DynamoDB のレポートテーブルは全てリージョナルなリソースであり、上記の [Comprehend のデータプライバシーの項目](https://docs.aws.amazon.com/comprehend/latest/dg/data-privacy.html)でも、Comprehend 自体が呼び出したリージョン外でデータを処理しないことが確認されています。これはレジデンシーに関するアンケートに対する明快な肯定的回答になります。一点補足すると、マルチリージョンのフリートに対して本スキャナーを複数リージョンにデプロイする場合、各リージョンの DynamoDB レポートテーブルは独立しています — 分類レポートのリージョン横断レプリケーションや集約は組み込まれていないため、各リージョンのスキャン結果をそのリージョン内に留めるというレジデンシー主導の判断は、既にデフォルトの挙動であり、追加で設定する必要はありません。
 - **VPC 限定の Access Point は束縛された VPC の外からは経路を持たない**: これは Access Point 自体が持つネットワーク上の性質であり（[AWS のネットワーク起点比較](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)参照）、IAM だけで回避できるものではありません。VPC 限定の Access Point をスキャンする場合は、`VpcId` を設定して本スタックをデプロイし（デプロイモード2）、本スタックが作成する S3 Gateway Endpoint 経由で、スキャナー Lambda が同じ VPC 内から S3 へのルートを持つようにしてください。
 
 > **Procurement/Third-Party Risk Management（TPRM）Analyst の視点**: 「データは第三者に送信されるか」「データはどこで処理されるか」を問うベンダー評価アンケートに対しては — 本パイプラインがファイル内容を送信する先は Amazon Comprehend という AWS のファーストパーティ・マネージドサービスであり、外部のサードパーティベンダーではありません。処理はデプロイ先の AWS リージョン内に留まります（上記のデータプライバシーの項目参照）。データ保持期間について: 本スキャナーは自身で何かを削除することはありません — DynamoDB のレポートテーブルにはデフォルトで TTL が設定されていないため、スタックを削除するか独自の TTL 属性を追加しない限り、分類レポートは無期限に保持されます。レポートが自社のデータ保持スケジュールの対象である場合はこれを踏まえてください。レポート自体には生の PII 値は含まれませんが、ファイルパス（データ分類ガイドでは Sensitive に分類）は含まれるためです。
