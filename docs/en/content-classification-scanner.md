@@ -66,6 +66,8 @@ This guide implements that content-level scan using Amazon Comprehend's managed 
 +-------------------------------------------------------------------+
 ```
 
+> **Diagram description (text alternative)**: A single Lambda (`ScannerFunction`) takes an S3 Access Point ARN as input — either standalone or from the Verified-Clean Recovery Point Guide's `AttachAccessPoint` step. It lists objects via `ListObjectsV2`, filters to scannable extensions with non-zero size, reads each file (fully or Range-sampled if oversized), splits the content into under-100KB UTF-8 chunks, calls Comprehend `DetectPiiEntities` per chunk, and aggregates results by entity type with count and max confidence. The aggregated report is written to DynamoDB, and an SNS notification fires if PII was found. The diagram above is ASCII art; this paragraph is the complete textual equivalent for screen-reader users.
+
 ---
 
 ## How Classification Works
@@ -119,6 +121,8 @@ Read failures (`AccessDenied`, `NoSuchKey`), decode failures, and Comprehend API
 | Automation in this repo | ✅ Full (reference table) | ✅ Full (this scanner) |
 
 > **Compliance lens (HIPAA/FISC/SOC2)**: Combine both. The schema-level guide tells you which *pipeline fields* to restrict via vendor RBAC (dashboards showing `user`/`path` are displaying PII by definition). This scanner tells you which *volumes/files* likely contain PII in their content, informing where to apply DLP controls, access restrictions, or a formal data classification label at the storage layer. Neither replaces a manual review by your data protection officer for regulatory purposes — see the scope note in the Data Classification Guide.
+
+> **Legal/eDiscovery & Litigation Hold Specialist lens**: This lens differs from the Data Protection Officer/Privacy Engineer lens elsewhere in this guide — that lens covers regulatory PII inventory judgment calls; this one covers what happens if the *scan itself* becomes relevant to litigation. Two considerations: (1) if a legal hold is in effect on a volume, running this scanner against it does not itself violate the hold (it's read-only and non-destructive — see Security Considerations), but the resulting DynamoDB report and its file-path findings may themselves become discoverable material, since they document what sensitive content existed and where at scan time; preserve scan reports under the same hold if the underlying data is subject to one. (2) The scanner never captures matched PII values (see Entity Aggregation above), so it cannot serve as a substitute for a legal team's own document review when specific PII values (not just entity types) need to be produced or redacted for a matter — route that to your standard eDiscovery tooling instead.
 
 ---
 
@@ -241,6 +245,8 @@ To scan the same isolated FlexClone used for ransomware verification (rather tha
 | `LambdaMemorySize` | 512 MB | Scanner Lambda memory |
 | `LambdaTimeoutSeconds` | 600 | Scanner Lambda timeout — size to your expected file count |
 
+> **FinOps/Cost Optimization Engineer lens**: [Amazon Comprehend's synchronous PII detection pricing](https://aws.amazon.com/comprehend/pricing/) is metered per 100-character unit processed, with a per-request minimum — cost here scales with total scanned *content volume*, not file count, so a handful of very large text files can cost more than thousands of small ones. Lambda invocation cost and DynamoDB `PutItem` cost are comparatively negligible next to Comprehend charges for any non-trivial scan. Before running this against a large volume, estimate cost from a representative sample (scan one department's share with `max_files` capped low, note the aggregate size scanned, then extrapolate) rather than assuming a fixed per-file cost — see [Remaining Limitations](#remaining-limitations) item 4 and the FAQ for related guidance on bounding a single run's cost.
+
 ---
 
 ## Security Considerations
@@ -250,6 +256,8 @@ To scan the same isolated FlexClone used for ransomware verification (rather tha
 - **Report table access should be restricted**: while the report itself doesn't contain PII values, it does contain *where* PII-shaped data was found (file paths) and *how much* — apply the same access restrictions you'd apply to any inventory of sensitive-data locations.
 - **Comprehend is a regional, AWS-managed service**: text sent to `DetectPiiEntities` is processed within the AWS Region you invoke it in; see [Amazon Comprehend's data privacy documentation](https://docs.aws.amazon.com/comprehend/latest/dg/data-privacy.html) for the service's own data handling commitments.
 - **VPC-scoped access points have no route from outside their bound VPC**: this is a network property of the access point itself (see [AWS's network-origin comparison](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)), not something IAM alone can work around. When scanning a VPC-scoped access point, deploy this stack with `VpcId` set (Deploy Mode 2) so the scanner Lambda runs inside that VPC with a route to S3 via the Gateway Endpoint this stack creates.
+
+> **Procurement/Third-Party Risk Management (TPRM) Analyst lens**: For vendor-assessment questionnaires that ask "is data sent to a third party" or "where is data processed" — this pipeline sends file content to Amazon Comprehend, a first-party AWS managed service, not an external third-party vendor; processing stays within the AWS Region you deploy to (see the data-privacy point above). Data retention: this scanner does not delete anything on its own — the DynamoDB report table has no TTL configured by default, so classification reports persist indefinitely until you delete the stack or add your own TTL attribute; factor that into your organization's data-retention schedule if reports are subject to one, since the reports themselves contain file paths (Sensitive per the Data Classification Guide) even though they exclude raw PII values.
 
 ---
 
@@ -268,7 +276,11 @@ python3 -m pytest shared/python/tests/test_content_classifier.py -v
 # 23 passed in 0.08s
 ```
 
+> **QA/Test Automation Engineer lens**: All 23 tests mock the `s3` and `comprehend` boto3 clients directly — no test calls a real S3 Access Point or Amazon Comprehend endpoint. This makes the suite fast and independent of AWS credentials, but it also means the tests validate this module's *own* logic (chunking, aggregation, error handling) correctly, not whether the mocked Comprehend response shape still matches the real `DetectPiiEntities` API. Re-run a manual smoke test against a real (non-production) access point and Comprehend endpoint after any `boto3`/`botocore` version bump, and don't treat `pytest` passing as proof the Lambda will behave identically in a live AWS account.
+
 > **Observability Engineer lens**: The stack ships CloudWatch Logs only — no CloudWatch Alarm on Lambda errors, throttles, or timeouts. Given the "timeout loses the whole run" behavior noted in [Remaining Limitations](#remaining-limitations) item 6, add your own alarm on this Lambda's `Errors`/`Duration` metrics (or route failures through the SNS topic already wired for PII-found notifications) so a silently-timed-out scan doesn't read as "no PII found" by omission.
+
+> **On-Call Engineer (SRE) lens**: This scanner is not a paging-worthy service by design — it's an on-demand/scheduled batch job (see [Remaining Limitations](#remaining-limitations) item 5), not a request-serving pipeline with an SLO. If you do get paged because a scheduled invocation failed: check CloudWatch Logs for the invocation first (see the FAQ's "zero findings" question for why the DynamoDB table alone can be misleading), then re-invoke manually with the same `access_point_arn` once the underlying cause (timeout, throttling, or a stale/deleted access point if chained after `restore-verification.yaml`) is addressed. There is no ledger row to clean up and no orphaned resource to worry about on failure — this scanner never creates infrastructure, only reads from an access point someone else manages.
 
 ---
 

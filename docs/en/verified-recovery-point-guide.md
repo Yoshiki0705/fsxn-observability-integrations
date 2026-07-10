@@ -11,7 +11,7 @@ This guide implements that missing verification step using AWS-native services o
 1. **FlexClone** the candidate snapshot into a read/write clone (ONTAP REST API) — never touches the production volume or the original snapshot.
 2. **Attach a VPC-scoped S3 Access Point** to the clone (AWS FSx API) — exposes the clone's files via the S3 API without mounting NFS/SMB, so verification has no network path to the production data plane.
 3. **Scan the clone's file listing** (S3 `ListObjectsV2` through the access point) for ransomware-associated file extensions — a fast pre-filter, not a substitute for ONTAP ARP's entropy analysis.
-4. **Record a pass/fail verdict** in DynamoDB (and optionally notify via SNS), then **always tear down** the S3 Access Point and FlexClone regardless of outcome.
+4. **Record a clean/suspicious/error verdict** in DynamoDB (and optionally notify via SNS), then **always tear down** the S3 Access Point and FlexClone regardless of outcome.
 
 > **Scope note**: This closes the RC.RP verification gap specifically — it does not replace ONTAP ARP (which detects ransomware *during* the attack, against the live volume) or the [Automated Response Guide](automated-response-guide.md)'s Respond-phase blocking. It answers a different, later question: *"is this specific snapshot, that we are about to promote to a restore point, actually clean?"*
 
@@ -56,6 +56,8 @@ This guide implements that missing verification step using AWS-native services o
 ```
 
 The key design choice: **cleanup runs on every path**, success or failure. The Step Functions `Catch` block routes any error straight to the same cleanup Lambda used on the happy path, so a mid-workflow failure never leaves a FlexClone volume or S3 Access Point behind consuming storage or presenting an unnecessary access surface.
+
+> **Diagram description (text alternative)**: The Step Functions state machine runs five states in sequence — `CreateFlexClone` (ONTAP REST API) → `AttachAccessPoint` (AWS FSx API, VPC-scoped) → `ScanForIndicators` (S3 `ListObjectsV2` via the access point) → `RecordVerdict` (DynamoDB, optional SNS) → `Cleanup` (detaches the S3 Access Point and deletes the FlexClone; this state always runs). If any of the first three states fails, control transfers to `CleanupAfterError`, which invokes the same `Cleanup` Lambda, then `RecordErrorVerdict` writes the failure to the ledger before the execution ends in a `Fail` state. The diagram above is ASCII art; this paragraph is the complete textual equivalent for screen-reader users.
 
 ---
 
@@ -242,6 +244,8 @@ aws dynamodb query \
 | `UnixUser` | root | UNIX identity used by the verification S3 Access Point for file system access checks |
 | `LambdaMemorySize` | 512 MB | Memory for all 5 verification Lambdas |
 
+> **FinOps/Cost Optimization Engineer lens**: The recurring cost drivers per verification run are Lambda invocation time (5 short-lived functions, typically seconds each), DynamoDB on-demand writes (2-3 `PutItem`/`UpdateItem` calls per run against a `PAY_PER_REQUEST` table), and — if `CreateVpcEndpoints=true` — the hourly cost of the Interface VPC Endpoints (Secrets Manager, STS, FSx) plus their per-GB data-processing charge; the S3 Gateway Endpoint itself has no hourly charge. None of these are metered per-scan-object the way [Amazon Comprehend pricing](https://aws.amazon.com/comprehend/pricing/) is for the companion PII scanner — cost here scales with *run frequency*, not volume size, so scheduling this workflow hourly against every snapshot on a large fleet is a meaningfully different cost profile than running it once per incident. Reuse Interface VPC Endpoints across this stack and `automated-response.yaml` in the same VPC (`CreateVpcEndpoints=false`) rather than paying for duplicates.
+
 ---
 
 ## Security Considerations
@@ -250,6 +254,9 @@ aws dynamodb query \
 - **VPC-scoped access point**: The access point is bound to the VPC at creation time and cannot be reached from outside it. This is a stronger guarantee than an internet-origin access point restricted only by policy — see [AWS's network-origin comparison](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html). This is also why `ScanForIndicators` (the Lambda that lists the access point's objects) *must* run inside the bound VPC with a route to S3 (the S3 Gateway Endpoint this stack creates) — there is no policy-only way to reach a VPC-scoped access point from outside its VPC, unlike an internet-origin one.
 - **Least privilege for `fsx:*S3AccessPoint*` actions**: These actions do not currently support resource-level permissions or condition keys as fine-grained as other FSx actions; the IAM policy in this stack scopes them to `Resource: '*'` with a documented rationale. Revisit this if AWS adds resource-level support.
 - **Verdict ledger as evidence, not a substitute for governance**: The DynamoDB ledger supplies auditable evidence (who verified what, when, with what result) that a CSF 2.0 Govern program can consume — see the [DII Capability Map](dii-capability-map.md#where-this-fits-in-cyber-resilience-nist-csf-20)'s Govern-function discussion for why this repo does not attempt to automate the governance program itself.
+- **The ledger table has no delete protection by default**: `VerificationLedgerTable` is created with Point-in-Time Recovery enabled but without `DeletionProtectionEnabled` or an explicit `DeletionPolicy: Retain`. If this table is your primary evidence of periodic restore testing (see the Cyber Insurance/Risk Transfer lens note below), add `DeletionProtectionEnabled: true` and consider a `DeletionPolicy: Retain` override before relying on it for audit purposes — an accidental `aws cloudformation delete-stack` should not be able to erase your evidence history.
+
+> **Cyber Insurance/Risk Transfer Analyst lens**: Underwriting checklists for cyber insurance increasingly ask for evidence of *tested* backups, not just backup existence — "periodic restore verification" is called out explicitly in several 2026 underwriting guides. The DynamoDB ledger this workflow produces (timestamped `snapshot_key`, verdict, and `reason` per run) is a reasonable evidence artifact for that question, but it wasn't designed with an insurer's evidence format in mind: there is no built-in export to PDF/CSV for a renewal questionnaire, and (as noted above) no delete protection guarding the evidence itself. If you plan to cite this ledger during underwriting or renewal, export a snapshot of the relevant `dynamodb query` output alongside your other control evidence, and enable the delete protection above first.
 
 ---
 
@@ -268,6 +275,10 @@ The `restore_verification.py` module has 23 unit tests covering:
 python3 -m pytest shared/python/tests/test_restore_verification.py -v
 # 23 passed in 0.11s
 ```
+
+> **QA/Test Automation Engineer lens**: All 23 tests run against mocked `boto3` clients and mocked ONTAP HTTP responses — none of them exercise a real FSx for ONTAP file system or a real S3 Access Point. This keeps the suite fast and CI-safe (no AWS credentials or live infrastructure required), but it also means these tests cannot catch drift between the mocked API contracts and the real ONTAP REST API/AWS FSx API behavior. Treat `pytest` passing as necessary but not sufficient evidence the workflow works end-to-end — validate against a real (non-production) FSx for ONTAP file system before relying on this in production, and re-validate after any ONTAP or AWS SDK version bump that touches the FlexClone or S3 Access Point APIs.
+
+> **On-Call Engineer (SRE) lens**: If paged for a failed verification run, start here: (1) check the Step Functions execution history for the `StateMachineExecutionArn` — the failing state name tells you which of the five Lambdas failed; (2) check that Lambda's CloudWatch Logs (`/aws/lambda/{stack-name}-{create-clone|attach-ap|scan|record-verdict|cleanup}`) for the actual exception; (3) query the DynamoDB ledger for the `snapshot_key` in question — an `error` verdict with a `reason` field is often enough to triage without touching logs at all. A failed run does not require immediate remediation at 2am: the workflow's own `Cleanup`/`CleanupAfterError` states already guarantee no orphaned FlexClone or S3 Access Point is left behind (see Architecture above), so this is a "investigate when convenient" alert, not a "stop the bleeding" one — unless the same `snapshot_key` fails repeatedly, which may indicate an ONTAP-side or IAM-side problem worth escalating sooner.
 
 ---
 

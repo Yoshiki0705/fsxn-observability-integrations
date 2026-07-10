@@ -11,7 +11,7 @@
 1. **FlexClone**: 検証対象の Snapshot を読み書き可能なクローンとして複製します（ONTAP REST API）。本番ボリュームや元の Snapshot には一切触れません。
 2. **VPC 限定の S3 Access Point** をクローンに接続します（AWS FSx API）。NFS/SMB でマウントせずに S3 API 経由でクローンのファイルを公開するため、検証処理は本番データプレーンへのネットワーク経路を一切持ちません。
 3. **クローンのファイル一覧をスキャン**します（S3 Access Point 経由の `ListObjectsV2`）。ランサムウェアに関連するファイル拡張子を検出する高速な事前フィルタであり、ONTAP ARP のエントロピー分析の代替ではありません。
-4. **合否判定を DynamoDB に記録**し（任意で SNS 通知も送信）、結果に関わらず S3 Access Point と FlexClone を**常に削除**します。
+4. **clean/suspicious/error の判定結果を DynamoDB に記録**し（任意で SNS 通知も送信）、結果に関わらず S3 Access Point と FlexClone を**常に削除**します。
 
 > **スコープに関する注記**: 本ガイドが埋めるのは RC.RP の検証ギャップに限定されます。ONTAP ARP（攻撃発生中に本番ボリュームに対してランサムウェアを検知する仕組み）や、[自動インシデント対応ガイド](automated-response-guide.md)の Respond フェーズのブロック機能を置き換えるものではありません。本ガイドが答えるのは別の、より後段の問いです — 「復旧ポイントとして採用しようとしている、この特定の Snapshot は、実際にクリーンなのか？」
 
@@ -56,6 +56,8 @@
 ```
 
 設計上の重要な選択: **クリーンアップは成功・失敗どちらの経路でも必ず実行されます**。Step Functions の `Catch` ブロックは、どのエラーも正常系と同じ Cleanup Lambda に直接ルーティングします。そのため、ワークフローの途中で失敗しても、FlexClone ボリュームや S3 Access Point がストレージを消費したり不要なアクセス面を残したりすることはありません。
+
+> **図の説明（テキストによる代替）**: Step Functions ステートマシンは 5 つのステートを順に実行します — `CreateFlexClone`（ONTAP REST API）→ `AttachAccessPoint`（AWS FSx API、VPC 限定）→ `ScanForIndicators`（Access Point 経由の S3 `ListObjectsV2`）→ `RecordVerdict`（DynamoDB、任意で SNS）→ `Cleanup`（S3 Access Point のデタッチと FlexClone の削除。このステートは常に実行されます）。最初の 3 ステートのいずれかが失敗すると、制御は `CleanupAfterError` に移り、同じ `Cleanup` Lambda を呼び出した後、`RecordErrorVerdict` が失敗結果を台帳に記録し、実行は `Fail` ステートで終了します。上記の図は ASCII アートです。この段落がスクリーンリーダー利用者向けの完全なテキスト版に相当します。
 
 ---
 
@@ -242,6 +244,8 @@ aws dynamodb query \
 | `UnixUser` | root | 検証用 S3 Access Point がファイルシステムアクセスチェックに使用する UNIX ID |
 | `LambdaMemorySize` | 512 MB | 検証用 5 Lambda 全てのメモリサイズ |
 
+> **FinOps/Cost Optimization Engineer の視点**: 1 回の検証実行あたりの主なコスト要因は、Lambda の実行時間（5 つの短命な関数、それぞれ数秒程度）、DynamoDB のオンデマンド書き込み（`PAY_PER_REQUEST` テーブルへの `PutItem`/`UpdateItem` 呼び出しが実行あたり 2〜3 回）、そして `CreateVpcEndpoints=true` の場合は Interface VPC Endpoint（Secrets Manager、STS、FSx）の時間課金とデータ処理量あたりの課金です。S3 Gateway Endpoint 自体には時間課金はありません。これらはいずれも、コンテンツレベル PII 分類スキャナーの [Amazon Comprehend の課金](https://aws.amazon.com/comprehend/pricing/)のようにスキャン対象オブジェクト単位で課金されるものではなく、コストは*実行頻度*に応じて増減します（ボリュームサイズには依存しません）。そのため、大規模なフリート内の全 Snapshot に対して 1 時間おきに本ワークフローを実行するのと、インシデントごとに一度だけ実行するのとでは、コストの規模が大きく異なります。同じ VPC 内で本スタックと `automated-response.yaml` の Interface VPC Endpoint を共用し（`CreateVpcEndpoints=false`）、重複課金を避けてください。
+
 ---
 
 ## セキュリティ考慮事項
@@ -250,6 +254,9 @@ aws dynamodb query \
 - **VPC 限定の Access Point**: Access Point は作成時に VPC に束縛され、VPC 外からは到達できません。これは、ポリシーのみで制御するインターネット起点の Access Point よりも強い保証です — 詳細は [AWS のネットワーク起点比較](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)を参照してください。この特性のため、Access Point のオブジェクトを一覧化する `ScanForIndicators` は、束縛された VPC 内で S3 へのルート（本スタックが作成する S3 Gateway Endpoint）を持って実行される*必要があります* — インターネット起点の Access Point とは異なり、VPC 限定の Access Point にはポリシーだけで VPC 外から到達する方法がありません。
 - **`fsx:*S3AccessPoint*` アクションの最小権限**: これらのアクションは現時点で、他の FSx アクションほど細かいリソースレベル権限や条件キーをサポートしていません。本スタックの IAM ポリシーではこれらを `Resource: '*'` にスコープし、その理由をドキュメント化しています。AWS がリソースレベルのサポートを追加した場合は見直してください。
 - **判定結果台帳はエビデンスであり、ガバナンスの代替ではない**: DynamoDB 台帳は、誰が何をいつ検証し、どのような結果だったかという監査可能なエビデンスを提供し、CSF 2.0 の Govern プログラムが入力として利用できます — 本リポジトリがガバナンスプログラム自体を自動化しようとしない理由については、[DII Capability Map](dii-capability-map.md#サイバーレジリエンス全体での位置づけ-nist-csf-20) の Govern 機能に関する議論を参照してください。
+- **台帳テーブルにはデフォルトで削除保護がない**: `VerificationLedgerTable` は Point-in-Time Recovery を有効にして作成されますが、`DeletionProtectionEnabled` や明示的な `DeletionPolicy: Retain` は設定されていません。このテーブルを定期的なリストア検証の主要なエビデンスとして利用する場合（下記のサイバー保険/リスク移転の視点を参照）、監査目的で依拠する前に `DeletionProtectionEnabled: true` を追加し、`DeletionPolicy: Retain` の上書きも検討してください — うっかり `aws cloudformation delete-stack` を実行しても、エビデンスの履歴が消えてしまうことがないようにするためです。
+
+> **Cyber Insurance/Risk Transfer Analyst の視点**: サイバー保険の引受チェックリストでは、バックアップの存在だけでなく*テスト済み*であることのエビデンスが求められる傾向が強まっています — 2026 年時点の複数の引受ガイドで「定期的なリストア検証（periodic restore verification）」が明示的に挙げられています。本ワークフローが生成する DynamoDB 台帳（実行ごとにタイムスタンプ付きの `snapshot_key`、判定結果、`reason` を記録）は、この問いに対する合理的なエビデンスアーティファクトになりますが、保険会社側のエビデンス提出フォーマットを念頭に設計されたものではありません。更新時のアンケート提出用に PDF/CSV へエクスポートする機能は組み込まれておらず（上記の通り）、エビデンス自体を守る削除保護もありません。引受や更新の際に本台帳を提示する予定がある場合は、まず上記の削除保護を有効化した上で、該当する `dynamodb query` の出力結果のスナップショットを他の管理エビデンスと一緒にエクスポートしてください。
 
 ---
 
@@ -268,6 +275,10 @@ aws dynamodb query \
 python3 -m pytest shared/python/tests/test_restore_verification.py -v
 # 23 passed in 0.11s
 ```
+
+> **QA/Test Automation Engineer の視点**: 23 件のテストは全て `boto3` クライアントと ONTAP への HTTP レスポンスをモックした状態で実行され、実際の FSx for ONTAP ファイルシステムや実際の S3 Access Point には一切アクセスしません。これによりテストスイートは高速かつ CI 上で安全に実行できます（AWS 認証情報や稼働中のインフラは不要）が、その反面、モックされた API の契約と実際の ONTAP REST API/AWS FSx API の挙動との間にずれが生じても検出できません。`pytest` の成功は、ワークフローがエンドツーエンドで動作するための必要条件ではあっても十分条件ではないものとして扱ってください — 本番投入前に実際の（本番でない）FSx for ONTAP ファイルシステムで検証し、FlexClone や S3 Access Point の API に関わる ONTAP や AWS SDK のバージョンアップ後は再検証してください。
+
+> **On-Call Engineer（SRE）の視点**: 検証実行の失敗でアラートを受けた場合、まず次の手順で確認してください: (1) 該当する `StateMachineExecutionArn` の Step Functions 実行履歴を確認し、失敗したステート名から 5 つの Lambda のうちどれが失敗したかを特定する。(2) その Lambda の CloudWatch Logs（`/aws/lambda/{stack-name}-{create-clone|attach-ap|scan|record-verdict|cleanup}`）で実際の例外内容を確認する。(3) 該当する `snapshot_key` で DynamoDB 台帳を検索する — `error` 判定と `reason` フィールドだけで、ログを見ずにトリアージできることも多いです。失敗した実行そのものは深夜 2 時の即時対応を必要としません — ワークフロー自身の `Cleanup`/`CleanupAfterError` ステートが、FlexClone や S3 Access Point の残置を既に保証しているためです（上記アーキテクチャ参照）。そのため基本的には「都合のよいときに調査すればよい」アラートであり、「今すぐ止血が必要」なアラートではありません。ただし同じ `snapshot_key` が繰り返し失敗する場合は、ONTAP 側または IAM 側の問題である可能性があり、早めのエスカレーションを検討してください。
 
 ---
 
