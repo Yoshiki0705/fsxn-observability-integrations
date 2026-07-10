@@ -26,6 +26,8 @@ This index provides navigation across all security-related documentation in this
 | Run the full demo for evaluation | [Demo Runbook](demo-automated-response.md) | All phases |
 | Compare full DII SWS capability set (Protect/Detect/Respond/Recover/Forensics), not just containment | [DII Capability Map](dii-capability-map.md) | Capability Parity Table |
 | Build a user/IP/file-path forensic investigation dashboard (who accessed what, from where) | [DII Capability Map](dii-capability-map.md) | Per-Vendor Forensics Dashboard Implementation |
+| Verify a snapshot is clean before relying on it as a recovery point (RC.RP) | [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md) | How Verification Works |
+| Discover PII in file contents, not just field-level classification | [Content-Level PII Classification Scanner](content-classification-scanner.md) | How Classification Works |
 | Compare with dedicated security products (e.g., DII Storage Workload Security) | [Automated Response Guide](automated-response-guide.md) | Comparison table, FAQ |
 | Review detection latency | [EMS Detection Capabilities](ems-detection-capabilities.md) | Delivery Latency Comparison |
 
@@ -41,7 +43,9 @@ This index provides navigation across all security-related documentation in this
 | Need | Document | Key Section |
 |------|----------|-------------|
 | Evidence pack template | [Compliance Evidence Pack](compliance-evidence-pack.md) | All |
-| Data classification | [Data Classification](data-classification.md) | PII fields |
+| Data classification (field-level) | [Data Classification](data-classification.md) | PII fields |
+| Data classification (file-content-level) | [Content-Level PII Classification Scanner](content-classification-scanner.md) | How Classification Works |
+| Evidence a recovery point was tested clean (RC.RP) | [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md) | Testing, Deployment |
 | Log retention policies | [Pipeline SLO](pipeline-slo.md) | Retention |
 | Audit trail for blocks | [Automated Response Guide](automated-response-guide.md) | Security Considerations |
 
@@ -69,6 +73,10 @@ This index provides navigation across all security-related documentation in this
 [3.5] Forensic Investigation (cross-cutting, any phase)
     └─→ DII Capability Map (dii-capability-map.md)
     └─→ Splunk / Datadog / Grafana / Elastic dashboards (per-vendor guidance in the map)
+
+[3.6] Recovery Verification & Data Discovery (Recover / Identify functions)
+    └─→ Verified-Clean Recovery Point Guide (verified-recovery-point-guide.md)
+    └─→ Content-Level PII Classification Scanner (content-classification-scanner.md)
 
 [4] Operations
     └─→ PagerDuty Escalation (pagerduty-escalation-guide.md)

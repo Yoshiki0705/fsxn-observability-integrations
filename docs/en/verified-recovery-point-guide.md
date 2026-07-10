@@ -1,0 +1,289 @@
+# Verified-Clean Recovery Point Guide — Closing the CSF 2.0 RC.RP Gap
+
+🌐 [日本語](../ja/verified-recovery-point-guide.md) | **English** (this page)
+
+## Executive Summary
+
+The [DII Capability Map](dii-capability-map.md) is explicit about a gap this repository did not previously address: a protective snapshot existing is a **Protect**-phase artifact, not evidence that the snapshot is actually clean and restorable. NIST CSF 2.0's **RC.RP** (Incident Recovery Plan Execution) subcategory is only credible once a recovery point has been tested and confirmed free of compromise — not merely confirmed to exist.
+
+This guide implements that missing verification step using AWS-native services only:
+
+1. **FlexClone** the candidate snapshot into a read/write clone (ONTAP REST API) — never touches the production volume or the original snapshot.
+2. **Attach a VPC-scoped S3 Access Point** to the clone (AWS FSx API) — exposes the clone's files via the S3 API without mounting NFS/SMB, so verification has no network path to the production data plane.
+3. **Scan the clone's file listing** (S3 `ListObjectsV2` through the access point) for ransomware-associated file extensions — a fast pre-filter, not a substitute for ONTAP ARP's entropy analysis.
+4. **Record a pass/fail verdict** in DynamoDB (and optionally notify via SNS), then **always tear down** the S3 Access Point and FlexClone regardless of outcome.
+
+> **Scope note**: This closes the RC.RP verification gap specifically — it does not replace ONTAP ARP (which detects ransomware *during* the attack, against the live volume) or the [Automated Response Guide](automated-response-guide.md)'s Respond-phase blocking. It answers a different, later question: *"is this specific snapshot, that we are about to promote to a restore point, actually clean?"*
+
+**Key capabilities:**
+- FlexClone-based verification with zero impact on production volumes (copy-on-write, read-only workload against the clone)
+- VPC-scoped S3 Access Point — the clone's contents are never internet-reachable
+- Fast extension-based pre-filter for ransomware indicators
+- Guaranteed cleanup via Step Functions `Catch` — no orphaned clones or access points, even on failure
+- DynamoDB ledger of every verification run, doubling as CSF 2.0 RC.RP evidence for audits
+
+**When to run this:**
+- After the [Automated Response Guide](automated-response-guide.md)'s `create_snapshot` action fires, before relying on that snapshot as your recovery point
+- On a schedule against your regular protective/scheduled snapshots, as a periodic recovery-readiness check
+- Manually, before a planned DR test or compliance audit that requires evidence of a *tested* recovery point
+
+---
+
+## Architecture
+
+```
++-------------------------------------------------------------------+
+| Step Functions: Verified-Clean Recovery Point Workflow            |
++-------------------------------------------------------------------+
+|                                                                   |
+|  CreateFlexClone (ONTAP REST API)                                 |
+|       |                                                           |
+|       v                                                           |
+|  AttachAccessPoint (AWS FSx API, VPC-scoped)                      |
+|       |                                                           |
+|       v                                                           |
+|  ScanForIndicators (S3 ListObjectsV2 via access point)             |
+|       |                                                           |
+|       v                                                           |
+|  RecordVerdict (DynamoDB + optional SNS)                          |
+|       |                                                           |
+|       v                                                           |
+|  Cleanup (detach S3 AP + delete FlexClone)  <-- ALWAYS runs        |
+|                                                                   |
+|  (any step failure) --> CleanupAfterError --> RecordErrorVerdict   |
+|                          --> Fail                                  |
++-------------------------------------------------------------------+
+```
+
+The key design choice: **cleanup runs on every path**, success or failure. The Step Functions `Catch` block routes any error straight to the same cleanup Lambda used on the happy path, so a mid-workflow failure never leaves a FlexClone volume or S3 Access Point behind consuming storage or presenting an unnecessary access surface.
+
+---
+
+## How Verification Works
+
+### Step 1: FlexClone Creation
+
+A [FlexClone](https://aws.amazon.com/fsx/netapp-ontap/features/) is a point-in-time, writable copy that shares data blocks with its parent volume via copy-on-write — creation is near-instant and consumes no additional storage until something writes to the clone (which this workflow never does; it only reads).
+
+```
+POST /api/storage/volumes
+{
+  "name": "verify_vol_data_20260710_143022",
+  "svm": {"name": "svm-prod-01"},
+  "clone": {
+    "parent_volume": {"name": "vol_data"},
+    "parent_snapshot": {"name": "incident_response_20260708_143022"},
+    "is_flexclone": true
+  }
+}
+```
+
+This returns an async job; the Lambda polls `GET /api/cluster/jobs/{uuid}` until `state: success`, then resolves the clone's ONTAP volume UUID for later cleanup.
+
+### Step 2: S3 Access Point Attachment
+
+The clone is exposed via a [VPC-scoped S3 Access Point](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-vpc.html) — not internet-origin — so requests must traverse an Interface VPC Endpoint in the bound VPC:
+
+```python
+fsx.create_and_attach_s3_access_point(
+    Name="verify-vol-data-20260710-143022",
+    Type="ONTAP",
+    OntapConfiguration={
+        "VolumeId": fsvol_id,  # resolved via DescribeVolumes, NOT the ONTAP UUID
+        "FileSystemIdentity": {"Type": "UNIX", "UnixUser": {"Name": "root"}},
+    },
+    S3AccessPoint={"VpcConfiguration": {"VpcId": vpc_id}},
+)
+```
+
+> **Resolving fsvol-id from the ONTAP UUID**: AWS FSx discovers volumes created via ONTAP REST API asynchronously — there is no direct API to map an ONTAP volume UUID to the corresponding `fsvol-xxxx` ID. This workflow polls `DescribeVolumes` filtered by `file-system-id`, matching on the clone's `Name`, until FSx reports it `AVAILABLE`.
+
+The access point transitions `CREATING` → `AVAILABLE` (or `FAILED`/`MISCONFIGURED` on error) — the Lambda polls `DescribeS3AccessPointAttachments` until a terminal state.
+
+### Step 3: Ransomware Indicator Scan
+
+The scan lists the clone's objects through the access point (`ListObjectsV2`) and flags file extensions commonly appended by ransomware families (`.encrypted`, `.locked`, `.crypt`, `.wcry`, `.locky`, and others). A snapshot is flagged **suspicious** only when both:
+
+- The suspicious object count is ≥ `SuspiciousMinCount` (default 20 — avoids false positives on small volumes with a couple of legitimately-named files)
+- The suspicious ratio is ≥ `SuspiciousRatioThreshold` (default 5%)
+
+> **Resilience-maturity lens**: This is deliberately a coarse, fast pre-filter — not a replacement for [ONTAP ARP](arp-incident-response-guide.md)'s file-content entropy analysis, which runs against the live volume during an active attack. This scan answers a narrower, later question: does *this specific snapshot* look like it captured a volume dominated by ransomware-renamed files? A "clean" verdict here is evidence for RC.RP; it is not a general-purpose malware scan, and it does not inspect file *contents* (see the [Content-Level PII Classification Scanner](content-classification-scanner.md) for a complementary content-scanning capability aimed at a different problem — data classification, not ransomware detection).
+
+### Step 4: Verdict Recording
+
+Every run — clean, suspicious, or error — is written to a DynamoDB ledger table (`snapshot_key` = `{svm}/{volume}/{snapshot}`, sort key `started_at`), giving you a queryable, timestamped history of which recovery points have been verified and what the outcome was. This table is the artifact you point to as RC.RP evidence in an audit.
+
+### Step 5: Guaranteed Cleanup
+
+The cleanup Lambda is idempotent-ish by design: a missing `access_point_name` or `volume_uuid` (e.g., cleanup running after an early failure, before those resources existed) is treated as a no-op, not an error. Both the S3 Access Point detach and FlexClone deletion tolerate "already gone" (404 / `NotFound`) responses.
+
+---
+
+## Comparison: Snapshot Exists vs Verified-Clean Recovery Point
+
+| Aspect | Snapshot Exists (Respond phase) | Verified-Clean Recovery Point (this workflow) |
+|--------|----------------------------------|------------------------------------------------|
+| CSF 2.0 function | Protect (the snapshot itself) | Recover — RC.RP specifically |
+| What it proves | A point-in-time copy was captured | The copy was inspected and does not show ransomware indicators |
+| Production impact | None (snapshot creation is near-instant) | None (FlexClone is copy-on-write; scan is read-only against the clone) |
+| Confidence for a restore decision | Low — a snapshot taken *during* an attack can itself contain encrypted files | Higher — an automated go/no-go signal before a human commits to a restore |
+| Automation in this repo | ✅ Full ([Automated Response Guide](automated-response-guide.md)) | ✅ Full (this guide) |
+
+> **Recovery/BC-DR Specialist lens**: Treat a "clean" verdict from this workflow as a *necessary*, not *sufficient*, condition before restoring. It rules out the coarse, obvious case (a volume dominated by ransomware-renamed files) fast and cheaply. It does not verify application-level data integrity, verify the snapshot restores cleanly end-to-end, or replace a full DR test. Schedule periodic full restore tests separately; use this workflow as the automated first gate that runs on every candidate snapshot, not as the last word on recoverability.
+
+---
+
+## Prerequisites
+
+### ONTAP Version
+
+- **FlexClone REST API** (`clone.is_flexclone`): Available from ONTAP 9.8+
+- **Volume creation/deletion REST API**: Available from ONTAP 9.6+
+
+### AWS Permissions
+
+The Lambda execution role requires:
+
+```
+# ONTAP REST API (via Secrets Manager credentials)
+- secretsmanager:GetSecretValue
+
+# FSx S3 Access Point lifecycle (no resource-level permissions supported
+# for these actions as of this writing)
+- fsx:CreateAndAttachS3AccessPoint
+- fsx:DetachAndDeleteS3AccessPoint
+- fsx:DescribeS3AccessPointAttachments
+- fsx:DescribeVolumes
+
+# S3 Access Point object read (scanning) + policy management
+- s3:ListBucket / s3:GetObject  (scoped to arn:aws:s3:*:*:accesspoint/*)
+- s3:PutAccessPointPolicy / s3:GetAccessPointPolicy
+
+# Verdict ledger
+- dynamodb:PutItem / dynamodb:UpdateItem  (scoped to the ledger table)
+```
+
+### Network Access
+
+The `CreateFlexClone`, `AttachAccessPoint`, and `Cleanup` Lambdas run inside the VPC with access to the ONTAP management endpoint (same VPC/subnets as the [Automated Response Guide](automated-response-guide.md) stack, if deployed alongside it). The `ScanForIndicators` and `RecordVerdict` Lambdas run outside the VPC — they only call the S3 and DynamoDB APIs, not ONTAP.
+
+> **Critical: VPC Endpoints**. If this stack is deployed standalone (not alongside `automated-response.yaml` in the same VPC), set `CreateVpcEndpoints=true` so the VPC-bound Lambdas can reach Secrets Manager and STS. If your VPC already has these endpoints (e.g., from the Automated Response stack), leave it `false` to avoid duplicate endpoint costs.
+
+---
+
+## Deployment
+
+### One Stack Deploy
+
+```bash
+aws cloudformation deploy \
+  --template-file shared/templates/restore-verification.yaml \
+  --stack-name fsxn-restore-verification \
+  --parameter-overrides \
+    OntapMgmtIp=<management-ip> \
+    OntapCredentialsSecretArn=<secret-arn> \
+    FileSystemId=<fs-id> \
+    VpcId=<vpc-id> \
+    SubnetIds=<subnet-1>,<subnet-2> \
+    SecurityGroupId=<sg-id> \
+    NotificationTopicArn=<optional-sns-topic-arn> \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+The stack creates:
+- Step Functions state machine (`{stack-name}-workflow`)
+- 5 Lambda functions (create-clone, attach-ap, scan, record-verdict, cleanup)
+- DynamoDB ledger table (`{stack-name}-ledger`)
+- CloudWatch Logs for the state machine (365-day retention) and each Lambda (90-day, except record-verdict at 365-day since it doubles as compliance evidence)
+- VPC Endpoints for Secrets Manager + STS (if `CreateVpcEndpoints=true`)
+
+### Starting a Verification Run
+
+```bash
+aws stepfunctions start-execution \
+  --state-machine-arn <StateMachineArn output> \
+  --input '{
+    "svm_name": "svm-prod-01",
+    "volume_name": "vol_data",
+    "snapshot_name": "incident_response_20260708_143022",
+    "vpc_id": "vpc-0123456789abcdef0"
+  }'
+```
+
+Chain this after the [Automated Response Guide](automated-response-guide.md)'s `create_snapshot` action by having your SOAR playbook or Step Functions fan-out (see that guide's FAQ) invoke this state machine with the newly created snapshot's name once containment completes.
+
+### Querying the Ledger
+
+```bash
+aws dynamodb query \
+  --table-name fsxn-restore-verification-ledger \
+  --key-condition-expression "snapshot_key = :sk" \
+  --expression-attribute-values '{":sk": {"S": "svm-prod-01/vol_data/incident_response_20260708_143022"}}'
+```
+
+---
+
+## Configuration Reference
+
+| Parameter | Default | Purpose |
+|-----------|---------|---------|
+| `SuspiciousRatioThreshold` | 0.05 | Fraction of scanned objects with ransomware-associated extensions required to flag "suspicious" |
+| `SuspiciousMinCount` | 20 | Absolute floor on suspicious object count (avoids false positives on small volumes) |
+| `StepTimeoutSeconds` | 180 | Timeout for each Step Functions Lambda task |
+| `UnixUser` | root | UNIX identity used by the verification S3 Access Point for file system access checks |
+| `LambdaMemorySize` | 512 MB | Memory for all 5 verification Lambdas |
+
+---
+
+## Security Considerations
+
+- **No production data path**: The FlexClone shares blocks with its parent via copy-on-write, but the S3 Access Point only exposes the *clone*, not the parent volume. Deleting the clone at cleanup does not affect the parent volume or the original snapshot.
+- **VPC-scoped access point**: The access point is bound to the VPC at creation time and cannot be reached from outside it. This is a stronger guarantee than an internet-origin access point restricted only by policy — see [AWS's network-origin comparison](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html).
+- **Least privilege for `fsx:*S3AccessPoint*` actions**: These actions do not currently support resource-level permissions or condition keys as fine-grained as other FSx actions; the IAM policy in this stack scopes them to `Resource: '*'` with a documented rationale. Revisit this if AWS adds resource-level support.
+- **Verdict ledger as evidence, not a substitute for governance**: The DynamoDB ledger supplies auditable evidence (who verified what, when, with what result) that a CSF 2.0 Govern program can consume — see the [DII Capability Map](dii-capability-map.md#where-this-fits-in-cyber-resilience-nist-csf-20)'s Govern-function discussion for why this repo does not attempt to automate the governance program itself.
+
+---
+
+## Testing
+
+The `restore_verification.py` module has 23 unit tests covering:
+
+| Category | What's Verified |
+|----------|-----------------|
+| FlexClone create/delete | Success, job failure, clone-lookup failure, already-deleted (404) |
+| S3 Access Point attach/detach | Success, fsvol resolution timeout, MISCONFIGURED state, ClientError handling, not-found on detach |
+| Ransomware indicator scan | Clean volume, suspicious volume, empty volume, case-insensitive extension matching |
+| Full orchestration | Clean verdict, suspicious verdict, below-min-count false-positive avoidance, error path with cleanup, error-after-clone-created cleanup, result serialization capping |
+
+```bash
+python3 -m pytest shared/python/tests/test_restore_verification.py -v
+# 23 passed in 0.11s
+```
+
+---
+
+## Related Documents
+
+- [DII Capability Map](dii-capability-map.md) — the Genuine Gaps and CSF 2.0 RECOVER discussion this guide implements a fix for
+- [Automated Response Guide](automated-response-guide.md) — the Respond-phase blocking and protective snapshot creation that typically precedes running this workflow
+- [ARP Incident Response Guide](arp-incident-response-guide.md) — the live-volume entropy detection this workflow's scan complements but does not replace
+- [Content-Level PII Classification Scanner](content-classification-scanner.md) — a related content-scanning capability for the CSF 2.0 Identify function (data classification), built on the same FlexClone + S3 Access Point pattern
+- [Governance & Compliance](governance-and-compliance.md) — where the verdict ledger fits as Govern-function evidence
+- [Compliance Evidence Pack](compliance-evidence-pack.md) — audit-trail evidence artifact templates
+
+## FAQ
+
+**Q: Does a "clean" verdict guarantee the snapshot is safe to restore?**
+A: No — see the Recovery/BC-DR Specialist lens note above. It's a fast, automated pre-filter based on file-extension patterns, not a full malware scan or application-level integrity check. Treat it as a necessary first gate, not the final word.
+
+**Q: Why FlexClone instead of just scanning the production volume directly?**
+A: Scanning the live volume would compete with production I/O and risk interacting with an active attack. A FlexClone is an isolated, point-in-time, read/write copy that shares blocks via copy-on-write — verification runs against it with zero production impact, and it's deleted afterward.
+
+**Q: Why an S3 Access Point instead of mounting the clone via NFS/SMB?**
+A: Mounting requires network-level access to the SVM's data LIF and a running NFS/SMB client in the verification environment. An S3 Access Point lets a stateless Lambda list and read files via the S3 API with no mount step, and (when VPC-scoped) with no path to the production data plane beyond the read-only access point itself.
+
+**Q: What happens if the workflow fails partway through — is the clone left behind?**
+A: No. The Step Functions `Catch` blocks route every failure mode to the same `Cleanup` Lambda used on the success path. The cleanup Lambda tolerates partial state (e.g., a clone was created but the access point attach failed) and cleans up whatever exists.
+
+**Q: Can I run this against snapshots other than the ones created by the Automated Response module?**
+A: Yes. `verify_snapshot()` / the Step Functions input only need `svm_name`, `volume_name`, and `snapshot_name` — any existing ONTAP snapshot works, including scheduled Snapshot Policy snapshots unrelated to an incident.

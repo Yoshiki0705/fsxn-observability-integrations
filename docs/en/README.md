@@ -263,6 +263,8 @@ Two browser-based options exist for GUI-driven management (audit config, quota, 
 - [DII Capability Map](dii-capability-map.md) — full DII Storage Workload Security capability map (Protect/Detect/Respond/Recover/Forensics) against this repo, including per-vendor forensic investigation dashboards (user/IP/file-path/action)
 - [Automated Incident Response Guide](automated-response-guide.md) — user/IP blocking, snapshot, session disconnect (ONTAP REST API)
   > 🔍 Looking for AD-integrated user/IP-level storage-layer access blocking, similar to what dedicated storage security products (e.g., DII Storage Workload Security) provide? See the comparison table and FAQ in this guide. Scope: storage-layer blocking and evidence preservation only — host isolation, malware removal, and credential rotation are out of scope.
+- [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md) — FlexClone + isolated S3 Access Point scan to verify a snapshot is clean before restoring (CSF 2.0 RC.RP)
+- [Content-Level PII Classification Scanner](content-classification-scanner.md) — Amazon Comprehend-based PII discovery for file contents (CSF 2.0 Identify), complementing the Data Classification Guide's schema-level classification
 - [EMS Detection Capabilities](ems-detection-capabilities.md) — 30+ events, push delivery, latency comparison
 - [Security Monitoring Index](security-monitoring-index.md) — role-based and feature-based documentation index
 - [Data Classification Guide](data-classification.md)

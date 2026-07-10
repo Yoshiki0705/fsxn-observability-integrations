@@ -265,6 +265,8 @@ aws cloudformation delete-stack --stack-name fsxn-observability-prerequisites --
 - [DII 機能マップ](dii-capability-map.md) — DII Storage Workload Security の全機能（Protect/Detect/Respond/Recover/Forensics）と本リポジトリの対応関係、ユーザー/IP/ファイルパス/アクションを可視化するベンダー別フォレンジック調査ダッシュボードの実装方法
 - [自動インシデント対応ガイド](automated-response-guide.md) — ユーザー/IP ブロック、Snapshot、セッション切断（ONTAP REST API）
   > 🔍 AD 連携によるユーザー/IP レベルでのストレージ層アクセス遮断（DII Storage Workload Security などの専用ストレージセキュリティ製品が提供する機能）の AWS ネイティブな実現方法をお探しの場合は、このガイド内の比較表・FAQ を参照してください。スコープ: ストレージ層での遮断と証拠保全のみ — 侵害端末の隔離、マルウェア除去、認証情報のローテーションは範囲外です。
+- [検証済みクリーン復旧ポイントガイド](verified-recovery-point-guide.md) — FlexClone + 隔離された S3 Access Point スキャンにより、リストア前に Snapshot がクリーンであることを検証（CSF 2.0 RC.RP）
+- [コンテンツレベル PII 分類スキャナー](content-classification-scanner.md) — Amazon Comprehend によるファイル内容の PII 発見（CSF 2.0 Identify）、データ分類ガイドのスキーマレベル分類を補完
 - [EMS 検知機能リファレンス](ems-detection-capabilities.md) — 30+ イベント、Push 配信、レイテンシ比較
 - [セキュリティ監視ナビゲーション](security-monitoring-index.md) — ロール別・機能別ドキュメント索引
 - [データ分類ガイド](../en/data-classification.md)
