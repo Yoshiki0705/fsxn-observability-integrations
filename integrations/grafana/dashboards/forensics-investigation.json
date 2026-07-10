@@ -1,0 +1,124 @@
+{
+  "title": "FSx for ONTAP — Forensic Investigation",
+  "description": "User/IP/file-centric investigation views over normalized audit and FPolicy events. See docs/en/dii-capability-map.md for the capability mapping this dashboard implements.",
+  "uid": "fsxn-forensics-investigation",
+  "tags": ["fsxn", "security", "forensics"],
+  "editable": true,
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "loki",
+        "label": "Loki data source",
+        "current": {}
+      },
+      {
+        "name": "user",
+        "type": "textbox",
+        "label": "User",
+        "description": "Windows/AD username to investigate, e.g. CORP\\\\jdoe. Left blank matches all users.",
+        "current": { "value": ".*" },
+        "query": ".*"
+      },
+      {
+        "name": "client_ip",
+        "type": "textbox",
+        "label": "Client IP",
+        "description": "Source IP address to investigate. Left blank matches all IPs.",
+        "current": { "value": ".*" },
+        "query": ".*"
+      },
+      {
+        "name": "path",
+        "type": "textbox",
+        "label": "File path",
+        "description": "File or directory path (regex) to investigate. Left blank matches all paths.",
+        "current": { "value": ".*" },
+        "query": ".*"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "User Activity — ${user}",
+      "description": "All audit + FPolicy events for the selected user, chronological. Equivalent to DII SWS's Forensic User Overview.",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "{source=\"fsxn\"} | json | user=~\"$user\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      }
+    },
+    {
+      "id": 2,
+      "title": "IP-Centric Activity — ${client_ip}",
+      "description": "All activity originating from the selected source IP, across users. Use for lateral-movement or credential-compromise investigation. Equivalent to DII SWS's Forensic User Activity Data drill-down.",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 9 },
+      "targets": [
+        {
+          "expr": "{source=\"fsxn\"} | json | client_ip=~\"$client_ip\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      }
+    },
+    {
+      "id": 3,
+      "title": "File / Entity History — ${path}",
+      "description": "All activity on the selected file/path, across every user who touched it. Equivalent to DII SWS's Forensic Entities Page.",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 18 },
+      "targets": [
+        {
+          "expr": "{source=\"fsxn\"} | json | path=~\"$path\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      }
+    },
+    {
+      "id": 4,
+      "title": "Operation Breakdown (active filter)",
+      "description": "Count of operations grouped by type, for whichever filter (user/IP/path) is currently narrowed. Helps spot anomalous action mixes (e.g. a spike in delete operations).",
+      "type": "barchart",
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 27 },
+      "targets": [
+        {
+          "expr": "sum by (operation) (count_over_time({source=\"fsxn\"} | json | user=~\"$user\" | client_ip=~\"$client_ip\" | path=~\"$path\" [$__interval]))",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0
+      }
+    }
+  ]
+}

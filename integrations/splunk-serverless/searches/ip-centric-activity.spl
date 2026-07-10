@@ -1,0 +1,4 @@
+index=fsxn (sourcetype=fsxn:audit:evtx OR sourcetype=fsxn:audit:xml OR sourcetype=fsxn:fpolicy) client_ip="$ip_tok$"
+| eval action=coalesce(operation_type, operation)
+| table _time, client_ip, user, svm, volume, path, action, result
+| sort - _time

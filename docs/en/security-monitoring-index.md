@@ -22,6 +22,8 @@ This index provides navigation across all security-related documentation in this
 |------|----------|-------------|
 | Understand automated storage-layer blocking | [Automated Response Guide](automated-response-guide.md) | How Blocking Works |
 | Run the full demo for evaluation | [Demo Runbook](demo-automated-response.md) | All phases |
+| Compare full DII SWS capability set (Protect/Detect/Respond/Recover/Forensics), not just containment | [DII Capability Map](dii-capability-map.md) | Capability Parity Table |
+| Build a user/IP/file-path forensic investigation dashboard (who accessed what, from where) | [DII Capability Map](dii-capability-map.md) | Per-Vendor Forensics Dashboard Implementation |
 | Compare with dedicated security products (e.g., DII Storage Workload Security) | [Automated Response Guide](automated-response-guide.md) | Comparison table, FAQ |
 | Review detection latency | [EMS Detection Capabilities](ems-detection-capabilities.md) | Delivery Latency Comparison |
 
@@ -61,6 +63,10 @@ This index provides navigation across all security-related documentation in this
     └─→ ARP Incident Response Guide (arp-incident-response-guide.md)
     └─→ Demo Runbook (demo-automated-response.md)
     └─→ Runbooks (runbooks/)
+
+[3.5] Forensic Investigation (cross-cutting, any phase)
+    └─→ DII Capability Map (dii-capability-map.md)
+    └─→ Splunk / Datadog / Grafana / Elastic dashboards (per-vendor guidance in the map)
 
 [4] Operations
     └─→ PagerDuty Escalation (pagerduty-escalation-guide.md)

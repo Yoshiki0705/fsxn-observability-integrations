@@ -263,9 +263,12 @@ Full documentation is available in [English](docs/en/README.md) and [日本語](
 | Management | [Decision Tree](docs/en/decision-tree-management-monitoring.md) · [System Manager GUI Guide](docs/en/system-manager-gui-guide.md) |
 | Operations | [Pipeline SLO](docs/en/pipeline-slo.md) · [Operational Guide](docs/en/operational-guide.md) · [Runbooks](docs/en/runbooks/) |
 | Monitoring | [CloudWatch Log Alarm](docs/en/cloudwatch-log-alarm.md) · [Detection Use Cases](docs/en/detection-use-cases.md) · [EMS Detection Capabilities](docs/en/ems-detection-capabilities.md) · [File Access Audit Format Comparison](docs/en/file-access-audit-format-comparison.md) |
-| Security | [Automated Incident Response](docs/en/automated-response-guide.md) · [Data Classification](docs/en/data-classification.md) · [Security Review Checklist](docs/en/security-review-checklist.md) · [Compliance Evidence Pack](docs/en/compliance-evidence-pack.md) |
+| Security | [DII Capability Map](docs/en/dii-capability-map.md) · [Automated Incident Response](docs/en/automated-response-guide.md) · [Data Classification](docs/en/data-classification.md) · [Security Review Checklist](docs/en/security-review-checklist.md) · [Compliance Evidence Pack](docs/en/compliance-evidence-pack.md) |
 | Enterprise | [Multi-Account Deployment](docs/en/multi-account-deployment.md) · [Cross-Region DR](docs/en/cross-region-replication.md) · [PII Redaction Cookbook](integrations/otel-collector/docs/en/pii-redaction-cookbook.md) |
 | Partner | [Solution Brief](docs/en/partner-solution-brief.md) · [Vendor Comparison](docs/en/vendor-comparison.md) · [PoC Success Criteria](docs/en/poc-success-criteria.md) · [Workshop Guide](docs/en/workshop-hands-on-half-day.md) |
+
+> 🔍 **Looking for the full DII Storage Workload Security picture (Protect/Detect/Respond/Recover/Forensics), not just containment?**
+> See the [DII Capability Map](docs/en/dii-capability-map.md) — it maps every DII SWS phase to what this repo already provides, what requires assembling existing pieces, and genuine gaps, including per-vendor forensic investigation dashboards (who accessed what file, from where, doing what).
 
 > 🔍 **Looking for storage-level user/IP blocking (quarantine) via AD integration, similar to what dedicated storage security products (e.g., DII Storage Workload Security) provide?**
 > See [Automated Incident Response Guide](docs/en/automated-response-guide.md) — it implements the same containment-phase blocking actions (block SMB user, block NFS IP, snapshot, session disconnect) using ONTAP REST API, with a side-by-side comparison table and FAQ against dedicated products. Scope: storage-layer blocking and evidence preservation only — host isolation, malware removal, and credential rotation are out of scope.

@@ -22,6 +22,8 @@
 |-----------|-----------|-------------|
 | 自動ストレージ層遮断の理解 | [自動応答ガイド](automated-response-guide.md) | ブロックの仕組み |
 | 評価用の完全デモ実行 | [デモ手順書](demo-automated-response.md) | 全フェーズ |
+| DII SWS の全体機能（Protect/Detect/Respond/Recover/Forensics）を封じ込め以外も含めて比較したい | [DII 機能マップ](dii-capability-map.md) | 機能対応表 |
+| ユーザー/IP/ファイルパス単位のフォレンジック調査ダッシュボード（誰が、どこから、何にアクセスしたか）を構築したい | [DII 機能マップ](dii-capability-map.md) | ベンダー別 Forensics ダッシュボード実装 |
 | 専用セキュリティ製品との比較（DII Storage Workload Security など） | [自動応答ガイド](automated-response-guide.md) | 比較テーブル、FAQ |
 | 検知レイテンシの確認 | [EMS 検知機能リファレンス](ems-detection-capabilities.md) | 配信レイテンシ比較 |
 
@@ -61,6 +63,10 @@
     └─→ ARP インシデント対応ガイド (arp-incident-response-guide.md)
     └─→ デモ手順書 (demo-automated-response.md)
     └─→ ランブック (runbooks/)
+
+[3.5] フォレンジック調査（横断的、全フェーズ）
+    └─→ DII 機能マップ (dii-capability-map.md)
+    └─→ Splunk / Datadog / Grafana / Elastic ダッシュボード（機能マップ内のベンダー別ガイダンス）
 
 [4] 運用
     └─→ PagerDuty エスカレーション (pagerduty-escalation-guide.md)

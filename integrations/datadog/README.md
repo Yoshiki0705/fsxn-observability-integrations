@@ -130,6 +130,28 @@ Pre-configured views for common investigation scenarios:
 | FSx for ONTAP Sensitive Share Access | `source:fsxn (@path:*finance* OR @path:*hr* OR @path:*legal*)` | Access to sensitive file shares |
 | FSx for ONTAP After-Hours Access | `source:fsxn` | Filter by time for off-hours monitoring |
 
+## Forensic Investigation Notebook
+
+> 🔍 For a user/IP/path-centric investigation workflow (who accessed what, from where, doing what — similar to DII Storage Workload Security's Forensics dashboards), build a Datadog **Notebook** with the following query cells using [Notebook variables](https://docs.datadoghq.com/notebooks/) (`{{user}}`, `{{client_ip}}`, `{{path}}`) so the same notebook is reusable per incident:
+
+```
+# Cell 1 — User Overview
+source:fsxn @user:"{{user}}"
+# group by @operation, visualize as timeseries + top list
+
+# Cell 2 — All Activity for that user (chronological)
+source:fsxn @user:"{{user}}"
+# Log Stream view, sorted by time ascending
+
+# Cell 3 — IP-centric drill-down (lateral movement / credential compromise)
+source:fsxn @client_ip:"{{client_ip}}"
+
+# Cell 4 — Entity/file drill-down
+source:fsxn @path:"{{path}}"
+```
+
+Export findings via Log Explorer's CSV export, scoped to your investigation time range. See [DII Capability Map](../../docs/en/dii-capability-map.md) for how this maps to DII SWS's four Forensics views and what data-source caveats apply (FPolicy vs audit log coverage, PII handling).
+
 ![Saved Views](screenshots/datadog-saved-views.png)
 
 ## Facets Setup

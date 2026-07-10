@@ -260,6 +260,7 @@ Two browser-based options exist for GUI-driven management (audit config, quota, 
 - [Cost Validation Template](cost-validation.md)
 
 ### Security & Compliance
+- [DII Capability Map](dii-capability-map.md) — full DII Storage Workload Security capability map (Protect/Detect/Respond/Recover/Forensics) against this repo, including per-vendor forensic investigation dashboards (user/IP/file-path/action)
 - [Automated Incident Response Guide](automated-response-guide.md) — user/IP blocking, snapshot, session disconnect (ONTAP REST API)
   > 🔍 Looking for AD-integrated user/IP-level storage-layer access blocking, similar to what dedicated storage security products (e.g., DII Storage Workload Security) provide? See the comparison table and FAQ in this guide. Scope: storage-layer blocking and evidence preservation only — host isolation, malware removal, and credential rotation are out of scope.
 - [EMS Detection Capabilities](ems-detection-capabilities.md) — 30+ events, push delivery, latency comparison
