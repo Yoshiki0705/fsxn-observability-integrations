@@ -25,7 +25,7 @@ This pattern is one option among several; the right choice depends on data resid
 | Operations interface | GUI | GUI | GUI (custom) | Terminal only |
 | Trade-off | ~$250/month AWS resource cost; you operate it | Ongoing SaaS subscription | Development + maintenance cost | No GUI; steeper learning curve for new operators |
 
-> **How to choose** (Partner/SI lens): Lead with the requirement, not the tool. If a data residency constraint rules out external SaaS, this pattern or CLI-only are the remaining options. If no such constraint exists and the team already has a NetApp SaaS relationship, DII<!-- allow:naming -->/BlueXP<!-- allow:naming --> may be the faster path since it needs no additional AWS infrastructure to operate.
+> **How to choose**: Lead with the requirement, not the tool. If a data residency constraint rules out external SaaS, this pattern or CLI-only are the remaining options. If no such constraint exists and the team already has a NetApp SaaS relationship, DII<!-- allow:naming -->/BlueXP<!-- allow:naming --> may be the faster path since it needs no additional AWS infrastructure to operate.
 
 ## PoC Success Criteria
 

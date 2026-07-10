@@ -679,13 +679,15 @@ Detects: internal IPs (10.x/172.16-31.x/192.168.x), AWS Account IDs, internal ho
 
 ### Public-output safety
 - 個人名/ペルソナ名・メール・AWS アカウントID・内部IP/ホスト名・サポートケース番号・ベンダー内部チケットID をコミットしない。role ベース表記（"Storage Specialist lens"）と "an internal product request (tracked)" を使う。
-- プロセスメタデータのノイズ禁止（"Persona Review Summary"・レビューラウンド・日付・レンズ数）。レビュー知見は inline の role-based lens note（`> **Topic** (Role lens): ...`）として織り込み、provenance は `.private/`（gitignore）へ。
+- プロセスメタデータのノイズ禁止（"Persona Review Summary"・レビューラウンド・日付・レンズ数）。provenance（who/when/rounds）は `.private/`（gitignore）へ。
+- **架空の役職名/ペルソナ名を inline note のラベルに使わない**（`> **Application Security Engineer (AppSec) lens**:`、`> **XXX の視点**:` など）。これらは実際のインタビュー・アンケート・担当者レビューを経たものではなく AI 支援分析であり、役職ラベルを付けると誤解を招く。中立的なトピックラベルを使う（`> **セキュリティに関する補足**:`、`> **Security note**:`）。指摘内容自体は変更不要、ラベルのみ変更する。例外は `global-evidence-backed-personas.md` の evidence-tiered 名前付きペルソナ（Public evidence 出典がある場合のみ、または Role-based archetype として一般化した場合のみ）。
+- コミット前チェック: `grep -rnoE '^> \*\*[^*]+(lens|の視点)[^*]*\*\*' <files>` — 役職名/専門家名/ペルソナ名を含むラベルがヒットしたら中立ラベルに直す。
 
 ### Bilingual docs (JA primary + EN)
 - JA/EN parity を維持（セクション構成/数の一致、inline note の対応）。片方を変更したら同じ変更で両方に反映。
 
 ### Technical reference / guide docs
-- 必須要素: エグゼクティブサマリの結論、FAQ/よくある誤解、選択フローチャート（mermaid 可）、OT/IT セキュリティ考慮（該当時）、段階的導入ステップ、Related Documents（逆リンク）、≥10 の inline role-based lens レビュー。
+- 必須要素: エグゼクティブサマリの結論、FAQ/よくある誤解、選択フローチャート（mermaid 可）、OT/IT セキュリティ考慮（該当時）、段階的導入ステップ、Related Documents（逆リンク）、≥10 の inline トピック別ノート（役職名ではなく `**XXXに関する補足**` 形式のラベル）。
 
 ### Before committing docs
 ```bash

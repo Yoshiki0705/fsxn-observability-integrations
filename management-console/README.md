@@ -67,7 +67,7 @@ The Management Console is a **2-layer architecture** deployed entirely within yo
 | Operation latency | Time from UI action to ONTAP API response displayed | < 5 seconds (P95) |
 | MTTR improvement | Time to identify + resolve a capacity issue (before vs after) | Measure against your own CLI-only baseline; no fixed target — report the observed delta |
 
-> **Sample run vs production estimate** (Observability Engineer lens): The deployment-time and latency figures above reflect the validation environment described in this repository (Stacks 1-3, single Region, low ONTAP management-call volume). They are not guaranteed service limits. Re-measure in your own account before using them for capacity planning or SLA commitments.
+> **Sample run vs production estimate**: The deployment-time and latency figures above reflect the validation environment described in this repository (Stacks 1-3, single Region, low ONTAP management-call volume). They are not guaranteed service limits. Re-measure in your own account before using them for capacity planning or SLA commitments.
 
 ## When to Choose This Approach
 
@@ -94,7 +94,7 @@ Each option below suits different requirements. None is universally preferable �
 - Standard built-in features are sufficient without customization
 - You prefer to avoid running and paying for additional AWS resources
 
-> **Combining both** (Storage Specialist lens): These options are not mutually exclusive. A common pattern is to keep System Manager for day-to-day ad hoc checks (it is free and always available) while using this self-hosted console for automated workflows, custom dashboards, or environments where a data residency requirement rules out any external SaaS call.
+> **Combining both**: These options are not mutually exclusive. A common pattern is to keep System Manager for day-to-day ad hoc checks (it is free and always available) while using this self-hosted console for automated workflows, custom dashboards, or environments where a data residency requirement rules out any external SaaS call.
 
 > 🔍 **Ransomware / incident response note**: The comparison above covers day-to-day management and monitoring. If you're specifically evaluating DII<!-- allow:naming --> Storage Workload Security's containment capabilities (automated user/IP blocking on anomaly detection), see the [Automated Incident Response Guide](../docs/en/automated-response-guide.md) for an AWS-native alternative that implements the same ONTAP REST API blocking actions, triggerable from any detection source (this console's alerts, a SIEM, or a manual CLI call) rather than DII's own ML detection.
 
