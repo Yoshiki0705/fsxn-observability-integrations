@@ -8,7 +8,7 @@ The [DII Capability Map](dii-capability-map.md) is direct about a gap in the Ide
 
 This guide implements that content-level scan using Amazon Comprehend's managed PII entity detection, exposed as a standalone Lambda function that reads files through an existing S3 Access Point:
 
-1. **List objects** through a given S3 Access Point (`ListObjectsV2`) and filter to scannable text/structured-data extensions (`.txt`, `.csv`, `.json`, `.log`, and others — binary formats like Office documents are out of scope; see [Genuine Limitations](#genuine-limitations) below).
+1. **List objects** through a given S3 Access Point (`ListObjectsV2`) and filter to scannable text/structured-data extensions (`.txt`, `.csv`, `.json`, `.log`, and others — binary formats like Office documents are out of scope; see [Remaining Limitations](#remaining-limitations) below).
 2. **Read and chunk** each file's content into byte-bounded segments under Amazon Comprehend's per-call size ceiling.
 3. **Call `DetectPiiEntities`** per chunk and aggregate entity type, count, and confidence score per file — **the PII values themselves are never persisted**, only entity type/offset/confidence.
 4. **Write a classification report** to DynamoDB and optionally notify via SNS when PII is found.
@@ -100,6 +100,8 @@ For each file, findings record **only**:
 
 The matched text itself (the actual email address, SSN, etc.) is **never written to the report, logs, or DynamoDB**. This mirrors the [Data Classification Guide](data-classification.md)'s pseudonymization guidance — a report saying "this file contains 3 SSN-pattern matches at 0.97+ confidence" is useful for prioritizing remediation without itself becoming a new PII exposure surface.
 
+> **Data Protection Officer/Privacy Engineer lens**: The report records `highest_confidence_by_type` per entity, but the scanner does **not** filter or flag low-confidence matches — a single `EMAIL` detection at Comprehend confidence 0.31 counts toward `files_with_pii` exactly the same as one at 0.99. Before using `files_with_pii`/`pii_density_by_type` as an input to a regulatory PII inventory or a DPIA, review the per-entity `highest_confidence_by_type` in the raw findings (not just the summary counts) and apply your own confidence floor — treating every low-confidence match as confirmed PII risks overstating exposure; treating every match as noise risks understating it. Neither judgment call is one this scanner makes for you.
+
 ### Error Handling — One Bad File Doesn't Abort the Scan
 
 Read failures (`AccessDenied`, `NoSuchKey`), decode failures, and Comprehend API errors (`TextSizeLimitExceededException`, throttling) are captured per-file in the `error` field rather than raised — a single problematic file is recorded and skipped, and the scan continues across the rest of the volume.
@@ -120,7 +122,7 @@ Read failures (`AccessDenied`, `NoSuchKey`), decode failures, and Comprehend API
 
 ---
 
-## Genuine Limitations
+## Remaining Limitations
 
 Being direct about what this scanner does **not** do:
 
@@ -129,6 +131,9 @@ Being direct about what this scanner does **not** do:
 3. **Sampling, not full-file scanning, above 5 MB.** Large log or CSV files are only scanned in their first 500 KB by default — PII appearing later in a large file is not detected. Increase `DEFAULT_MAX_FILE_BYTES`/`sample_bytes` if this matters for your data, at increased Comprehend cost.
 4. **Cost scales with file count and size.** Comprehend `DetectPiiEntities` is priced per unit of text processed. Scanning a large volume with many/large scannable files can generate meaningful Comprehend charges — the `max_files` cap exists specifically to bound this per invocation.
 5. **No automatic re-scan on file change.** This is an on-demand/scheduled scanner, not an event-driven one. Pair it with your own EventBridge Scheduler rule (following the pattern in the [Automated Response Guide](automated-response-guide.md#deployment)'s TTL cleanup schedule) if you want periodic re-classification.
+6. **A Lambda timeout mid-scan loses the entire run's findings, not just the unscanned files.** The scanner writes its DynamoDB report once, after the full `ListObjectsV2`/classify loop completes — there is no partial-progress checkpoint. If `LambdaTimeoutSeconds` is exceeded partway through a large volume, Lambda kills the invocation before the `put_item` call, and no report (not even a partial one) is written for that run. Size `LambdaTimeoutSeconds` and `max_files` conservatively for your expected file count and average file size, and check CloudWatch Logs (not just the DynamoDB table) to distinguish "scan found nothing" from "scan never completed."
+
+> **Recovery Test Engineer lens**: If chaining this scanner after the [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md)'s workflow, sequencing matters — that workflow's `Cleanup` step always detaches the S3 Access Point and deletes the FlexClone, on both the success and failure paths (see that guide's Architecture). Invoke this scanner's classification *before* that workflow reaches `Cleanup`, either as an additional Step Functions state inserted ahead of it or as a synchronous follow-up call using the same execution's `access_point_arn` output — invoking it after the workflow has already completed will fail because the access point no longer exists.
 
 ---
 
@@ -156,11 +161,15 @@ This scanner does **not** create or manage S3 Access Points — pass the ARN of 
 - An access point you manage directly against a production or DR volume
 - The `access_point_arn` output from the [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md)'s `AttachAccessPoint` step, scanning the same FlexClone used for ransomware verification
 
+> **Network origin determines whether you need `VpcId`**: a [VPC-scoped access point](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-vpc.html) — which is what `AttachAccessPoint` creates — has no route from outside the VPC it's bound to; a Lambda outside that VPC cannot reach it at all, regardless of IAM permissions. An internet-origin access point (any access point without a `VpcConfiguration`) is reachable without a VPC. See [Deployment](#deployment) below for the `VpcId` parameter that governs which mode this stack deploys in.
+
 ---
 
 ## Deployment
 
-### One Stack Deploy
+### Deploy Mode 1: Standalone (Internet-Origin Access Point)
+
+Use this when scanning an access point that does **not** have a `VpcConfiguration` — the simpler, cheaper mode, since no VPC Endpoints are created:
 
 ```bash
 aws cloudformation deploy \
@@ -173,10 +182,33 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM
 ```
 
-The stack creates:
-- One Lambda function (`{stack-name}-scanner`)
+### Deploy Mode 2: In-VPC (VPC-Scoped Access Point)
+
+Use this when scanning a VPC-scoped access point — required if chaining after the [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md)'s `AttachAccessPoint` step, since that step always creates a VPC-scoped access point:
+
+```bash
+aws cloudformation deploy \
+  --template-file shared/templates/content-classification-scanner.yaml \
+  --stack-name fsxn-content-classification \
+  --parameter-overrides \
+    VpcId=<vpc-id> \
+    SubnetIds=<subnet-1>,<subnet-2> \
+    SecurityGroupId=<sg-id> \
+    RouteTableIds=<route-table-1>,<route-table-2> \
+    DefaultLanguageCode=en \
+    DefaultMaxFiles=500 \
+    NotificationTopicArn=<optional-sns-topic-arn> \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+Setting `VpcId` changes both the scanner Lambda (adds `VpcConfig`) and the stack's resources (adds S3/DynamoDB Gateway Endpoints and Comprehend/SNS Interface Endpoints, unless `CreateVpcEndpoints=false` because your VPC already has them — e.g., reusing `restore-verification.yaml`'s VPC only covers Secrets Manager/STS/FSx from that stack, not these four).
+
+### What the Stack Creates
+
+- One Lambda function (`{stack-name}-scanner`) — with or without `VpcConfig` depending on `VpcId`
 - DynamoDB report table (`{stack-name}-reports`)
 - CloudWatch Logs (365-day retention — reports double as compliance evidence)
+- If `VpcId` is set and `CreateVpcEndpoints=true` (default): S3 Gateway Endpoint, DynamoDB Gateway Endpoint, Comprehend Interface Endpoint, SNS Interface Endpoint
 
 ### Invoking the Scanner
 
@@ -195,6 +227,8 @@ aws lambda invoke \
 ### Chaining After Recovery Verification
 
 To scan the same isolated FlexClone used for ransomware verification (rather than production data), invoke this Lambda with the `access_point_arn` produced by the [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md)'s `AttachAccessPoint` Step Functions task — either by adding a state to that state machine, or as a separate follow-up invocation using the same execution's output.
+
+> **This chaining pattern requires Deploy Mode 2 (In-VPC)**: `AttachAccessPoint` always creates a VPC-scoped access point, and this scanner must run inside that same VPC to reach it — see the network-origin note in [Prerequisites](#an-existing-s3-access-point) above. Deploying this stack in standalone mode (no `VpcId`) against a chained FlexClone access point will fail at the `ListObjectsV2` call every time, since there is no network route to try intermittently.
 
 ---
 
@@ -215,6 +249,7 @@ To scan the same isolated FlexClone used for ransomware verification (rather tha
 - **No write access to scanned volumes**: the scanner only calls `s3:GetObject`/`s3:ListBucket` — it cannot modify, redact, or delete the files it scans.
 - **Report table access should be restricted**: while the report itself doesn't contain PII values, it does contain *where* PII-shaped data was found (file paths) and *how much* — apply the same access restrictions you'd apply to any inventory of sensitive-data locations.
 - **Comprehend is a regional, AWS-managed service**: text sent to `DetectPiiEntities` is processed within the AWS Region you invoke it in; see [Amazon Comprehend's data privacy documentation](https://docs.aws.amazon.com/comprehend/latest/dg/data-privacy.html) for the service's own data handling commitments.
+- **VPC-scoped access points have no route from outside their bound VPC**: this is a network property of the access point itself (see [AWS's network-origin comparison](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)), not something IAM alone can work around. When scanning a VPC-scoped access point, deploy this stack with `VpcId` set (Deploy Mode 2) so the scanner Lambda runs inside that VPC with a route to S3 via the Gateway Endpoint this stack creates.
 
 ---
 
@@ -233,11 +268,13 @@ python3 -m pytest shared/python/tests/test_content_classifier.py -v
 # 23 passed in 0.08s
 ```
 
+> **Observability Engineer lens**: The stack ships CloudWatch Logs only — no CloudWatch Alarm on Lambda errors, throttles, or timeouts. Given the "timeout loses the whole run" behavior noted in [Remaining Limitations](#remaining-limitations) item 6, add your own alarm on this Lambda's `Errors`/`Duration` metrics (or route failures through the SNS topic already wired for PII-found notifications) so a silently-timed-out scan doesn't read as "no PII found" by omission.
+
 ---
 
 ## Related Documents
 
-- [DII Capability Map](dii-capability-map.md) — the Identify-function Genuine Gap this scanner implements a fix for
+- [DII Capability Map](dii-capability-map.md) — the Identify-function Remaining Gap this scanner implements a fix for
 - [Data Classification Guide](data-classification.md) — the schema-level (field-name) classification this scanner complements at the content level
 - [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md) — the FlexClone + S3 Access Point pattern this scanner can chain after, for zero-production-impact scanning
 - [Automated Response Guide](automated-response-guide.md) — the containment-phase module whose protective snapshots are a natural scan target via the recovery verification workflow
@@ -256,3 +293,12 @@ A: This module intentionally scopes to plain-text and structured-data formats to
 
 **Q: How do I avoid excessive Comprehend costs on a very large volume?**
 A: Use `max_files` to cap the per-invocation scan size, and consider running the scanner against a representative subset (e.g., one department's share) rather than an entire multi-terabyte volume in one pass. Comprehend pricing is per-unit of text processed, so cost scales with total scanned content, not file count alone.
+
+**Q: I deployed standalone (no `VpcId`) and every invocation fails at `ListObjectsV2` — why?**
+A: The `access_point_arn` you're passing is almost certainly VPC-scoped (most commonly, one produced by the [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md)'s `AttachAccessPoint` step). A VPC-scoped access point has no network route from outside its bound VPC — this fails deterministically, not intermittently, regardless of IAM permissions. Redeploy with `VpcId`/`SubnetIds`/`SecurityGroupId`/`RouteTableIds` set (Deploy Mode 2) so the scanner runs inside the same VPC the access point is bound to.
+
+**Q: Does a low `Score` (confidence) on a PII entity mean I can ignore it?**
+A: Not automatically — this scanner doesn't apply a confidence floor for you (see the Data Protection Officer/Privacy Engineer lens note under [Entity Aggregation](#entity-aggregation--data-minimization-by-design)). It records the highest confidence seen per entity type per file so *you* can apply a threshold appropriate to your regulatory context; it does not decide for you what confidence level constitutes "found" PII.
+
+**Q: My scan of a large volume shows zero findings in DynamoDB — did it actually run?**
+A: Check CloudWatch Logs for that invocation before concluding "no PII found." Because the report is written once at the end of the handler (see [Remaining Limitations](#remaining-limitations) item 6), a Lambda timeout partway through a large scan produces the same DynamoDB-side symptom (no report row) as a scan that genuinely found nothing — the two are only distinguishable via the Lambda's own logs/duration metrics.

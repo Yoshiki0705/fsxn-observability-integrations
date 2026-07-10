@@ -165,9 +165,17 @@ Lambda 実行ロールには以下が必要です:
 
 ### ネットワークアクセス
 
-`CreateFlexClone`、`AttachAccessPoint`、`Cleanup` の各 Lambda は、ONTAP 管理エンドポイントにアクセス可能な VPC 内で実行されます（[自動インシデント対応ガイド](automated-response-guide.md)のスタックと併せてデプロイする場合は同じ VPC/サブネット）。`ScanForIndicators` と `RecordVerdict` の Lambda は VPC 外で実行され、S3 と DynamoDB の API のみを呼び出します（ONTAP は呼び出しません）。
+どの Lambda が VPC 内で実行されるかは、「検証ワークフローだから一律 VPC 内」という単純なルールではなく、各 Lambda が何を呼び出すかによって決まります:
 
-> **重要: VPC Endpoint について**。本スタックを単独でデプロイする場合（`automated-response.yaml` と同じ VPC で併せてデプロイしない場合）は、`CreateVpcEndpoints=true` に設定し、VPC 内の Lambda が Secrets Manager と STS に到達できるようにしてください。既に VPC にこれらのエンドポイントがある場合（例: 自動応答スタックによるもの）は `false` のままにして、Endpoint の重複作成によるコストを避けてください。
+| Lambda | 呼び出し先 | VPC 内で実行？ | 理由 |
+|--------|-----------|----------------|------|
+| `CreateFlexClone` | ONTAP REST API を直接呼び出し（ボリューム作成） | ✅ 実行する | `SubnetIds`/`SecurityGroupId` が提供する管理 IP へのルートが必要 |
+| `AttachAccessPoint` | FSx コントロールプレーン API のみ（`CreateAndAttachS3AccessPoint`、`DescribeVolumes`）— ONTAP には直接触れない | ❌ 実行しない | FSx API はパブリックな AWS API であり VPC なしでも到達可能。この 1 ステップのためだけに FSx 用 Interface Endpoint を用意する必要をなくすため、VPC 外で実行 |
+| `ScanForIndicators` | 前ステップで作成した **VPC 限定** の S3 Access Point に対する `ListObjectsV2` | ✅ 実行する | ここが最も重要: VPC 限定の Access Point は、束縛された VPC の外からは一切到達できません（下記セキュリティ考慮事項参照）。VPC 外の Lambda では原理的に到達不可能 |
+| `RecordVerdict` | DynamoDB + SNS のみ | ❌ 実行しない | いずれの API も VPC アクセスを必要としない |
+| `Cleanup` | ONTAP REST API を直接呼び出し（ボリューム削除）**と** FSx コントロールプレーン API（`DetachAndDeleteS3AccessPoint`）の両方 | ✅ 実行する | ONTAP 呼び出しには管理 IP へのルートが必要。VPC 内から FSx API を呼ぶには FSx 用 Interface Endpoint が必要 |
+
+> **重要: VPC Endpoint について**。`CreateFlexClone`/`Cleanup` は（ONTAP 認証情報のために）VPC から Secrets Manager と STS に到達できる必要があります。`Cleanup` はさらに（`DetachAndDeleteS3AccessPoint` のために）**FSx 用 Interface Endpoint** が必要です。`ScanForIndicators` は、ルートテーブル（`RouteTableIds` パラメータ）に紐づいた **S3 Gateway Endpoint** が必要です — これがないと、スキャンステップは VPC 限定の Access Point に一切到達できず、ワークフローは間欠的にではなく毎回そのステートで失敗します。VPC に Secrets Manager・STS・FSx・S3 Gateway Endpoint の 4 つ全てが既に存在している場合を除き、`CreateVpcEndpoints=true`（デフォルト）のままにしてください。[`automated-response.yaml`](automated-response-guide.md) と併せてデプロイする場合、そのスタック自身の Endpoint でカバーされるのは Secrets Manager と STS のみです。本スタックが追加で必要とする FSx と S3 の Endpoint は作成されないため、別途これら 2 つを用意していない限り `CreateVpcEndpoints=true` のままにしてください。
 
 ---
 
@@ -186,6 +194,7 @@ aws cloudformation deploy \
     VpcId=<vpc-id> \
     SubnetIds=<subnet-1>,<subnet-2> \
     SecurityGroupId=<sg-id> \
+    RouteTableIds=<route-table-1>,<route-table-2> \
     NotificationTopicArn=<optional-sns-topic-arn> \
   --capabilities CAPABILITY_NAMED_IAM
 ```
@@ -195,7 +204,7 @@ aws cloudformation deploy \
 - Lambda 関数 5 個（create-clone、attach-ap、scan、record-verdict、cleanup）
 - DynamoDB 台帳テーブル（`{stack-name}-ledger`）
 - ステートマシン用 CloudWatch Logs（365 日保持）、各 Lambda 用 CloudWatch Logs（90 日保持。record-verdict はコンプライアンスエビデンスも兼ねるため 365 日保持）
-- Secrets Manager + STS 用 VPC Endpoint（`CreateVpcEndpoints=true` の場合）
+- Secrets Manager・STS・FSx 用の Interface Endpoint、および `RouteTableIds` に紐づく S3 Gateway Endpoint（`CreateVpcEndpoints=true`、デフォルトの場合）— どの Lambda がどの Endpoint を必要とするかは上記[ネットワークアクセス](#ネットワークアクセス)を参照
 
 ### 検証実行の開始
 
@@ -238,7 +247,7 @@ aws dynamodb query \
 ## セキュリティ考慮事項
 
 - **本番データへの経路なし**: FlexClone は copy-on-write で親ボリュームとブロックを共有しますが、S3 Access Point が公開するのは *クローン* のみで、親ボリュームは公開されません。クリーンアップ時にクローンを削除しても、親ボリュームや元の Snapshot には影響しません。
-- **VPC 限定の Access Point**: Access Point は作成時に VPC に束縛され、VPC 外からは到達できません。これは、ポリシーのみで制御するインターネット起点の Access Point よりも強い保証です — 詳細は [AWS のネットワーク起点比較](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)を参照してください。
+- **VPC 限定の Access Point**: Access Point は作成時に VPC に束縛され、VPC 外からは到達できません。これは、ポリシーのみで制御するインターネット起点の Access Point よりも強い保証です — 詳細は [AWS のネットワーク起点比較](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html)を参照してください。この特性のため、Access Point のオブジェクトを一覧化する `ScanForIndicators` は、束縛された VPC 内で S3 へのルート（本スタックが作成する S3 Gateway Endpoint）を持って実行される*必要があります* — インターネット起点の Access Point とは異なり、VPC 限定の Access Point にはポリシーだけで VPC 外から到達する方法がありません。
 - **`fsx:*S3AccessPoint*` アクションの最小権限**: これらのアクションは現時点で、他の FSx アクションほど細かいリソースレベル権限や条件キーをサポートしていません。本スタックの IAM ポリシーではこれらを `Resource: '*'` にスコープし、その理由をドキュメント化しています。AWS がリソースレベルのサポートを追加した場合は見直してください。
 - **判定結果台帳はエビデンスであり、ガバナンスの代替ではない**: DynamoDB 台帳は、誰が何をいつ検証し、どのような結果だったかという監査可能なエビデンスを提供し、CSF 2.0 の Govern プログラムが入力として利用できます — 本リポジトリがガバナンスプログラム自体を自動化しようとしない理由については、[DII Capability Map](dii-capability-map.md#サイバーレジリエンス全体での位置づけ-nist-csf-20) の Govern 機能に関する議論を参照してください。
 
@@ -264,7 +273,7 @@ python3 -m pytest shared/python/tests/test_restore_verification.py -v
 
 ## 関連ドキュメント
 
-- [DII Capability Map](dii-capability-map.md) — 本ガイドが対応する「本当のギャップ」と CSF 2.0 RECOVER 機能に関する議論
+- [DII Capability Map](dii-capability-map.md) — 本ガイドが対応する「残存するギャップ」と CSF 2.0 RECOVER 機能に関する議論
 - [自動インシデント対応ガイド](automated-response-guide.md) — 本ワークフローの実行前に通常先行する、Respond フェーズのブロックと保護 Snapshot 作成
 - [ARP インシデント対応ガイド](arp-incident-response-guide.md) — 本ワークフローのスキャンが補完する（代替するのではない）、本番ボリュームに対するリアルタイムのエントロピー検知
 - [コンテンツレベル PII 分類スキャナー](content-classification-scanner.md) — 同じ FlexClone + S3 Access Point パターンを基盤とした、CSF 2.0 の Identify 機能（データ分類）向けの関連コンテンツスキャン機能

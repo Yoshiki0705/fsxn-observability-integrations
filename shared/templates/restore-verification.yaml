@@ -45,6 +45,16 @@ Parameters:
     Type: AWS::EC2::SecurityGroup::Id
     Description: Security Group ID that allows HTTPS (443) to ONTAP management IP
 
+  RouteTableIds:
+    Type: CommaDelimitedList
+    Description: >-
+      Route table IDs associated with SubnetIds. Used to attach the S3
+      Gateway VPC Endpoint that ScanForIndicators needs to reach the
+      VPC-scoped S3 Access Point from inside the VPC. Required even if
+      CreateVpcEndpoints=false is chosen for Secrets Manager/STS/FSx — pass
+      the route tables regardless (the parameter has no effect when the S3
+      Gateway Endpoint already exists; see CreateVpcEndpoints).
+
   UnixUser:
     Type: String
     Description: UNIX identity used by the verification S3 Access Point for file system access checks
@@ -90,11 +100,17 @@ Parameters:
   CreateVpcEndpoints:
     Type: String
     Description: >-
-      Create VPC Endpoints for Secrets Manager and SNS. Set to 'false' if your
-      VPC already has these endpoints (e.g., from the automated-response.yaml
-      stack in the same VPC). Lambda in VPC CANNOT reach AWS APIs without VPC
-      Endpoints or a NAT Gateway.
-    Default: 'false'
+      Create VPC Endpoints for Secrets Manager, STS, FSx, and an S3 Gateway
+      Endpoint. Set to 'false' if your VPC already has these endpoints (e.g.,
+      from the automated-response.yaml stack in the same VPC — note that
+      stack does not create an FSx or S3 endpoint, so if reusing its VPC,
+      leave this 'true' unless you have separately added FSx/S3 endpoints).
+      Lambda in VPC CANNOT reach AWS APIs without VPC Endpoints or a NAT
+      Gateway. The S3 Gateway Endpoint specifically is required for
+      ScanForIndicators to reach the VPC-scoped S3 Access Point — a
+      VPC-scoped access point has no route from outside the bound VPC (see
+      Security Considerations).
+    Default: 'true'
     AllowedValues: ['true', 'false']
 
 Conditions:
@@ -105,6 +121,21 @@ Resources:
   # ================================================================
   # VPC Endpoints — only created if the shared VPC doesn't already have
   # them (e.g., first deployment without automated-response.yaml).
+  #
+  # Four Lambdas run inside the VPC (CreateClone, AttachAccessPoint, Scan,
+  # Cleanup) — see the per-Lambda comments below for which endpoint each one
+  # needs:
+  #   - CreateClone / Cleanup call the ONTAP REST API directly over the
+  #     management-IP route already provided by SubnetIds/SecurityGroupId
+  #     (no additional VPC Endpoint needed for that traffic).
+  #   - CreateClone / Cleanup also call Secrets Manager (ONTAP credentials).
+  #   - AttachAccessPoint / Cleanup call the FSx control-plane API
+  #     (CreateAndAttachS3AccessPoint, DetachAndDeleteS3AccessPoint, etc.) —
+  #     requires the FSx Interface Endpoint below.
+  #   - Scan calls ListObjectsV2 against the VPC-scoped S3 Access Point —
+  #     requires the S3 Gateway Endpoint below (a VPC-scoped access point has
+  #     no route from outside its bound VPC; see Security Considerations in
+  #     the Verified-Clean Recovery Point Guide).
   # ================================================================
   SecretsManagerVpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
@@ -130,11 +161,36 @@ Resources:
         - !Ref VpcEndpointSecurityGroup
       PrivateDnsEnabled: true
 
+  FsxVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.fsx'
+      VpcEndpointType: Interface
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+      PrivateDnsEnabled: true
+
+  S3GatewayVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      RouteTableIds: !Ref RouteTableIds
+      # Gateway endpoint policy is intentionally permissive (S3 is scoped by
+      # IAM + the S3 Access Point's own resource policy, not by this
+      # endpoint policy); tighten with a Condition on aws:sourceVpce if your
+      # organization requires endpoint-level restriction in addition to IAM.
+
   VpcEndpointSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Condition: ShouldCreateVpcEndpoints
     Properties:
-      GroupDescription: Allow Lambda to access VPC Endpoints (Secrets Manager, STS)
+      GroupDescription: Allow Lambda to access Interface VPC Endpoints (Secrets Manager, STS, FSx)
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -290,6 +346,10 @@ Resources:
       MemorySize: !Ref LambdaMemorySize
       Timeout: !Ref StepTimeoutSeconds
       Role: !GetAtt VerificationLambdaRole.Arn
+      # VpcConfig required: calls the ONTAP management endpoint directly
+      # (volume create) over the network path provided by SubnetIds/
+      # SecurityGroupId. Does not call the FSx control-plane API, so it does
+      # not need FsxVpcEndpoint.
       VpcConfig:
         SubnetIds: !Ref SubnetIds
         SecurityGroupIds:
@@ -415,10 +475,14 @@ Resources:
       MemorySize: !Ref LambdaMemorySize
       Timeout: !Ref StepTimeoutSeconds
       Role: !GetAtt VerificationLambdaRole.Arn
-      VpcConfig:
-        SubnetIds: !Ref SubnetIds
-        SecurityGroupIds:
-          - !Ref SecurityGroupId
+      # No VpcConfig: this Lambda only calls the FSx control-plane API
+      # (CreateAndAttachS3AccessPoint, DescribeVolumes,
+      # DescribeS3AccessPointAttachments) — a public AWS API reachable from
+      # outside the VPC. It never talks to the ONTAP management endpoint
+      # directly. Running it outside the VPC avoids needing the FSx
+      # Interface Endpoint just for this step (Cleanup still needs that
+      # endpoint, since it also calls the FSx API from inside the VPC — see
+      # FsxVpcEndpoint above).
       Environment:
         Variables:
           FILE_SYSTEM_ID: !Ref FileSystemId
@@ -521,6 +585,17 @@ Resources:
       MemorySize: !Ref LambdaMemorySize
       Timeout: !Ref StepTimeoutSeconds
       Role: !GetAtt VerificationLambdaRole.Arn
+      # VpcConfig required: the S3 Access Point attached in the previous
+      # step is VPC-scoped (S3AccessPoint.VpcConfiguration.VpcId), so it has
+      # no route from outside that VPC — see AWS's network-origin comparison
+      # in the Verified-Clean Recovery Point Guide's Security Considerations.
+      # Reaching it from here requires both running inside the VPC AND the
+      # S3 Gateway Endpoint (S3GatewayVpcEndpoint above) bound to the route
+      # tables in RouteTableIds.
+      VpcConfig:
+        SubnetIds: !Ref SubnetIds
+        SecurityGroupIds:
+          - !Ref SecurityGroupId
       Environment:
         Variables:
           SUSPICIOUS_RATIO_THRESHOLD: !Ref SuspiciousRatioThreshold
@@ -698,6 +773,10 @@ Resources:
       MemorySize: !Ref LambdaMemorySize
       Timeout: !Ref StepTimeoutSeconds
       Role: !GetAtt VerificationLambdaRole.Arn
+      # VpcConfig required: this Lambda calls both the ONTAP management
+      # endpoint directly (volume delete) and the FSx control-plane API
+      # (DetachAndDeleteS3AccessPoint) — the latter needs FsxVpcEndpoint
+      # above since this Lambda runs inside the VPC.
       VpcConfig:
         SubnetIds: !Ref SubnetIds
         SecurityGroupIds:

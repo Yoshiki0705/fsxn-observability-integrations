@@ -1,22 +1,64 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: |
+Description: >-
   FSx for ONTAP Content-Level PII Classification Scanner (CSF 2.0 Identify).
-
-  Closes the gap documented in the DII Capability Map: this repository's
-  Data Classification Guide defines a schema-level classification (which
-  fields — UserName, ObjectName — are PII) but does not scan file contents.
-  This stack adds that content-level scan using Amazon Comprehend's managed
-  PII entity detection, exposed as a Lambda invocable standalone or chained
-  after the restore-verification.yaml workflow (scanning the same FlexClone
-  used for ransomware verification, rather than the production volume).
-
-  Deploy standalone (pass any existing S3 Access Point ARN) or alongside
-  restore-verification.yaml (pass the access_point_arn from that workflow's
-  AttachAccessPoint step output).
-
+  Scans files via an S3 Access Point using Amazon Comprehend
+  DetectPiiEntities. Deploy standalone (internet-origin access point, no
+  VpcId) or with VpcId set to scan a VPC-scoped access point (e.g., from
+  restore-verification.yaml) — see VpcId parameter and README for details.
   Stack name pattern: fsxn-content-classification
 
 Parameters:
+  VpcId:
+    Type: String
+    Description: >-
+      VPC ID to run the scanner Lambda inside. REQUIRED if the
+      access_point_arn you plan to scan is VPC-scoped (e.g., from
+      restore-verification.yaml's AttachAccessPoint step) — a VPC-scoped
+      access point cannot be reached from a Lambda outside its bound VPC.
+      Leave empty to deploy the scanner outside any VPC, which only works
+      against internet-origin access points.
+    Default: ''
+    AllowedPattern: '^(vpc-[0-9a-f]{8,17})?$'
+
+  SubnetIds:
+    Type: CommaDelimitedList
+    Description: >-
+      Private subnet IDs for the scanner Lambda. Required if VpcId is set;
+      ignored otherwise. Leave as the default single empty-string entry
+      when VpcId is empty.
+    Default: ''
+
+  SecurityGroupId:
+    Type: String
+    Description: >-
+      Security Group ID for the scanner Lambda (egress to VPC Endpoints).
+      Required if VpcId is set; ignored otherwise.
+    Default: ''
+    AllowedPattern: '^(sg-[0-9a-f]{8,17})?$'
+
+  RouteTableIds:
+    Type: CommaDelimitedList
+    Description: >-
+      Route table IDs associated with SubnetIds. Used to attach the S3 and
+      DynamoDB Gateway VPC Endpoints the scanner needs when running inside
+      a VPC. Required if VpcId is set and CreateVpcEndpoints=true; ignored
+      otherwise.
+    Default: ''
+
+  CreateVpcEndpoints:
+    Type: String
+    Description: >-
+      When VpcId is set, create VPC Endpoints for S3 and DynamoDB (Gateway)
+      plus Comprehend and SNS (Interface) so the in-VPC scanner Lambda can
+      reach the access point, report table, PII detection API, and
+      notifications. Set to 'false' if your VPC already has all four
+      endpoints (e.g., reusing restore-verification.yaml's VPC — note that
+      stack does not create Comprehend/DynamoDB/SNS endpoints, so leave this
+      'true' unless you've added those separately). Ignored if VpcId is
+      empty.
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+
   LambdaMemorySize:
     Type: Number
     Description: Lambda memory size in MB for the scanner function
@@ -54,8 +96,74 @@ Parameters:
 
 Conditions:
   HasNotificationTopic: !Not [!Equals [!Ref NotificationTopicArn, '']]
+  HasVpc: !Not [!Equals [!Ref VpcId, '']]
+  ShouldCreateVpcEndpoints: !And
+    - !Condition HasVpc
+    - !Equals [!Ref CreateVpcEndpoints, 'true']
 
 Resources:
+  # ================================================================
+  # VPC Endpoints — only created when VpcId is set and
+  # CreateVpcEndpoints=true. Required so the in-VPC scanner Lambda can
+  # reach: the VPC-scoped S3 Access Point being scanned (S3 Gateway), the
+  # DynamoDB report table (DynamoDB Gateway), Comprehend DetectPiiEntities
+  # (Comprehend Interface), and SNS notifications (SNS Interface).
+  # ================================================================
+  S3GatewayVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      RouteTableIds: !Ref RouteTableIds
+
+  DynamoDbGatewayVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
+      VpcEndpointType: Gateway
+      RouteTableIds: !Ref RouteTableIds
+
+  ComprehendVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.comprehend'
+      VpcEndpointType: Interface
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+      PrivateDnsEnabled: true
+
+  SnsVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.sns'
+      VpcEndpointType: Interface
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+      PrivateDnsEnabled: true
+
+  VpcEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: ShouldCreateVpcEndpoints
+    Properties:
+      GroupDescription: Allow scanner Lambda to access Interface VPC Endpoints (Comprehend, SNS)
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref SecurityGroupId
+          Description: Lambda SG to VPC Endpoint (HTTPS)
+
   # ================================================================
   # DynamoDB — classification report ledger
   # ================================================================
@@ -98,6 +206,11 @@ Resources:
             Principal:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
+      # Attached unconditionally — harmless when VpcId is empty (the
+      # scanner Lambda simply won't have ENIs to manage), and avoids a
+      # Fn::If on ManagedPolicyArns.
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
       Policies:
         - PolicyName: ContentClassificationPolicy
           PolicyDocument:
@@ -158,6 +271,17 @@ Resources:
       MemorySize: !Ref LambdaMemorySize
       Timeout: !Ref LambdaTimeoutSeconds
       Role: !GetAtt ScannerLambdaRole.Arn
+      # Only set VpcConfig when VpcId is provided. A VPC-scoped S3 Access
+      # Point (e.g., from restore-verification.yaml's AttachAccessPoint
+      # step) has no route from outside its bound VPC, so scanning one
+      # requires this Lambda to run inside that VPC — see the Description
+      # above and Security Considerations in content-classification-scanner.md.
+      VpcConfig: !If
+        - HasVpc
+        - SubnetIds: !Ref SubnetIds
+          SecurityGroupIds:
+            - !Ref SecurityGroupId
+        - !Ref 'AWS::NoValue'
       Environment:
         Variables:
           REPORT_TABLE_NAME: !Ref ClassificationReportTable
@@ -379,7 +503,11 @@ Outputs:
       {"access_point_arn": "..."} or chain after the restore-verification.yaml
       workflow's AttachAccessPoint step (e.g., via Step Functions or a
       scheduled EventBridge rule targeting an S3 Access Point you manage
-      separately).
+      separately). If VpcId was set at deploy time, this function only
+      reaches VPC-scoped access points bound to that same VPC (and
+      internet-origin ones, via the VPC's own internet/NAT path if
+      present) — if VpcId was left empty, this function only reaches
+      internet-origin access points.
     Value: !GetAtt ScannerFunction.Arn
 
   ReportTableName:

@@ -165,9 +165,17 @@ The Lambda execution role requires:
 
 ### Network Access
 
-The `CreateFlexClone`, `AttachAccessPoint`, and `Cleanup` Lambdas run inside the VPC with access to the ONTAP management endpoint (same VPC/subnets as the [Automated Response Guide](automated-response-guide.md) stack, if deployed alongside it). The `ScanForIndicators` and `RecordVerdict` Lambdas run outside the VPC — they only call the S3 and DynamoDB APIs, not ONTAP.
+Which Lambdas run inside the VPC depends on what each one calls, not on a uniform "verification workflow" rule:
 
-> **Critical: VPC Endpoints**. If this stack is deployed standalone (not alongside `automated-response.yaml` in the same VPC), set `CreateVpcEndpoints=true` so the VPC-bound Lambdas can reach Secrets Manager and STS. If your VPC already has these endpoints (e.g., from the Automated Response stack), leave it `false` to avoid duplicate endpoint costs.
+| Lambda | Calls | Runs inside VPC? | Why |
+|--------|-------|-------------------|-----|
+| `CreateFlexClone` | ONTAP REST API directly (volume create) | ✅ Yes | Needs the management-IP route via `SubnetIds`/`SecurityGroupId` |
+| `AttachAccessPoint` | FSx control-plane API only (`CreateAndAttachS3AccessPoint`, `DescribeVolumes`) — never touches ONTAP directly | ❌ No | The FSx API is a public AWS API reachable without a VPC; running it outside the VPC avoids needing an FSx Interface Endpoint just for this step |
+| `ScanForIndicators` | `ListObjectsV2` against the **VPC-scoped** S3 Access Point created in the previous step | ✅ Yes | This is the critical one: a VPC-scoped access point has no route from outside the VPC it's bound to (see Security Considerations below) — a Lambda outside the VPC cannot reach it, full stop |
+| `RecordVerdict` | DynamoDB + SNS only | ❌ No | Neither API requires VPC access |
+| `Cleanup` | Both the ONTAP REST API directly (volume delete) **and** the FSx control-plane API (`DetachAndDeleteS3AccessPoint`) | ✅ Yes | Needs the management-IP route for the ONTAP call; the FSx API call from inside the VPC requires the FSx Interface Endpoint |
+
+> **Critical: VPC Endpoints**. `CreateFlexClone`/`Cleanup` need Secrets Manager + STS reachable from the VPC (for ONTAP credentials); `Cleanup` additionally needs the **FSx Interface Endpoint** (for `DetachAndDeleteS3AccessPoint`); `ScanForIndicators` needs the **S3 Gateway Endpoint** bound to your route tables (`RouteTableIds` parameter) — without it, the scan step cannot reach the VPC-scoped access point at all, and the workflow will fail at that state every time, not intermittently. Set `CreateVpcEndpoints=true` (the default) unless your VPC already has all four endpoints — Secrets Manager, STS, FSx, and the S3 Gateway Endpoint. Deploying this stack alongside [`automated-response.yaml`](automated-response-guide.md) only covers Secrets Manager and STS from that stack's own endpoints; it does **not** create the FSx or S3 endpoints this stack additionally needs, so leave `CreateVpcEndpoints=true` unless you've added those two separately.
 
 ---
 
@@ -186,6 +194,7 @@ aws cloudformation deploy \
     VpcId=<vpc-id> \
     SubnetIds=<subnet-1>,<subnet-2> \
     SecurityGroupId=<sg-id> \
+    RouteTableIds=<route-table-1>,<route-table-2> \
     NotificationTopicArn=<optional-sns-topic-arn> \
   --capabilities CAPABILITY_NAMED_IAM
 ```
@@ -195,7 +204,7 @@ The stack creates:
 - 5 Lambda functions (create-clone, attach-ap, scan, record-verdict, cleanup)
 - DynamoDB ledger table (`{stack-name}-ledger`)
 - CloudWatch Logs for the state machine (365-day retention) and each Lambda (90-day, except record-verdict at 365-day since it doubles as compliance evidence)
-- VPC Endpoints for Secrets Manager + STS (if `CreateVpcEndpoints=true`)
+- VPC Endpoints for Secrets Manager, STS, and FSx (Interface), plus an S3 Gateway Endpoint bound to `RouteTableIds` (if `CreateVpcEndpoints=true`, the default) — see [Network Access](#network-access) above for which Lambda needs which endpoint
 
 ### Starting a Verification Run
 
@@ -238,7 +247,7 @@ aws dynamodb query \
 ## Security Considerations
 
 - **No production data path**: The FlexClone shares blocks with its parent via copy-on-write, but the S3 Access Point only exposes the *clone*, not the parent volume. Deleting the clone at cleanup does not affect the parent volume or the original snapshot.
-- **VPC-scoped access point**: The access point is bound to the VPC at creation time and cannot be reached from outside it. This is a stronger guarantee than an internet-origin access point restricted only by policy — see [AWS's network-origin comparison](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html).
+- **VPC-scoped access point**: The access point is bound to the VPC at creation time and cannot be reached from outside it. This is a stronger guarantee than an internet-origin access point restricted only by policy — see [AWS's network-origin comparison](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html). This is also why `ScanForIndicators` (the Lambda that lists the access point's objects) *must* run inside the bound VPC with a route to S3 (the S3 Gateway Endpoint this stack creates) — there is no policy-only way to reach a VPC-scoped access point from outside its VPC, unlike an internet-origin one.
 - **Least privilege for `fsx:*S3AccessPoint*` actions**: These actions do not currently support resource-level permissions or condition keys as fine-grained as other FSx actions; the IAM policy in this stack scopes them to `Resource: '*'` with a documented rationale. Revisit this if AWS adds resource-level support.
 - **Verdict ledger as evidence, not a substitute for governance**: The DynamoDB ledger supplies auditable evidence (who verified what, when, with what result) that a CSF 2.0 Govern program can consume — see the [DII Capability Map](dii-capability-map.md#where-this-fits-in-cyber-resilience-nist-csf-20)'s Govern-function discussion for why this repo does not attempt to automate the governance program itself.
 
@@ -264,7 +273,7 @@ python3 -m pytest shared/python/tests/test_restore_verification.py -v
 
 ## Related Documents
 
-- [DII Capability Map](dii-capability-map.md) — the Genuine Gaps and CSF 2.0 RECOVER discussion this guide implements a fix for
+- [DII Capability Map](dii-capability-map.md) — the Remaining Gaps and CSF 2.0 RECOVER discussion this guide implements a fix for
 - [Automated Response Guide](automated-response-guide.md) — the Respond-phase blocking and protective snapshot creation that typically precedes running this workflow
 - [ARP Incident Response Guide](arp-incident-response-guide.md) — the live-volume entropy detection this workflow's scan complements but does not replace
 - [Content-Level PII Classification Scanner](content-classification-scanner.md) — a related content-scanning capability for the CSF 2.0 Identify function (data classification), built on the same FlexClone + S3 Access Point pattern
