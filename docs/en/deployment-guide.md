@@ -428,6 +428,23 @@ The name-mapping deny mechanism (`replacement: " "`) has important scope limitat
 - Modify NTFS ACL to remove the user's access
 - Use Security Group changes to block network-level access (with cross-subnet limitation noted above)
 
+**Why this happens** (from NetApp documentation):
+
+On NTFS security style volumes, ONTAP still performs win→unix name-mapping to build internal credentials (UID/GID lookup), but the final access decision uses **Windows credentials (NTFS ACL)**, not the mapped UNIX identity. A deny mapping (`" "`) prevents UNIX ID resolution, but ONTAP falls back to the `default-unix-user` (`pcuser`, UID 65534) and proceeds with NTFS ACL evaluation using the original Windows token.
+
+On UNIX/MIXED security style volumes, access is controlled by the **mapped UNIX UID/GID**. A deny mapping blocks UNIX ID resolution entirely, and access is denied.
+
+Sources:
+- [NetApp KB: How does name-mapping work when CIFS clients access NTFS security style resources](https://kb.netapp.com/on-prem/ontap/da/NAS/NAS-KBs/How_does_name-mapping_work_when_CIFS_clients_access_NTFS_security_style_resources) — "Access is granted or denied based on the Windows credentials because the volume is set to NTFS security style."
+- [NetApp KB: Understanding name-mapping in a multiprotocol environment](https://kb.netapp.com/on-prem/ontap/da/NAS/NAS-KBs/Understanding_name-mapping_in_a_multiprotocol_environment) — CIFS→UNIX style: "Access is granted or denied based on the UID and GID(s) of the UNIX credentials"
+- [NetApp ONTAP Docs: Security styles and their effects](https://docs.netapp.com/us-en/ontap/smb-admin/security-styles-their-effects-concept.html) — "Security styles only determine the type of permissions ONTAP uses to control data access"
+- [NetApp ONTAP Docs: Create name mappings](https://docs.netapp.com/us-en/ontap/nfs-admin/create-name-mapping-task.html) — "You can use the -replacement statement to explicitly deny a mapping to the user by using the null replacement string \" \" (the space character)"
+- [NetApp KB: How to manually unblock SMB/CIFS access blocked by Workload Security](https://kb.netapp.com/Cloud/BlueXP/DII/How_to_manually_unblock_SMB_CIFS_access_that_blocked_by_Workload_security) — Confirms DII uses `replacement: " "` (same mechanism as this project)
+
+**Implication for DII Storage Workload Security**: DII's SMB user blocking uses the same name-mapping deny mechanism. This implies DII's blocking is also effective only on UNIX/MIXED security style volumes for SMB access. (DII's documentation does not explicitly state this limitation, but it follows from the ONTAP name-mapping behavior above.)
+
+**Open investigation (Limitation 3)**: In our testing on AD-joined SVMs (ONTAP 9.17.1P7D1), name-mapping entries with `replacement: " "` were observed to disappear shortly after creation (HTTP 201 returned, immediate read-back confirmed, but gone within seconds). This did not occur on non-AD-joined SVMs. Root cause under investigation — may be related to `default-unix-user` configuration or CIFS server credential building. DII Workload Security uses this mechanism successfully, suggesting a configuration difference rather than a fundamental incompatibility.
+
 ### DNS / Route 53
 
 No stack creates Route 53 records. VPC Endpoint private DNS is handled automatically by AWS (PrivateDnsEnabled=true). No custom DNS configuration required.
