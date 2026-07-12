@@ -413,6 +413,21 @@ If your security policy requires network-layer blocking even when client and FSx
 
 **Recommendation for same-subnet deployments**: Use export-policy deny rule (Option 3) as the primary mechanism. It is immediate, per-IP, and does not require network infrastructure changes. If you also need to block the IP's non-NFS traffic, consider Option 1 as a long-term architectural improvement.
 
+#### SMB Blocking: Name-Mapping Limitations (Verified)
+
+The name-mapping deny mechanism (`replacement: " "`) has important scope limitations:
+
+| Condition | Blocks SMB? | Notes |
+|-----------|:-----------:|-------|
+| UNIX/MIXED volume, non-admin user | ✅ | Requires UNIX ID resolution during SMB access |
+| NTFS volume, any user | ❌ | NTFS ACL evaluated directly, mapping skipped |
+| Any volume, Domain Admins member | ❌ | FileSystemAdministratorsGroup bypasses mapping |
+
+**Key point for readers**: If your FSx for ONTAP volumes use NTFS security style (common in Windows-only environments), name-mapping deny will NOT block SMB access. Alternative mechanisms for NTFS volumes:
+- Disable the AD user account directly (prevents Kerberos authentication)
+- Modify NTFS ACL to remove the user's access
+- Use Security Group changes to block network-level access (with cross-subnet limitation noted above)
+
 ### DNS / Route 53
 
 No stack creates Route 53 records. VPC Endpoint private DNS is handled automatically by AWS (PrivateDnsEnabled=true). No custom DNS configuration required.

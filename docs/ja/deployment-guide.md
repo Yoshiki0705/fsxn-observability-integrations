@@ -413,6 +413,21 @@ done
 
 **同一サブネット構成での推奨**: export-policy deny rule（選択肢 3）を主要メカニズムとして使用してください。即時有効、IP 単位、ネットワークインフラ変更不要です。NFS 以外のトラフィックもブロックする必要がある場合は、長期的なアーキテクチャ改善として選択肢 1 を検討してください。
 
+#### SMB ブロック: Name-Mapping の制限事項（検証済み）
+
+name-mapping deny メカニズム（`replacement: " "`）には重要なスコープ制限があります。
+
+| 条件 | SMB をブロック? | 備考 |
+|------|:-----------:|------|
+| UNIX/MIXED ボリューム、非管理者ユーザー | ✅ | SMB アクセス時に UNIX ID 解決が必要 |
+| NTFS ボリューム、全ユーザー | ❌ | NTFS ACL が直接評価され、マッピングはスキップ |
+| 全ボリューム、Domain Admins メンバー | ❌ | FileSystemAdministratorsGroup がマッピングをバイパス |
+
+**読者への重要な注意**: FSx for ONTAP ボリュームが NTFS セキュリティスタイル（Windows 環境で一般的）の場合、name-mapping deny は SMB アクセスをブロックしません。NTFS ボリュームの代替メカニズム:
+- AD ユーザーアカウントを直接無効化（Kerberos 認証を阻止）
+- NTFS ACL を変更してユーザーのアクセスを除外
+- Security Group 変更でネットワークレベルのアクセスをブロック（上記のクロスサブネット制限あり）
+
 ### DNS / Route 53
 
 Route 53 レコードを作成するスタックはありません。VPC Endpoint のプライベート DNS は AWS が自動処理します（PrivateDnsEnabled=true）。カスタム DNS 設定は不要です。
