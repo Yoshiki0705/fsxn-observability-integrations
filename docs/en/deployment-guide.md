@@ -343,11 +343,35 @@ The S3 Access Point requires UNIX security style for the target volume. NTFS and
 
 ### Active Directory Integration
 
-No stack in this project creates or modifies AD configurations. The `automated-response` stack's SMB user blocking (name-mapping) operates at the ONTAP SVM level and does not require AD changes. However:
+The `automated-response` stack's SMB user blocking (name-mapping) operates at the ONTAP SVM level. To block SMB users by domain identity (e.g., `CORP\jdoe`), the SVM must be joined to Active Directory.
 
-- Blocked users are identified by `DOMAIN\\username` pattern
-- The domain name must match what ONTAP uses (check: `vserver cifs show`)
-- Group-based blocking is not supported (individual users only)
+#### AD Join: Verified Deployment Sequence
+
+1. **Create or identify your AD** (AWS Managed or self-managed)
+2. **Deploy `demo-ad-environment.yaml`** (or use existing AD infrastructure)
+3. **Run `demo-ad-join-svm.sh`** to join the SVM to AD
+4. **Create a CIFS share** on the SVM (required for SMB access)
+
+#### AD Join: Critical Configuration (Verified on ONTAP 9.17.1)
+
+| Setting | AWS Managed AD | Self-Managed AD |
+|---------|---------------|-----------------|
+| OU Path | `OU=Computers,OU=<ShortName>,DC=...` | `OU=Computers,DC=...` or custom |
+| FileSystemAdministratorsGroup | `Domain Admins` | `Domain Admins` or delegated group |
+| NetBIOS Name | Must differ from domain ShortName | Must be unique in domain |
+| Username | `Admin` | Service account with delegated perms |
+
+**Common failure**: Using `AWS Delegated FSx Administrators` as `FileSystemAdministratorsGroup` causes the SVM to enter `MISCONFIGURED` state. Use `Domain Admins` instead.
+
+**OU path for AWS Managed AD**: AWS Managed AD creates an intermediate OU with the domain's short name. For domain `demo.fsx.local` (ShortName: `demo`), the correct path is `OU=Computers,OU=demo,DC=demo,DC=fsx,DC=local` — not `OU=Computers,DC=demo,DC=fsx,DC=local`.
+
+**Recovery from MISCONFIGURED**: Re-run `aws fsx update-storage-virtual-machine` with corrected parameters. No SVM deletion required.
+
+#### Windows EC2 Domain Join (CloudFormation)
+
+Use `AWS::SSM::Association` with the AWS-managed `AWS-JoinDirectoryServiceDomain` document. Do NOT use `SsmAssociations` on the EC2 instance or create custom SSM Documents with `aws:domainJoin`.
+
+See `shared/templates/demo-ad-environment.yaml` for the verified pattern.
 
 ### DNS / Route 53
 

@@ -1,0 +1,32 @@
+[
+  {"ParameterKey": "AdMode", "ParameterValue": "create-new",
+   "_comment": "Options: create-new | use-existing-managed | use-self-managed"},
+
+  {"ParameterKey": "VpcId", "ParameterValue": "vpc-0123456789abcdef0"},
+  {"ParameterKey": "SubnetId", "ParameterValue": "subnet-aaaaaaaaaaaaa"},
+  {"ParameterKey": "SubnetId2", "ParameterValue": "subnet-bbbbbbbbbbbbb"},
+  {"ParameterKey": "SecurityGroupId", "ParameterValue": "sg-0123456789abcdef0"},
+
+  {"ParameterKey": "AdDomainName", "ParameterValue": "demo.fsx.local",
+   "_comment": "Pattern A only"},
+  {"ParameterKey": "AdPassword", "ParameterValue": "<YourP@ssw0rd123>",
+   "_comment": "Pattern A only"},
+
+  {"ParameterKey": "ExistingDirectoryId", "ParameterValue": "",
+   "_comment": "Pattern B only: d-xxxxxxxxxx"},
+
+  {"ParameterKey": "SelfManagedAdDomainName", "ParameterValue": "",
+   "_comment": "Pattern C only: corp.example.com"},
+  {"ParameterKey": "SelfManagedAdDnsIps", "ParameterValue": "",
+   "_comment": "Pattern C only: 198.51.100.10,198.51.100.11"},
+  {"ParameterKey": "SelfManagedAdUsername", "ParameterValue": "Admin"},
+  {"ParameterKey": "SelfManagedAdPassword", "ParameterValue": ""},
+  {"ParameterKey": "SelfManagedAdOu", "ParameterValue": "",
+   "_comment": "Pattern C only: OU=FSxServers,DC=corp,DC=example,DC=com"},
+
+  {"ParameterKey": "InstanceType", "ParameterValue": "t3.medium"},
+  {"ParameterKey": "FsxSvmId", "ParameterValue": "svm-0123456789abcdef0"},
+  {"ParameterKey": "FsxSvmDnsName", "ParameterValue": "svm-xxx.fs-xxx.fsx.ap-northeast-1.amazonaws.com"},
+  {"ParameterKey": "FsxVolumePath", "ParameterValue": "/data"},
+  {"ParameterKey": "NetBiosName", "ParameterValue": "FSXNSVM"}
+]
