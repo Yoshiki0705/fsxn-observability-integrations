@@ -466,6 +466,28 @@ Sources:
 
 **Open investigation (Limitation 3)**: In our testing on AD-joined SVMs (ONTAP 9.17.1P7D1), name-mapping entries with `replacement: " "` were observed to disappear shortly after creation (HTTP 201 returned, immediate read-back confirmed, but gone within seconds). This did not occur on non-AD-joined SVMs. Root cause under investigation — may be related to `default-unix-user` configuration or CIFS server credential building. DII Workload Security uses this mechanism successfully, suggesting a configuration difference rather than a fundamental incompatibility.
 
+**Root cause identified (Limitation 3)**: On AD-joined SVMs running ONTAP 9.17.1P7D1, a background validation process periodically checks name-mapping `replacement` values against the local UNIX user table. Values that cannot be resolved to a valid UNIX user (including `" "` space) are automatically deleted within 30–60 seconds of creation. This explains why DII Workload Security works (it likely ensures the relevant UNIX user lookup infrastructure is in place), while our minimal SVM configuration triggers the auto-cleanup.
+
+**Verified behavior**:
+| replacement value | Persists after 60s? | Why |
+|-------------------|:-------------------:|-----|
+| `" "` (space) | ❌ Auto-deleted | Not resolvable as UNIX user |
+| `"pcuser"` (UID 65534) | ✅ Persists | Exists in local UNIX user table |
+| `"nobody"` (UID 65535) | ✅ Persists | Exists in local UNIX user table |
+
+**Workaround for AD-joined SVMs**: Use `replacement: "nobody"` instead of `replacement: " "`. The `nobody` user (UID 65535) is a standard unprivileged UNIX identity. Combined with restrictive volume permissions (mode 750 or 700, owner=root, group=root), this effectively denies SMB access on UNIX/MIXED security style volumes because `nobody` has no `other` read access.
+
+**Action required on the volume** (if using `nobody` workaround):
+```bash
+# Set volume root permissions to deny 'other' access:
+curl -sk -u fsxadmin:<pass> -X PATCH \
+  "https://<mgmt-ip>/api/storage/volumes/<uuid>" \
+  -H "Content-Type: application/json" \
+  -d '{"nas":{"unix_permissions":"750"}}'
+```
+
+**Note**: This workaround changes the semantics from "mapping fails → access denied at authentication" to "mapping succeeds with unprivileged UID → access denied by UNIX permissions." The net effect is the same (user cannot access files), but the mechanism is different and requires the volume's UNIX permissions to be restrictive.
+
 ### DNS / Route 53
 
 No stack creates Route 53 records. VPC Endpoint private DNS is handled automatically by AWS (PrivateDnsEnabled=true). No custom DNS configuration required.
