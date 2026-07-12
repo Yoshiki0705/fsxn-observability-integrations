@@ -1,0 +1,19 @@
+[
+  {"ParameterKey": "OntapMgmtIp", "ParameterValue": "<your-fsx-management-ip>"},
+  {"ParameterKey": "OntapCredentialsSecretArn", "ParameterValue": "arn:aws:secretsmanager:<region>:<account-id>:secret:<secret-name>-XXXXXX"},
+  {"ParameterKey": "FileSystemId", "ParameterValue": "fs-0123456789abcdef0"},
+  {"ParameterKey": "VpcId", "ParameterValue": "vpc-0123456789abcdef0"},
+  {"ParameterKey": "SubnetIds", "ParameterValue": "subnet-aaaaaaaaaaaaa,subnet-bbbbbbbbbbbbb"},
+  {"ParameterKey": "SecurityGroupId", "ParameterValue": "sg-0123456789abcdef0"},
+  {"ParameterKey": "RouteTableIds", "ParameterValue": "rtb-aaaaaaaaaaaaa,rtb-bbbbbbbbbbbbb"},
+  {"ParameterKey": "UnixUser", "ParameterValue": "root"},
+  {"ParameterKey": "LambdaMemorySize", "ParameterValue": "512"},
+  {"ParameterKey": "StepTimeoutSeconds", "ParameterValue": "180"},
+  {"ParameterKey": "AttachAccessPointTimeoutSeconds", "ParameterValue": "60"},
+  {"ParameterKey": "SuspiciousRatioThreshold", "ParameterValue": "0.05"},
+  {"ParameterKey": "SuspiciousMinCount", "ParameterValue": "20"},
+  {"ParameterKey": "NotificationTopicArn", "ParameterValue": ""},
+  {"ParameterKey": "CreateSecretsManagerEndpoint", "ParameterValue": "false"},
+  {"ParameterKey": "CreateStsEndpoint", "ParameterValue": "true"},
+  {"ParameterKey": "CreateS3GatewayEndpoint", "ParameterValue": "false"}
+]

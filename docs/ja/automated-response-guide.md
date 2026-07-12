@@ -264,6 +264,8 @@ ONTAP 認証情報を JSON として保存:
 
 ### パラメータ値の確認方法
 
+> **自動化された事前検証**: `bash shared/scripts/preflight-check.sh --vpc-id <vpc-id> --profile automated-response` を実行すると、既存の VPC Endpoint を自動検出し、セキュリティグループのエグレスを確認し、推奨パラメータ値を生成します。詳細は[デプロイメントガイド](deployment-guide.md)を参照してください。
+
 ```bash
 # 1. FSx for ONTAP 管理 IP
 aws fsx describe-file-systems --file-system-ids <fs-id> \
@@ -624,6 +626,25 @@ export-policy rule delete -vserver <svm> -policyname <policy> -ruleindex <index>
 | VPC ENI | $0（Lambda VPC） | 既存 VPC と共有 |
 | **合計** | **~$0.51/月** | VPC/NAT コスト除外（共有） |
 
+### スケール時のコスト
+
+| インシデント量 | Lambda | CW Logs | SNS | 合計 |
+|-------------|--------|---------|-----|------|
+| 10/月 | $0.01 | $0.03 | $0.01 | ~$0.45 + Secrets Manager |
+| 100/月 | $0.05 | $0.30 | $0.01 | ~$0.76 |
+| 1,000/月 | $0.50 | $3.00 | $0.05 | ~$3.95 |
+| 10,000/月 | $5.00 | $30.00 | $0.50 | ~$35.90 |
+
+> 10,000 件/月（極端な量 — 検知閾値の設定ミスを示唆）でも月額 $40 未満。Lambda VPC のコールドスタートコストは、ENI が呼び出し間で再利用されるため無視可能です。
+
+### 本番デプロイに関する補足
+
+CloudFormation テンプレートは、クイックスタート用に Lambda コードを `ZipFile` として埋め込んでいます。本番の GitOps ワークフロー向けには:
+1. `ontap_response.py` を Lambda Layer としてパッケージ（`shared/python/` ディレクトリ構造）
+2. `ZipFile` の代わりに S3 バケット経由の `CodeUri` を使用
+3. Layer をスタックとは独立にバージョン管理
+4. CI/CD パイプライン: `pytest` → Layer パッケージ → デプロイ → 統合テスト
+
 ---
 
 ---
@@ -662,6 +683,8 @@ aws lambda delete-layer-version --layer-name fsxn-shared-python --version-number
 
 ## 関連ドキュメント
 
+- [デプロイメントガイド](deployment-guide.md) — VPC Endpoint 設定、パラメータファイル、デプロイ前検証を含む完全なデプロイ手順
+- [Verified-Clean Recovery Point ガイド](verified-recovery-point-guide.md) — インシデント後のスナップショット検証ワークフロー
 - [ARP インシデント対応ガイド](arp-incident-response-guide.md)
 - [EMS Webhook セットアップ](../integrations/datadog/docs/ja/ems-webhook-setup.md)
 - [FPolicy 運用ノート](operational-notes-fpolicy.md)
@@ -743,3 +766,6 @@ A: SMB name-mapping ブロックは新しい接続に対して即時有効です
 
 **Q: 正当なユーザーをブロックしてしまうリスクはありますか？**
 A: はい — これは全ての自動応答システムに共通です。対策: (1) 検知閾値を保守的に設定、(2) 通知トピックでオペレーターに即時通知、(3) 自動解除付きの時間制限ブロックの実装、(4) 迅速な手動解除の手順書を整備。
+
+
+---

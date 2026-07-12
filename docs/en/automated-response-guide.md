@@ -245,6 +245,8 @@ Before deploying, verify the following (most common causes of deployment failure
 
 ### Finding Your Parameter Values
 
+> **Automated pre-flight check**: Run `bash shared/scripts/preflight-check.sh --vpc-id <vpc-id> --profile automated-response` to automatically detect existing VPC Endpoints, verify security group egress, and generate recommended parameter values. See the [Deployment Guide](deployment-guide.md) for the full pre-flight workflow.
+
 ```bash
 # 1. FSx for ONTAP Management IP
 aws fsx describe-file-systems --file-system-ids <fs-id> \
@@ -746,3 +748,11 @@ A: SMB name-mapping blocks are effective immediately for new connections. Existi
 
 **Q: Is there a risk of blocking legitimate users?**
 A: Yes — this is true for any automated response system. Mitigations: (1) set detection thresholds conservatively, (2) use the notification topic to alert operators immediately, (3) implement time-limited blocks with auto-unblock, (4) maintain a runbook for rapid manual reversal.
+
+
+---
+
+## See Also
+
+- [Deployment Guide](deployment-guide.md) — Full deployment instructions including VPC Endpoint setup, parameter files, and pre-flight validation
+- [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md) — Post-incident snapshot verification workflow

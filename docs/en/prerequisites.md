@@ -497,3 +497,10 @@ This project supports multiple deployment patterns:
 | Partner/MSP managed | Customer workload account + partner-operated integration | Managed service offerings |
 
 For multi-account deployments, cross-account S3 Access Point access and IAM trust relationships are required. See the [operational guide](operational-guide.md) for details.
+
+
+---
+
+## See Also
+
+- [**Deployment Guide**](deployment-guide.md) — Comprehensive guide for integrating all stacks with existing FSx for ONTAP environments (parameter mapping, VPC Endpoint conflict matrix, verified paths, cost estimates)

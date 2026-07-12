@@ -204,15 +204,19 @@ Resources:
           def _cleanup_smb_blocks(svm_uuid, svm_name, ttl_minutes):
               """Remove expired SMB name-mapping blocks."""
               removed = []
+              # ONTAP REST API does not support filtering by replacement=" " (space),
+              # so we fetch all win_unix mappings and filter client-side.
               status, data = _api_request(
                   "GET",
-                  f"/name-services/name-mappings?svm.uuid={svm_uuid}&direction=win_unix&replacement=%20"
+                  f"/name-services/name-mappings?svm.uuid={svm_uuid}&direction=win_unix&fields=pattern,replacement"
               )
 
               for record in data.get("records", []):
-                  # All name-mappings with empty replacement are considered auto-blocks
-                  # In production, you'd check creation time via audit logs
-                  # For now, remove all that match the pattern
+                  # Identify auto-blocks: replacement is a single space (" ")
+                  replacement = record.get("replacement", "")
+                  if replacement != " ":
+                      continue  # Not an auto-block, skip
+
                   index = record.get("index", 0)
                   pattern = record.get("pattern", "")
 

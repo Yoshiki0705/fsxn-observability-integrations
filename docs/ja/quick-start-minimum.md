@@ -65,3 +65,5 @@ aws cloudformation deploy \
 1. [フィールドマッピング](../../integrations/datadog/docs/ja/field-mapping.md)を確認
 2. [調査クエリ](../../integrations/datadog/docs/ja/field-mapping.md#datadog-検索クエリ)を試す
 3. Monitor を設定（ブログシリーズ Part 3）
+
+4. 本番デプロイ（VPC Endpoint、コスト計画、マルチスタック連携）については[デプロイメントガイド](deployment-guide.md)を参照
