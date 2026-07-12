@@ -15,6 +15,11 @@ This guide describes how to implement automated storage-layer access blocking fo
 - Disconnect active CIFS sessions to immediately cut off a compromised user
 - Composite containment actions that execute all steps in sequence
 
+**Response timing (verified on ONTAP 9.17.1P7D1)**:
+- Lambda execution (contain_smb_threat): **1.8 seconds** (snapshot + block + session disconnect)
+- End-to-end (detection → routing → response): **under 2 minutes** (typical), **under 3 minutes** (worst-case with Lambda cold start + VPC ENI attach)
+- SMB block effective: immediately on next authentication attempt (existing sessions continue until token expiry or session disconnect)
+
 **Detection sources (any combination):**
 - CloudWatch Log Alarm (admin audit log anomalies)
 - EMS Webhook (ARP ransomware detection, quota events)
@@ -68,6 +73,8 @@ The mechanism uses ONTAP name-mapping to deny access:
 | 4 | All SVM volumes affected | Name-mapping applies SVM-wide |
 
 **Scope**: The block applies to the entire SVM. All volumes, shares, and exports within the SVM deny access to the blocked user.
+
+> **Operational safety note (position 1 insertion)**: The deny mapping is inserted at position 1 by default, meaning it's evaluated *before* any existing name-mappings. If your SVM has existing name-mappings for service accounts or automation workflows, the new entry may shadow them. Always test with `health_check` + a non-production user first. To immediately undo an accidental block: `./automated-response-cli.sh unblock-smb --domain <DOMAIN> --user <username>`. For multi-tenant SVMs, verify that blocking one tenant's compromised user doesn't affect shared service accounts evaluated at higher positions.
 
 **Reversal**: Delete the name-mapping entry to restore access.
 
@@ -249,12 +256,15 @@ aws cloudformation deploy \
     SubnetIds=<subnet-id> \
     SecurityGroupId=<sg-id> \
     DefaultSvmName=<svm-name> \
+    SharedPythonLayerArn=<layer-arn> \
     NotificationEmail=<your-email> \
     CreateVpcEndpoints=true \
   --capabilities CAPABILITY_NAMED_IAM
 ```
 
-> **`CreateVpcEndpoints` parameter**: The stack creates Interface VPC Endpoints for Secrets Manager and SNS by default. Lambda in VPC **cannot** reach AWS APIs without these endpoints (or a NAT Gateway). Set to `false` if your VPC already has them.
+> **`SharedPythonLayerArn` parameter (new)**: Provide the ARN of the `fsxn-shared-python` Lambda Layer containing `ontap_response.py`. Without this, the handler fails with `ModuleNotFoundError`. Build and publish the layer first using `bash shared/python/build-layer.sh`.
+
+> **`CreateVpcEndpoints` parameter**: The stack creates Interface VPC Endpoints for Secrets Manager and SNS by default. Lambda in VPC **cannot** reach AWS APIs without these endpoints (or a NAT Gateway). Set to `false` if your VPC already has them. If your VPC has a NAT Gateway, set to `false` to avoid the additional ~$14/month cost.
 
 ### Post-Deployment: Attach Lambda Layer
 
@@ -513,6 +523,9 @@ export-policy rule delete -vserver <svm> -policyname <policy> -ruleindex <index>
 | Metric | Source | Alert Threshold |
 |--------|--------|----------------|
 | DLQ depth | CloudWatch (auto-created alarm) | > 0 messages |
+
+> **DLQ alarm = urgent (P1)**: A message in the DLQ means a containment action *failed to execute*. Unlike typical DLQs where retry-later is acceptable, here **the attacker may still have active access** to the storage layer. Treat DLQ depth > 0 as a P1 incident requiring immediate human investigation and manual containment. Recovery steps: [DLQ Replay Runbook](runbooks/dlq-replay.md).
+
 | Lambda errors | CloudWatch Lambda metrics | > 0 in 5 min |
 | Response latency | Lambda Duration metric | p95 > 10s |
 | Active blocks | Custom metric (optional) | Tracking only |

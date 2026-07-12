@@ -13,12 +13,14 @@ ARP uses AI/ML to detect the following anomalies:
 | Detection Type | Description |
 |---------------|-------------|
 | Entropy changes | Abnormal increase in data randomness (encryption indicator) |
-| File extension changes | Appearance of unusual extensions (20+ files) |
+| File extension changes | Appearance of unusual extensions (5+ distinct new extensions within 48h) |
 | IOPS anomalies | Surge in abnormal volume activity with encrypted data |
 
+> **ARP/AI (ONTAP 9.16.1+)**: ARP/AI is **immediately active** after enablement — no learning period is required. The `security anti-ransomware volume attack simulate` command does NOT exist in ONTAP 9.17.1. To test ARP detection, perform actual ransomware-like file operations (encrypt + delete + rename with new extension). See the [ONTAP REST API Quick Reference](ontap-rest-api-reference.md) for details.
+
 Actions on detection:
-1. **Automatic ARP snapshot creation** — prefixed with `Anti_ransomware_backup`
-2. **EMS event emission** — `arw.volume.state` event (severity: alert)
+1. **Automatic ARP snapshot creation** — prefixed with `Anti_ransomware_backup` (or `Anti_ransomware_attack_backup` in recent versions)
+2. **EMS event emission** — `callhome.arw.activity.seen` event (severity: alert) for attack detection; `arw.volume.state` for state changes (enable/disable)
 3. **Notification to Observability platform via this project's EMS Webhook**
 
 ---
@@ -85,9 +87,13 @@ ssh admin@<management-ip> "volume snapshot show -vserver <svm-name> -volume <vol
 # Check ARP status
 ssh admin@<management-ip> "security anti-ransomware volume show -vserver <svm-name> -volume <volume-name>"
 
-# List suspect files
-ssh admin@<management-ip> "security anti-ransomware volume show-suspect-files -vserver <svm-name> -volume <volume-name>"
+# List suspect files (generate attack report)
+# Note: `show-suspect-files` does NOT exist in ONTAP 9.17.1+.
+# Use `generate-report` instead:
+ssh admin@<management-ip> "security anti-ransomware volume attack generate-report -vserver <svm-name> -volume <volume-name> -dest-path <svm-name>:/<volume-name>/"
 ```
+
+> **ONTAP version note (ARP/AI, 9.16.1+)**: ARP/AI is immediately active with no learning period. The `show-suspect-files` subcommand has been removed in recent ONTAP versions. Use the REST API (`GET /api/storage/volumes/<uuid>?fields=anti_ransomware`) or `attack generate-report` to inspect suspect activity.
 
 ### Additional Investigation via Observability Platform
 
@@ -107,7 +113,7 @@ source:fsxn-fpolicy @attributes.user:<suspect-user>
 | Item | How to Check | Severity Indicator |
 |------|-------------|-------------------|
 | Affected volume count | `security anti-ransomware volume show` | Multiple volumes = severe |
-| Suspect file count | `show-suspect-files` | 20+ files = high probability |
+| Suspect file count | `attack generate-report` or REST API | 20+ files = high probability |
 | Attack source client | FPolicy logs client_ip | Internal vs external |
 | Attack source user | FPolicy logs user | Compromised legitimate user? |
 | Attack time range | EMS/FPolicy log timestamps | Estimate damage scope |

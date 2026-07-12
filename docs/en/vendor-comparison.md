@@ -128,3 +128,149 @@ The CrowdStrike Falcon **EDR trial** includes read-only access to the Next-Gen S
 | Honeycomb | Free tier (20M events/month) | $0 |
 | CrowdStrike | HEC protocol verified via Splunk | $0 |
 | OTel Collector | Self-hosted (Docker Compose) | $0 |
+
+---
+
+## Dashboard Integration — How Events Appear in Each Vendor
+
+Once events flow into your observability platform, here's how FSx for ONTAP audit logs, FPolicy file operations, and ARP alerts appear in each vendor's dashboard.
+
+### Datadog
+
+**Audit Logs (S3 AP path)**:
+
+![Datadog Logs Explorer showing FSx audit logs](../screenshots/datadog-logs-arrival.png)
+
+Logs arrive with `source:fsxn-ems` and structured attributes. Use facets for filtering by SVM, volume, and operation type.
+
+**FPolicy File Operations**:
+
+![Datadog FPolicy event detail](../screenshots/datadog-fpolicy-detail.png)
+
+FPolicy events include the full file path, operation type (create/write/rename/delete), client IP, and volume name. Create a Datadog Monitor to alert on suspicious patterns (e.g., high file rename rate from a single client).
+
+**ARP Ransomware Detection**:
+
+![Datadog ARP detection alert](../screenshots/datadog-arp-detection.png)
+
+ARP `arw.volume.state` events appear as `severity:alert`. Configure a Monitor with `@sns-<trigger-topic>` in the notification to auto-trigger containment:
+
+```
+source:fsxn-ems @attributes.event_name:arw.volume.state @attributes.severity:alert
+```
+
+![Datadog ARP log detail](../screenshots/datadog-arp-log-detail.png)
+
+**Dashboard recommendations**:
+- Create a "FSx for ONTAP Security" dashboard with:
+  - Timeseries: file operations/minute by type
+  - Top list: most active client IPs
+  - Event timeline: ARP alerts and automated response actions
+  - Table: recent unauthorized access attempts
+
+---
+
+### Grafana Cloud (via OTel Collector)
+
+![Grafana Cloud OTel logs](../screenshots/06-grafana-cloud-otel-logs.png)
+
+Logs arrive via the OTLP gateway endpoint with structured labels. Query in Loki:
+
+```logql
+{service_name="fsxn-observability"} | json | operation_type="create"
+```
+
+**Dashboard recommendations**:
+- Use Loki as data source in Grafana dashboards
+- Create panels for: event rate, top volumes, client IP distribution
+- Alert rules via Grafana Alerting → Contact point → AWS SNS (for auto-containment)
+
+---
+
+### Honeycomb (via OTel Collector)
+
+![Honeycomb OTel logs](../screenshots/07-honeycomb-otel-logs.png)
+
+Events arrive as structured traces/logs with dataset `fsxn-fpolicy` or `fsxn-ems`. Use Honeycomb's query builder to:
+- Group by `file_extension` to detect ransomware-like patterns
+- Heatmap on `file_size` to detect anomalous encryption activity
+- BubbleUp on `client_ip` when ARP triggers
+
+---
+
+### Splunk (HEC)
+
+Events arrive at the `fsxn_audit` or `fsxn_fpolicy` index with sourcetype `fsxn:ontap:audit` / `fsxn:ontap:fpolicy` / `fsxn:ontap:ems`.
+
+**Search queries**:
+```spl
+index=fsxn_ems sourcetype="fsxn:ontap:ems" message-name="arw.volume.state"
+| table _time, parameters.vserver-name, parameters.volume-name, parameters.state
+
+index=fsxn_fpolicy sourcetype="fsxn:ontap:fpolicy" operation_type="create"
+| stats count by file_path, client_ip
+| sort -count
+```
+
+**Dashboard recommendations**:
+- Create an "FSx ONTAP Security Operations" dashboard
+- Panel: ARP events timeline (single value + time chart)
+- Panel: FPolicy file operations by type (pie chart)
+- Panel: Top talkers by client IP (table)
+- Alert action: Use "AWS SNS notification" action (Splunk Add-on for AWS) to trigger auto-containment
+
+> **Note**: Splunk Cloud trial does not provision HEC DNS. Use Splunk Enterprise (Docker) for local validation. See [Trial & Verification Notes](#trial--verification-notes).
+
+---
+
+### Elastic (Bulk API)
+
+![Kibana Discover view](../screenshots/elastic/kibana-discover.png)
+
+Events are indexed with the `fsxn-audit-*` or `fsxn-fpolicy-*` index pattern. In Kibana:
+
+```kql
+event.dataset: "fsxn.fpolicy" AND operation_type: "create" AND NOT file_path: *~$*
+```
+
+**Dashboard recommendations**:
+- Kibana Lens: file operations over time, grouped by operation_type
+- SIEM Detection Rule: "Ransomware-like file rename burst" (>50 renames in 60s from same client)
+- Alert action: SNS connector to trigger auto-containment
+
+---
+
+### Auto-Containment Integration Pattern (All Vendors)
+
+Regardless of which vendor you use, the containment trigger flow is:
+
+```
+Vendor Dashboard Alert
+  → SNS Publish (TriggerTopicArn from automated-response stack)
+    → Lambda (fsxn-automated-response-handler)
+      → ONTAP REST API (block user / block IP / snapshot)
+        → SNS Notification (result to security team)
+```
+
+**Configuration per vendor**:
+
+| Vendor | Alert → SNS Method |
+|--------|-------------------|
+| Datadog | `@sns-<topic-name>` in Monitor notification |
+| Splunk | Alert action → AWS SNS (Splunk Add-on for AWS) |
+| Grafana | Alert rule → Contact point → AWS SNS |
+| Elastic | Kibana Alert → SNS connector |
+| New Relic | Workflow → Destination → AWS SNS |
+| Honeycomb | Trigger → Webhook → Lambda → SNS |
+| Dynatrace | Problem notification → AWS SNS integration |
+| PagerDuty | Event Orchestration → Custom Action → SNS |
+
+---
+
+## Related Documents
+
+- [ONTAP REST API Quick Reference](ontap-rest-api-reference.md)
+- [ARP Incident Response Guide](arp-incident-response-guide.md)
+- [Automated Response Guide](automated-response-guide.md)
+- [EMS Detection Capabilities](ems-detection-capabilities.md)
+- [OTel Collector PII Redaction Cookbook](../integrations/otel-collector/docs/en/pii-redaction-cookbook.md)

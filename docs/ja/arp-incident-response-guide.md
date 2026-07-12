@@ -13,12 +13,14 @@ ARP は以下の異常を AI/ML で検知します:
 | 検知項目 | 説明 |
 |---------|------|
 | エントロピー変化 | ファイルデータのランダム性の異常な増加（暗号化の兆候） |
-| ファイル拡張子変化 | 通常使用されない拡張子の出現（20ファイル以上） |
+| ファイル拡張子変化 | 通常使用されない拡張子の出現（48 時間以内に 5 種類以上） |
 | IOPS 異常 | 暗号化データを伴う異常なボリュームアクティビティの急増 |
 
+> **ARP/AI（ONTAP 9.16.1+）**: ARP/AI は有効化後**即座にアクティブ**になります。学習期間は不要です。`security anti-ransomware volume attack simulate` コマンドは ONTAP 9.17.1 には存在しません。ARP 検知をテストするには、実際のランサムウェア様のファイル操作（暗号化 + 削除 + 新拡張子付与）を実行してください。詳細は [ONTAP REST API クイックリファレンス](ontap-rest-api-reference.md) を参照。
+
 検知時の動作:
-1. **ARP スナップショットの自動作成** — `Anti_ransomware_backup` プレフィックス付き
-2. **EMS イベントの発行** — `arw.volume.state` イベント（severity: alert）
+1. **ARP スナップショットの自動作成** — `Anti_ransomware_backup`（または最新バージョンでは `Anti_ransomware_attack_backup`）プレフィックス付き
+2. **EMS イベントの発行** — 攻撃検知時は `callhome.arw.activity.seen`（severity: alert）、状態変更時は `arw.volume.state`
 3. **本プロジェクトの EMS Webhook 経由で Observability プラットフォームに通知**
 
 ---
@@ -85,9 +87,12 @@ ssh admin@<management-ip> "volume snapshot show -vserver <svm-name> -volume <vol
 # ARP ステータスの確認
 ssh admin@<management-ip> "security anti-ransomware volume show -vserver <svm-name> -volume <volume-name>"
 
-# 疑わしいファイルの一覧
-ssh admin@<management-ip> "security anti-ransomware volume show-suspect-files -vserver <svm-name> -volume <volume-name>"
+# 疑わしいファイルの確認（攻撃レポート生成）
+# 注: `show-suspect-files` は ONTAP 9.17.1+ には存在しません
+ssh admin@<management-ip> "security anti-ransomware volume attack generate-report -vserver <svm-name> -volume <volume-name> -dest-path <svm-name>:/<volume-name>/"
 ```
+
+> **ONTAP バージョンに関する補足**: `show-suspect-files` は最新の ONTAP バージョンでは削除されています。REST API または `attack generate-report` を使用してください。
 
 ### Observability プラットフォームでの追加調査
 
@@ -107,7 +112,7 @@ source:fsxn-fpolicy @attributes.user:<suspect-user>
 | 項目 | 確認方法 | 判断基準 |
 |------|---------|---------|
 | 影響ボリューム数 | `security anti-ransomware volume show` | 複数ボリュームなら深刻 |
-| 疑わしいファイル数 | `show-suspect-files` | 20ファイル以上なら高確率 |
+| 疑わしいファイル数 | `attack generate-report` または REST API | 20ファイル以上なら高確率 |
 | 攻撃元クライアント | FPolicy ログの client_ip | 内部/外部の判定 |
 | 攻撃元ユーザー | FPolicy ログの user | 正規ユーザーの侵害か |
 | 攻撃の時間範囲 | EMS/FPolicy ログのタイムスタンプ | 被害範囲の推定 |
@@ -297,3 +302,13 @@ ssh admin@<management-ip> "volume mount -vserver <svm-name> -volume <clone-name>
 - [NetApp Docs: Restore data from ARP snapshots](https://docs.netapp.com/us-en/ontap/anti-ransomware/recover-data-task.html)
 - [NetApp Docs: Respond to abnormal activity](https://docs.netapp.com/us-en/ontap/anti-ransomware/respond-abnormal-task.html)
 - [NetApp KB: Ransomware prevention and recovery](https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/ONTAP_OS/Ransomware_prevention_and_recovery_in_ONTAP)
+
+---
+
+## 関連ドキュメント
+
+- [自動応答ガイド](automated-response-guide.md) — 封じ込めアクションの詳細
+- [自動応答デモ手順書](demo-automated-response.md) — Phase 4: ARP → 自動封じ込め
+- [EMS 検知機能リファレンス](ems-detection-capabilities.md) — ARP 関連 EMS イベント一覧
+- [ONTAP REST API クイックリファレンス](ontap-rest-api-reference.md) — API 操作時の注意点
+- [検証済みクリーン復旧ポイントガイド](verified-recovery-point-guide.md) — ARP Snapshot からの安全な復旧検証

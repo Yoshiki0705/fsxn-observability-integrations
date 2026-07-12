@@ -11,6 +11,8 @@
 - ブログ公開前の E2E 検証
 - 内部トレーニング
 
+> **エビデンス形式に関する注記**: 本手順書は、各ステップの後に「何を確認すべきか」を平文で記述しており、スクリーンショットのプレースホルダーや架空のサンプル出力は使用していません。本稿執筆時点で、この手順書自体はエンドツーエンドで実行されておらず、実際のスクリーンショットやコマンド出力も一切キャプチャされていません — 本ガイド内のいずれの記述も、これらの手順が実際に実行された証拠として扱わないでください。実際に本手順書を実行する際は、実際のコマンド出力やスクリーンショットを取得し（アカウントID/IP/ARN は `docs/screenshots/mask_screenshots.py` でマスキングしてから）、[自動応答ガイド](automated-response-guide.md)自身の [`e2e-verification-results.md`](../screenshots/automated-response/e2e-verification-results.md) と同じ形式で記録することを推奨します。
+
 ---
 
 ## 前提条件
@@ -55,7 +57,7 @@ aws cloudformation describe-stacks \
   --output table
 ```
 
-📸 **スクリーンショット 1**: CloudFormation スタック出力（TriggerTopicArn と NotificationTopicArn）
+**確認ポイント**: 出力テーブルに `TriggerTopicArn` と `NotificationTopicArn` の両方のキーが含まれ、それぞれに空でない SNS トピック ARN が設定されていること。
 
 ### ステップ 1.3: CLI 環境変数の設定
 
@@ -84,7 +86,7 @@ cat //fsxn-share/test-data/sample-file.txt
 echo "write test" > //fsxn-share/test-data/write-test.txt
 ```
 
-📸 **スクリーンショット 2**: テストユーザーによるファイル操作成功（ls, read, write）
+**確認ポイント**: 3 つのコマンド全てが権限エラーなく成功すること — `ls` は想定通りのファイルを一覧表示し、`cat` はファイル内容を表示し、`write-test.txt` が作成されること。
 
 ### ステップ 2.2: SMB ユーザーブロックのトリガー
 
@@ -94,7 +96,7 @@ echo "write test" > //fsxn-share/test-data/write-test.txt
   --reason "デモ: 内部脅威シミュレーション"
 ```
 
-📸 **スクリーンショット 3**: CLI 出力（SNS publish 成功、MessageId 返却）
+**確認ポイント**: CLI ヘルパーまたは `aws sns publish` が成功し、`MessageId` フィールドに空でない値（UUID 形式の文字列）が返ること。
 
 ### ステップ 2.3: Lambda 実行の確認
 
@@ -109,7 +111,7 @@ aws logs filter-log-events \
   --output text | tail -5
 ```
 
-📸 **スクリーンショット 4**: CloudWatch Logs に "Blocking SMB user" ログ行
+**確認ポイント**: 対象ユーザーを対象 SVM 上でブロックした旨を示すログ行があり、指定した理由の文字列が含まれ、同一実行内の他のログ行と対応付けられる `RequestId` があること。
 
 ### ステップ 2.4: ONTAP でのブロック確認
 
@@ -117,7 +119,7 @@ aws logs filter-log-events \
 ssh fsxadmin@<management-ip> "vserver name-mapping show -direction win-unix -replacement \" \""
 ```
 
-📸 **スクリーンショット 5**: ONTAP CLI の name-mapping エントリ（DOMAIN\\user → " "）
+**確認ポイント**: `win-unix` 方向の `name-mapping` エントリが存在し、`DOMAIN\<test-user>` に一致し、置換先が空（`" "`）になっていること — これが Lambda が作成する拒否マッピングです。
 
 ### ステップ 2.5: アクセス拒否の確認（ブロック後）
 
@@ -127,7 +129,7 @@ ls //fsxn-share/test-data/
 # → 期待: Permission denied / Access denied
 ```
 
-📸 **スクリーンショット 6**: ブロックされたユーザーの "Permission denied" 表示
+**確認ポイント**: ステップ 2.1 では成功していたコマンドが、権限拒否系のエラーで失敗すること（正確な文言は SMB クライアントの OS により異なります）。
 
 ### ステップ 2.6: ユーザーのブロック解除
 
@@ -144,7 +146,7 @@ ls //fsxn-share/test-data/
 # → 期待: 成功
 ```
 
-📸 **スクリーンショット 7**: ブロック解除後のアクセス復元
+**確認ポイント**: `ls` が再度成功し、ブロック解除によってアクセスが復元されたことを確認できること。
 
 ---
 
@@ -157,7 +159,7 @@ ls /mnt/fsxn/test-data/
 touch /mnt/fsxn/test-data/nfs-write-test.txt
 ```
 
-📸 **スクリーンショット 8**: NFS ファイル操作成功
+**確認ポイント**: 両方のコマンドが権限エラーなく成功すること。
 
 ### ステップ 3.2: NFS IP ブロックのトリガー
 
@@ -170,7 +172,7 @@ echo "Blocking IP: $CLIENT_IP"
   --reason "デモ: 不審 IP からの大量削除シミュレーション"
 ```
 
-📸 **スクリーンショット 9**: NFS IP ブロック publish 成功
+**確認ポイント**: ステップ 2.2 と同様に、publish が `MessageId` を返して成功すること。
 
 ### ステップ 3.3: ONTAP でのブロック確認
 
@@ -178,7 +180,7 @@ echo "Blocking IP: $CLIENT_IP"
 ssh fsxadmin@<management-ip> "export-policy rule show -clientmatch *fsxn_auto_response*"
 ```
 
-📸 **スクリーンショット 10**: ONTAP の export-policy ルール（fsxn_auto_response マーカー付き）
+**確認ポイント**: `clientmatch` にブロック対象の IP を含み、`fsxn_auto_response` マーカーが付いた export-policy ルールが存在し、読み書きアクセスが拒否されていること。
 
 ### ステップ 3.4: NFS アクセス拒否の確認
 
@@ -191,7 +193,7 @@ ls /mnt/fsxn/test-data/
 
 > **NFS キャッシュに関する注記**: Linux NFS クライアントはアクセス判定を最大 60 秒間キャッシュします（`actimeo` デフォルト値）。ブロック後、拒否が即座に効くまで最大 60 秒待つか、テスト時は `mount -o actimeo=0` で再マウントしてください。
 
-📸 **スクリーンショット 11**: IP ブロック後の NFS アクセス拒否
+**確認ポイント**: 再マウントが失敗するか、マウント上での `ls` が権限拒否系のエラーで失敗すること — ブロック直後にアクセスが成功して見える場合は、上記の NFS キャッシュに関する注記を参照してください。
 
 ### ステップ 3.5: IP ブロック解除
 
@@ -209,9 +211,22 @@ ls /mnt/fsxn/test-data/
 ssh fsxadmin@<management-ip> "security anti-ransomware volume show -vserver $DEFAULT_SVM"
 ```
 
-📸 **スクリーンショット 12**: ONTAP で ARP が "active" 状態
+**確認ポイント**: 対象ボリュームの ARP 状態がコマンド出力で active/enabled と表示されること。
 
-### ステップ 4.2: ランサムウェアシミュレーション（テスト環境のみ）
+### ステップ 4.2: EMS Webhook をレスポンスパイプラインに接続
+
+EMS Webhook が Datadog/SIEM に配信されていること、および SIEM モニターがレスポンス用 SNS トピックに publish できることを確認します。CloudWatch Log Alarm パスを使用している場合:
+
+```bash
+# syslog 配信がアクティブであることを確認
+aws logs filter-log-events \
+  --log-group-name /syslog/fsxn-admin-audit \
+  --start-time $(date -v-5M +%s000 2>/dev/null || date -d '5 minutes ago' +%s000) \
+  --limit 3 \
+  --query 'events[*].message' --output text
+```
+
+### ステップ 4.3: ランサムウェアシミュレーション（テスト環境のみ）
 
 ```bash
 # 注意: テスト環境の廃棄可能データでのみ実行
@@ -219,9 +234,9 @@ ssh fsxadmin@<management-ip> \
   "security anti-ransomware volume attack simulate -vserver $DEFAULT_SVM -volume <test-vol>"
 ```
 
-📸 **スクリーンショット 13**: ONTAP CLI の ARP 攻撃シミュレーションコマンド
+**確認ポイント**: コマンドがエラーなく完了し、続けて `security anti-ransomware volume show` を実行すると対象ボリュームでシミュレートされた攻撃状態が反映されていること。
 
-### ステップ 4.3: 検知チェーンの観察
+### ステップ 4.4: 検知チェーンの観察
 
 EMS イベント配信まで ~30 秒待機:
 
@@ -233,9 +248,9 @@ aws logs filter-log-events \
   --query 'events[*].message' --output text
 ```
 
-📸 **スクリーンショット 14**: Lambda ログの `arw.volume.state` EMS イベント受信
+**確認ポイント**: 前のステップのシミュレーションコマンドから約 30 秒後に、`arw.volume.state` EMS イベントと対象ボリューム名を参照するログ行が届くこと。
 
-### ステップ 4.4: 全面封じ込めトリガー
+### ステップ 4.5: 全面封じ込めトリガー
 
 ```bash
 ./shared/scripts/automated-response-cli.sh contain-smb \
@@ -244,7 +259,7 @@ aws logs filter-log-events \
   --reason "ARP 検知 - arw.volume.state alert"
 ```
 
-### ステップ 4.5: 封じ込め結果の確認
+### ステップ 4.6: 封じ込め結果の確認
 
 ```bash
 aws logs filter-log-events \
@@ -254,20 +269,22 @@ aws logs filter-log-events \
   --query 'events[*].message' --output text
 ```
 
-📸 **スクリーンショット 15**: Lambda ログの 3 つの封じ込めステップ（snapshot + block + disconnect）
+**確認ポイント**: Snapshot 作成・ユーザーブロック・セッション切断の 3 つの封じ込めステップ全てのログ行があり、同一の `RequestId` を共有していること — これにより、単一の `contain_smb_threat` 呼び出し内で実行されたことが確認できます。
 
-### ステップ 4.6: Snapshot 作成の確認
+### ステップ 4.7: Snapshot 作成の確認
 
 ```bash
 ssh fsxadmin@<management-ip> \
   "volume snapshot show -vserver $DEFAULT_SVM -volume <test-vol> -snapshot incident_response_*"
 ```
 
-📸 **スクリーンショット 16**: ONTAP の incident_response snapshot（タイムスタンプ付き）
+**確認ポイント**: `incident_response_*` という名前の Snapshot が表示され、そのタイムスタンプが封じ込めがトリガーされた時刻と一致すること。
 
-### ステップ 4.7: SNS 通知の受信確認
+### ステップ 4.8: SNS 通知の受信確認
 
-📸 **スクリーンショット 17**: メール通知の封じ込め結果 JSON
+`NotificationEmail` の受信箱で、封じ込め結果の JSON を確認してください。
+
+**確認ポイント**: 封じ込め結果（Snapshot 名、ブロックしたユーザー、切断したセッション）を含む JSON がメールで届いていること。メールをエビデンスとして使いたくない場合は、Lambda 自身が同じ JSON ペイロードをログに出力しているので、ステップ 4.6 と同じ `filter-log-events` パターンで確認できます。加えて `aws sns get-topic-attributes --topic-arn <NotificationTopicArn> --query 'Attributes.NumberOfNotificationsFailed'` で配信失敗がないことを別途確認してください。
 
 ---
 
@@ -315,7 +332,7 @@ timeout 420 aws logs tail /aws/lambda/fsxn-automated-response-ttl-cleanup --foll
 
 > **注記**: TTL クリーンアップは現在、各実行時に `fsxn_auto_response` マーカーを持つ全ブロックを削除します。個別のブロック作成時刻は追跡しません。本番環境では DynamoDB による追跡テーブルの実装を検討してください。
 
-📸 **スクリーンショット 18**: CloudWatch Logs の "TTL expired — removed SMB block" メッセージ
+**確認ポイント**: TTL クリーンアップ Lambda が失効を検知し、SMB ブロックを削除した旨の CloudWatch Logs エントリがあること。
 
 ### ステップ 5.4: 自動解除の確認
 
@@ -324,7 +341,7 @@ ssh fsxadmin@<management-ip> "vserver name-mapping show -direction win-unix -rep
 # → 期待: エントリなし（ブロックが TTL により自動削除）
 ```
 
-📸 **スクリーンショット 19**: ONTAP の空の name-mapping（TTL によりブロック自動解除）
+**確認ポイント**: ステップ 2.4 で作成した name-mapping エントリが消えており、TTL クリーンアップが自動的に削除したことを確認できること。
 
 ---
 
@@ -335,34 +352,7 @@ ssh fsxadmin@<management-ip> "vserver name-mapping show -direction win-unix -rep
 ssh fsxadmin@<management-ip> "export-policy rule show -clientmatch *fsxn_auto_response*"
 ```
 
-📸 **スクリーンショット 20**: 現在のアクティブブロック状態（またはクリア済みの場合は空）
-
----
-
-## スクリーンショット一覧
-
-| # | 内容 | ファイル名 | フェーズ |
-|---|------|----------|---------|
-| 1 | CloudFormation スタック出力 | `01-cfn-stack-outputs.png` | デプロイ |
-| 2 | SMB アクセス成功（ブロック前） | `02-smb-access-before.png` | SMB ブロック |
-| 3 | SNS publish 成功（MessageId） | `03-sns-publish-block-smb.png` | SMB ブロック |
-| 4 | Lambda ログ: "Blocking SMB user" | `04-lambda-log-block-smb.png` | SMB ブロック |
-| 5 | ONTAP name-mapping エントリ | `05-ontap-name-mapping-blocked.png` | SMB ブロック |
-| 6 | SMB アクセス拒否（ブロック後） | `06-smb-access-denied.png` | SMB ブロック |
-| 7 | SMB アクセス復元（ブロック解除後） | `07-smb-access-restored.png` | SMB ブロック |
-| 8 | NFS アクセス成功（ブロック前） | `08-nfs-access-before.png` | NFS ブロック |
-| 9 | SNS publish 成功（NFS ブロック） | `09-sns-publish-block-nfs.png` | NFS ブロック |
-| 10 | ONTAP export-policy ルール（マーカー付き） | `10-ontap-export-policy-blocked.png` | NFS ブロック |
-| 11 | NFS アクセス拒否（ブロック後） | `11-nfs-access-denied.png` | NFS ブロック |
-| 12 | ONTAP ARP アクティブ状態 | `12-ontap-arp-active.png` | 全面封じ込め |
-| 13 | ARP 攻撃シミュレーションコマンド | `13-ontap-arp-simulate.png` | 全面封じ込め |
-| 14 | Lambda ログ: arw.volume.state 受信 | `14-lambda-ems-arp-event.png` | 全面封じ込め |
-| 15 | Lambda ログ: contain_smb_threat ステップ | `15-lambda-containment-steps.png` | 全面封じ込め |
-| 16 | ONTAP incident_response snapshot | `16-ontap-incident-snapshot.png` | 全面封じ込め |
-| 17 | メール通知（封じ込め結果） | `17-email-notification-containment.png` | 全面封じ込め |
-| 18 | Lambda ログ: TTL expired auto-remove | `18-lambda-ttl-cleanup.png` | TTL |
-| 19 | ONTAP 空の name-mapping（自動クリア） | `19-ontap-ttl-cleared.png` | TTL |
-| 20 | ONTAP アクティブブロック一覧 | `20-ontap-active-blocks-status.png` | 運用 |
+**確認ポイント**: 両方のコマンドで現在アクティブなブロックの状態が確認できること（それまでのフェーズでブロック解除済みであれば空になっているはず）。
 
 ---
 

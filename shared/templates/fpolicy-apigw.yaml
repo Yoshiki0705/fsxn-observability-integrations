@@ -8,10 +8,27 @@ Description: >-
 # DEPLOYMENT NOTE:
 # This template creates named IAM roles (RoleName property), so deployment
 # requires --capabilities CAPABILITY_NAMED_IAM (not just CAPABILITY_IAM).
+#
+# NETWORKING NOTE (AssignPublicIp):
+# Fargate tasks need outbound internet access to pull ECR images and send
+# SQS messages. You have three options:
+#   1. NAT Gateway in subnet (recommended for production) → AssignPublicIp=DISABLED
+#   2. Interface VPC Endpoints (ecr.api + ecr.dkr + S3 Gateway + SQS) → AssignPublicIp=DISABLED
+#   3. Public subnet with auto-assign public IP → AssignPublicIp=ENABLED
+# If the task fails to start with "CannotPullContainerError" or i/o timeout,
+# switch AssignPublicIp to ENABLED or add the required VPC Endpoints/NAT.
+#
 # Example:
 #   aws cloudformation deploy \
 #     --template-file fpolicy-apigw.yaml \
 #     --stack-name fsxn-fp-srv \
+#     --parameter-overrides \
+#       ComputeType=fargate \
+#       VpcId=vpc-0123456789abcdef0 \
+#       SubnetIds=subnet-aaa,subnet-bbb \
+#       FsxnSvmSecurityGroupId=sg-0123456789abcdef0 \
+#       ContainerImage=123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:latest \
+#       AssignPublicIp=ENABLED \
 #     --capabilities CAPABILITY_NAMED_IAM
 
 Metadata:
@@ -33,6 +50,7 @@ Metadata:
           - VpcId
           - SubnetIds
           - FsxnSvmSecurityGroupId
+          - AssignPublicIp
       - Label:
           default: FPolicy Configuration
         Parameters:
@@ -68,6 +86,20 @@ Parameters:
   SubnetIds:
     Type: List<AWS::EC2::Subnet::Id>
     Description: Subnet IDs for the FPolicy server (private subnets recommended)
+
+  AssignPublicIp:
+    Type: String
+    Default: DISABLED
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Description: >-
+      Whether to assign a public IP to Fargate tasks. Set to ENABLED if
+      the VPC lacks a NAT Gateway and ECR/SQS Interface VPC Endpoints.
+      When DISABLED (default, recommended for production), ensure the
+      subnets have outbound internet access via NAT Gateway or the VPC
+      has Interface VPC Endpoints for ECR (ecr.api + ecr.dkr + s3 gateway)
+      and SQS.
 
   FsxnSvmSecurityGroupId:
     Type: AWS::EC2::SecurityGroup::Id
@@ -429,7 +461,7 @@ Resources:
       LaunchType: FARGATE
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
+          AssignPublicIp: !Ref AssignPublicIp
           SecurityGroups:
             - !Ref FPolicyServerSecurityGroup
           Subnets: !Ref SubnetIds
