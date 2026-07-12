@@ -373,6 +373,32 @@ Use `AWS::SSM::Association` with the AWS-managed `AWS-JoinDirectoryServiceDomain
 
 See `shared/templates/demo-ad-environment.yaml` for the verified pattern.
 
+#### Prerequisites for Demo Environment
+
+Before deploying `demo-ad-environment.yaml`, ensure these VPC Endpoints exist (required for SSM access to private-subnet EC2):
+
+```bash
+# Check existing SSM endpoints
+aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=<vpc-id>" \
+  --query 'VpcEndpoints[?contains(ServiceName,`ssm`)].ServiceName'
+
+# If missing, create (one command per service):
+for svc in ssm ssmmessages ec2messages; do
+  aws ec2 create-vpc-endpoint --vpc-id <vpc-id> --vpc-endpoint-type Interface \
+    --service-name com.amazonaws.<region>.$svc \
+    --subnet-ids <subnet1>,<subnet2> --security-group-ids <sg-id> --private-dns-enabled
+done
+```
+
+#### NFS Blocking: Export-Policy vs NACL
+
+| Mechanism | Same-Subnet | Cross-Subnet | Root Client | Effect Timing |
+|-----------|:-----------:|:------------:|:-----------:|:-------------:|
+| Export-policy deny rule | ✅ Works | ✅ Works | ✅ Blocks root | Immediate |
+| NACL deny rule | ❌ No effect | ✅ Works | ✅ Blocks all | Immediate |
+
+For most FSx deployments (client and FSx ENI in the same subnet), **export-policy deny rule is the reliable mechanism**. NACL is useful as defense-in-depth only when client and FSx are in different subnets.
+
 ### DNS / Route 53
 
 No stack creates Route 53 records. VPC Endpoint private DNS is handled automatically by AWS (PrivateDnsEnabled=true). No custom DNS configuration required.

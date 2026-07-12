@@ -10,6 +10,9 @@ Description: >-
   VERIFIED: ONTAP 9.17.1P7D1, ap-northeast-1, July 2026.
   IMPORTANT: SVM AD join is a post-deploy step (see SvmAdJoinCommand output).
   Use 'Domain Admins' as FileSystemAdministratorsGroup (not 'AWS Delegated FSx Administrators').
+  PREREQUISITE: VPC must have SSM Interface VPC Endpoints (ssm, ssmmessages, ec2messages)
+  for SSM Session Manager access to EC2 instances in private subnets. Without these,
+  you cannot connect to the Windows/Linux instances after deployment.
   Stack name pattern: fsxn-demo-ad-env
 
 Metadata:
@@ -272,6 +275,16 @@ Resources:
       SecurityGroupIds:
         - !Ref SecurityGroupId
       IamInstanceProfile: !Ref Ec2InstanceProfile
+      UserData: !If
+        - CreateNewAd
+        - !Base64
+            Fn::Sub: |
+              <powershell>
+              # Set DNS to AD DNS IPs (required for domain join in private subnets)
+              $adapter = Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | Select-Object -First 1
+              Set-DnsClientServerAddress -InterfaceIndex $adapter.InterfaceIndex -ServerAddresses ${ManagedAD.DnsIpAddresses}
+              </powershell>
+        - !Ref AWS::NoValue
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-windows-smb'
@@ -394,20 +407,33 @@ Outputs:
     Description: Steps after stack creation
     Value: |
       === Post-Deploy Checklist ===
+      0. [Required] Ensure SSM VPC Endpoints exist (ssm, ssmmessages, ec2messages):
+         aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=<vpc-id> --query 'VpcEndpoints[].ServiceName'
+         If missing, create them:
+         aws ec2 create-vpc-endpoint --vpc-id <vpc-id> --vpc-endpoint-type Interface \
+           --service-name com.amazonaws.<region>.ssm --subnet-ids <subnet1>,<subnet2> \
+           --security-group-ids <sg-id> --private-dns-enabled
+         (repeat for ssmmessages and ec2messages)
       1. [~15 min] Wait for AD Active (Pattern A only):
          aws ds describe-directories --directory-ids <ManagedAdId output>
       2. [~5 min] Join SVM to AD:
          bash shared/scripts/demo-ad-join-svm.sh --svm-id <svm-id> --ad-stack-name <this-stack> --ad-password '<pass>'
-      3. Create CIFS share on the SVM (via ONTAP REST API or CLI):
-         vserver cifs share create -vserver <svm-name> -share-name data -path /data
-      4. Create a test user in AD for the block demo:
-         net user testuser P@ssw0rd /add /domain (from Windows instance)
-      5. Connect Windows instance via SSM Fleet Manager (RDP):
-         Map drive: \\<svm-dns>\data (domain\testuser credentials)
-      6. Connect Linux instance via SSM:
+      3. Create CIFS share (via ONTAP REST API from Linux EC2):
+         curl -sk -u fsxadmin:<pass> -X POST "https://<mgmt-ip>/api/protocols/cifs/shares" \
+           -H "Content-Type: application/json" \
+           -d '{"name":"data","path":"/demo_data","svm":{"name":"<svm-name>"}}'
+      4. Create a test AD user for the block demo:
+         (From Windows via SSM PowerShell): New-ADUser -Name testuser -AccountPassword (ConvertTo-SecureString "P@ssw0rd123" -AsPlainText -Force) -Enabled $true
+      5. Connect Windows via SSM Fleet Manager (RDP) or Session Manager (PowerShell):
+         Map drive: net use Z: \\<svm-dns>\data /user:DEMO\testuser P@ssw0rd123
+      6. Connect Linux via SSM Session Manager:
          bash /root/mount-nfs.sh
       7. Take "access granted" screenshots
-      8. Trigger block:
-         aws sns publish --topic-arn <trigger-topic> --message '{"action":"contain_smb_threat","domain":"<DOMAIN>","username":"testuser",...}'
+      8. Trigger block (via SNS or direct Lambda invoke)
       9. Take "access denied" screenshots
       10. Unblock and delete this stack when done
+      === IMPORTANT NOTES ===
+      - Windows DNS must point to AD DNS IPs for domain join (UserData handles this for Pattern A)
+      - NFS export-policy deny rule is effective immediately (even for root clients)
+      - Same-subnet NACL rules do NOT affect intra-subnet traffic — use export-policy for NFS blocking
+      - MISCONFIGURED SVM: retry with corrected params (no SVM delete needed)
