@@ -423,6 +423,27 @@ The name-mapping deny mechanism (`replacement: " "`) has important scope limitat
 | NTFS volume, any user | ❌ | NTFS ACL evaluated directly, mapping skipped |
 | Any volume, Domain Admins member | ❌ | FileSystemAdministratorsGroup bypasses mapping |
 
+#### Blocking Admin/Privileged Accounts: Options and Considerations
+
+Domain Admins (or members of `FileSystemAdministratorsGroup`) bypass name-mapping deny. If you need to block a compromised admin account, use one of these alternative mechanisms:
+
+| Option | Method | Effect | Considerations |
+|--------|--------|--------|----------------|
+| **1. Disable AD account** | PowerShell: `Disable-ADAccount -Identity <user>` or ONTAP REST API via AD LDAP | **Immediate on re-authentication** — Kerberos ticket renewal fails with "credentials revoked" | Affects ALL services (not just storage). Existing sessions persist until ticket expiry (~10 hr default) unless combined with session disconnect |
+| **2. Force session disconnect** | ONTAP REST API: `DELETE /protocols/cifs/sessions/{svm}/{id}/{conn}` | Terminates active session immediately, forces re-authentication | Combine with option 1 — disconnect alone is temporary (client will reconnect if account is still enabled) |
+| **3. Enable export-policy for SMB** | `vserver cifs options modify -is-exportpolicy-enabled true` + add deny rule | IP-based SMB blocking at the ONTAP level, works regardless of user privilege | Not enabled by default. Requires SVM-level configuration change. See [AWS Blog: Restrict access using export policies](https://aws.amazon.com/blogs/storage/restrict-access-to-your-amazon-fsx-for-netapp-ontap-volumes-using-export-policies/) |
+| **4. NACL deny (cross-subnet)** | AWS VPC NACL with deny rule for the admin's client IP | Network-level block, cannot be bypassed by any ONTAP mechanism | Only works cross-subnet. Same-subnet: no effect |
+| **5. Security Group removal** | Remove client's SG from FSx ENI allowed sources | Prevents new TCP connections from the client | Affects ALL users from that SG, not just the compromised admin. Existing TCP connections persist |
+
+**Recommended sequence for admin account compromise**:
+1. `Disable-ADAccount` (prevents new Kerberos tickets)
+2. `DELETE /protocols/cifs/sessions/...` (force-disconnect existing session)
+3. Wait for Kerberos ticket cache to expire (or force `klist purge` on the host if accessible)
+
+Source: [NetApp KB: Denied access to NTFS volume because AD Account is locked or disabled or expired](https://kb.netapp.com/on-prem/ontap/da/NAS/NAS-KBs/Denied_access_to_NTFS_volume_because_AD_Account_is_locked_or_disabled_or_expired) — confirms that disabled/locked AD accounts result in "Kerberos Error: Clients credentials have been revoked", blocking NTFS access regardless of name-mapping or security style.
+
+> **Operational note**: Disabling an AD admin account is a high-impact action. In a real incident, coordinate with your AD team and have a documented restoration procedure. Consider using a dedicated "break-glass" admin account that is never used day-to-day, so the primary admin can be disabled without losing all management access.
+
 **Key point for readers**: If your FSx for ONTAP volumes use NTFS security style (common in Windows-only environments), name-mapping deny will NOT block SMB access. Alternative mechanisms for NTFS volumes:
 - Disable the AD user account directly (prevents Kerberos authentication)
 - Modify NTFS ACL to remove the user's access
