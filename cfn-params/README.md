@@ -148,6 +148,31 @@ aws fsx update-storage-virtual-machine --storage-virtual-machine-id svm-xxx \
   --active-directory-configuration '{...corrected config...}'
 ```
 
+### 6. Windows EC2 DNS (Domain Join Prerequisite)
+
+Windows EC2 in private subnets uses VPC default DNS (`x.x.0.2`) which cannot resolve AD domains. The instance's DNS must be set to AD DNS IPs **before** domain join:
+```powershell
+# Set DNS to AD DNS IPs (required before Add-Computer)
+Set-DnsClientServerAddress -InterfaceIndex (Get-NetAdapter | Where {$_.Status -eq 'Up'}).InterfaceIndex `
+  -ServerAddresses 198.51.100.10,198.51.100.11
+```
+The `demo-ad-environment.yaml` template handles this automatically via UserData for Pattern A.
+
+### 7. SSM VPC Endpoints (Private Subnet Access)
+
+EC2 instances in private subnets need 3 Interface VPC Endpoints for SSM Session Manager:
+- `com.amazonaws.<region>.ssm`
+- `com.amazonaws.<region>.ssmmessages`
+- `com.amazonaws.<region>.ec2messages`
+
+Without these, instances appear `running` but never register with SSM. Create before deploying the demo stack, or you won't be able to connect.
+
+### 8. NFS Export-Policy vs NACL (Same-Subnet)
+
+- Export-policy deny rule: **immediate** effect, even for root NFS mounts
+- NACL deny rule: **only works across subnet boundaries** — NO effect if client and FSx ENI share the same subnet
+- For demo screenshots: use export-policy deny rule (reliable, immediate)
+
 ## Pre-flight Check
 
 Before deploying, run the pre-flight validation:
