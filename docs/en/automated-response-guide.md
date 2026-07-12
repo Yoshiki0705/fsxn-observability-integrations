@@ -335,6 +335,8 @@ aws lambda update-function-configuration \
   --layers $LAYER_ARN
 ```
 
+> **AD-aware SMB blocking (Layer v3+)**: The `ontap_response.py` module automatically detects whether the target SVM is joined to Active Directory (by checking for CIFS service presence). On AD-joined SVMs, `block_smb_user` uses `replacement: "nobody"` instead of `replacement: " "` (space). This is because ONTAP 9.17.1's background validation process auto-deletes name-mapping entries with unresolvable replacement values within 30-60 seconds. The `nobody` user (UID 65535) exists in the local UNIX user table and persists indefinitely. Verified on ONTAP 9.17.1P7D1, July 2026.
+
 ### Verify Deployment
 
 ```bash

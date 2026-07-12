@@ -349,6 +349,8 @@ aws lambda update-function-configuration \
   --layers $LAYER_ARN
 ```
 
+> **AD対応 SMB ブロック（Layer v3以降）**: `ontap_response.py` モジュールは、対象SVMがActive Directoryに参加しているかを自動検出します（CIFSサービスの存在を確認）。AD参加SVMでは、`block_smb_user` は `replacement: " "`（スペース）ではなく `replacement: "nobody"` を使用します。ONTAP 9.17.1のバックグラウンドバリデーションプロセスが、解決不能なreplacement値のname-mappingを30-60秒で自動削除するためです。`nobody`ユーザー（UID 65535）はローカルUNIXユーザーテーブルに存在し、永続します。ONTAP 9.17.1P7D1で検証済み（2026年7月）。
+
 ### デプロイ検証
 
 ```bash

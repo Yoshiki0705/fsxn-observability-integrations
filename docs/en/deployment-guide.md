@@ -488,6 +488,8 @@ curl -sk -u fsxadmin:<pass> -X PATCH \
 
 **Note**: This workaround changes the semantics from "mapping fails → access denied at authentication" to "mapping succeeds with unprivileged UID → access denied by UNIX permissions." The net effect is the same (user cannot access files), but the mechanism is different and requires the volume's UNIX permissions to be restrictive.
 
+> **Status: RESOLVED** — `ontap_response.py` (Lambda Layer v3+) now auto-detects AD-joined SVMs and uses `replacement: "nobody"` automatically. No manual configuration required. E2E verified: mapping persists 90+ seconds on AD-joined SVM (previously deleted in 30-60s with space replacement).
+
 ### DNS / Route 53
 
 No stack creates Route 53 records. VPC Endpoint private DNS is handled automatically by AWS (PrivateDnsEnabled=true). No custom DNS configuration required.

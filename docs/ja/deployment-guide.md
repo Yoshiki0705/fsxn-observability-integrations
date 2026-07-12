@@ -488,6 +488,8 @@ curl -sk -u fsxadmin:<pass> -X PATCH \
 
 **補足**: この回避策はメカニズムの意味が変わります — 「マッピング失敗→認証レベルでアクセス拒否」から「マッピング成功（無権限UID）→UNIXパーミッションでアクセス拒否」へ。最終結果（ユーザーがファイルアクセス不可）は同じですが、ボリュームのUNIXパーミッションが制限的である必要があります。
 
+> **ステータス: 解決済み** — `ontap_response.py`（Lambda Layer v3以降）はAD参加SVMを自動検出し、`replacement: "nobody"`を自動的に使用します。手動設定は不要です。E2E検証済み: AD参加SVMでmappingが90秒以上永続することを確認（以前のスペースreplacementでは30-60秒で削除されていた）。
+
 ### DNS / Route 53
 
 Route 53 レコードを作成するスタックはありません。VPC Endpoint のプライベート DNS は AWS が自動処理します（PrivateDnsEnabled=true）。カスタム DNS 設定は不要です。
