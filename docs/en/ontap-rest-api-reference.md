@@ -263,14 +263,36 @@ curl -sk -u "${ONTAP_USER}:${ONTAP_PASS}" -X POST \
 
 ### Behavioral Note: Block Timing
 
-The name-mapping block does **NOT** disconnect existing SMB sessions immediately. Existing mounts with `soft` option continue functioning until the session token expires.
+The name-mapping block alone does not terminate existing sessions — it is evaluated at authentication time, not per-I/O.
 
-**New connections (re-authentication) are denied immediately.**
+However, the `contain_smb_threat` composite action achieves **effective immediate cutoff** by combining two mechanisms:
 
-For immediate session termination, the `contain_smb_threat` composite action also calls the session disconnect endpoint:
-```
-DELETE /api/protocols/cifs/sessions/{svm-uuid}/{connection-id}/{identifier}
-```
+1. **name-mapping deny** — blocks all future authentication attempts
+2. **session disconnect** — forcefully terminates existing sessions:
+   ```
+   DELETE /api/protocols/cifs/sessions/{svm-uuid}/{identifier}/{connection-id}
+   ```
+
+When the existing session is terminated, the SMB client automatically re-authenticates — at which point the name-mapping deny takes effect. The net result: user is cut off within seconds of execution, not at the next natural session expiry.
+
+If the session disconnect returns HTTP 404 (session already gone), this is expected — the name-mapping deny still prevents future reconnection.
+
+---
+
+## NFS Immediate Blocking — Network Layer (NACL)
+
+ONTAP export-policy deny rules take effect on the next server-side I/O check, but Linux NFS clients cache access decisions for up to 60 seconds (`actimeo` default). For immediate blocking, use VPC NACL deny rules in addition to the export-policy rule.
+
+| Approach | Layer | Timing | API |
+|----------|-------|--------|-----|
+| Export-policy rule | ONTAP | Next I/O (up to 60s client cache) | `POST /protocols/nfs/export-policies/{id}/rules` |
+| **NACL deny rule** | AWS VPC | **Immediate** (packet level) | `ec2:CreateNetworkAclEntry` |
+
+The `contain_nfs_threat` action applies both layers automatically when `FSX_SUBNET_ID` is configured.
+
+> **NFSv4 lease note**: NFSv4 uses lease-based state management internally, but ONTAP does not expose a REST API endpoint for forced revocation of a specific client's lease. The NACL approach bypasses this limitation entirely by operating at the network layer, effective for both NFSv3 and NFSv4.
+
+> **VPC Endpoint requirement**: The Lambda needs EC2 API access to manage NACL rules. Ensure your VPC has NAT Gateway or an EC2 Interface VPC Endpoint.
 
 ---
 

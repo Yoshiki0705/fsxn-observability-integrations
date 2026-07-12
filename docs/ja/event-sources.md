@@ -229,7 +229,9 @@ FPolicy は独自バイナリプロトコル (TCP) を使用するため、HTTP/
 | **Fargate** | サーバーレス、IP 自動更新 Lambda 付き | 本番環境（推奨） |
 | **EC2** | 固定 IP、SSH アクセス可能 | デバッグ・開発環境 |
 
-> **Note**: Fargate モードではタスク再起動時に IP が変わるため、IP Auto-Updater Lambda が
+> **Note**
+>
+> Fargate モードではタスク再起動時に IP が変わるため、IP Auto-Updater Lambda が
 > ECS Task State Change イベントを検知し、ONTAP REST API で FPolicy External Engine の
 > `primary-servers` を自動更新します。
 

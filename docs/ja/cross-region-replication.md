@@ -6,7 +6,9 @@
 
 本ドキュメントでは、災害復旧（DR）と事業継続のために、FSx for ONTAP 監査ログパイプラインの状態とデータを AWS リージョン間でレプリケーションするパターンを説明します。
 
-> **スコープ**: 本ドキュメントは Observability パイプラインの DR を対象としています。FSx for ONTAP ファイルシステムのデータ DR については、NetApp SnapMirror または FSx for ONTAP クロスリージョンバックアップを使用してください。
+> **スコープ**
+>
+> 本ドキュメントは Observability パイプラインの DR を対象としています。FSx for ONTAP ファイルシステムのデータ DR については、NetApp SnapMirror または FSx for ONTAP クロスリージョンバックアップを使用してください。
 
 ## パイプラインのクロスリージョン DR が必要な理由
 

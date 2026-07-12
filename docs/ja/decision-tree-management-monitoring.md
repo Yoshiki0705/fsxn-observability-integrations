@@ -8,7 +8,9 @@
 
 全ての記載内容は **2026年5月28日の実機検証** に基づいており、引用元リンクとスクリーンショットを付記しています。
 
-> **検証環境**: ONTAP 9.17.1P6 / SINGLE_AZ_1 / NetApp Console + Link (Lambda)
+> **検証環境**
+>
+> ONTAP 9.17.1P6 / SINGLE_AZ_1 / NetApp Console + Link (Lambda)
 
 ---
 
@@ -453,7 +455,9 @@ groups:
 | Harvest + Grafana Cloud | ~$50-100 | 300+ メトリクス（マネージド） |
 | CloudWatch のみ | ~$0.30 | FSx レベルのみ（5 メトリクス） |
 
-> **推奨**: まず CloudWatch でボリュームレベル監視。FSA 固有メトリクスが必要なら Lambda + REST API を追加。フル ONTAP Observability（プロトコルレベル、アグリゲートレベル、ノードレベル）が必要になったら Harvest に移行。
+> **推奨**
+>
+> まず CloudWatch でボリュームレベル監視。FSA 固有メトリクスが必要なら Lambda + REST API を追加。フル ONTAP Observability（プロトコルレベル、アグリゲートレベル、ノードレベル）が必要になったら Harvest に移行。
 
 ---
 

@@ -11,7 +11,9 @@
 - ブログ公開前の E2E 検証
 - 内部トレーニング
 
-> **エビデンス形式に関する注記**: 本手順書は、各ステップの後に「何を確認すべきか」を平文で記述しており、スクリーンショットのプレースホルダーや架空のサンプル出力は使用していません。本稿執筆時点で、この手順書自体はエンドツーエンドで実行されておらず、実際のスクリーンショットやコマンド出力も一切キャプチャされていません — 本ガイド内のいずれの記述も、これらの手順が実際に実行された証拠として扱わないでください。実際に本手順書を実行する際は、実際のコマンド出力やスクリーンショットを取得し（アカウントID/IP/ARN は `docs/screenshots/mask_screenshots.py` でマスキングしてから）、[自動応答ガイド](automated-response-guide.md)自身の [`e2e-verification-results.md`](../screenshots/automated-response/e2e-verification-results.md) と同じ形式で記録することを推奨します。
+> **エビデンス形式に関する注記**
+>
+> 本手順書は、各ステップの後に「何を確認すべきか」を平文で記述しており、スクリーンショットのプレースホルダーや架空のサンプル出力は使用していません。本稿執筆時点で、この手順書自体はエンドツーエンドで実行されておらず、実際のスクリーンショットやコマンド出力も一切キャプチャされていません — 本ガイド内のいずれの記述も、これらの手順が実際に実行された証拠として扱わないでください。実際に本手順書を実行する際は、実際のコマンド出力やスクリーンショットを取得し（アカウントID/IP/ARN は `docs/screenshots/mask_screenshots.py` でマスキングしてから）、[自動応答ガイド](automated-response-guide.md)自身の [`e2e-verification-results.md`](../screenshots/automated-response/e2e-verification-results.md) と同じ形式で記録することを推奨します。
 
 ---
 
@@ -191,7 +193,9 @@ ls /mnt/fsxn/test-data/
 # → 期待: Permission denied またはマウント失敗
 ```
 
-> **NFS キャッシュに関する注記**: Linux NFS クライアントはアクセス判定を最大 60 秒間キャッシュします（`actimeo` デフォルト値）。ブロック後、拒否が即座に効くまで最大 60 秒待つか、テスト時は `mount -o actimeo=0` で再マウントしてください。
+> **NFS キャッシュに関する注記**
+>
+> Linux NFS クライアントはアクセス判定を最大 60 秒間キャッシュします（`actimeo` デフォルト値）。ブロック後、拒否が即座に効くまで最大 60 秒待つか、テスト時は `mount -o actimeo=0` で再マウントしてください。
 
 **確認ポイント**: 再マウントが失敗するか、マウント上での `ls` が権限拒否系のエラーで失敗すること — ブロック直後にアクセスが成功して見える場合は、上記の NFS キャッシュに関する注記を参照してください。
 
@@ -330,7 +334,9 @@ timeout 420 aws logs tail /aws/lambda/fsxn-automated-response-ttl-cleanup --foll
 # aws logs filter-log-events --log-group-name /aws/lambda/fsxn-automated-response-ttl-cleanup --filter-pattern "ERROR"
 ```
 
-> **注記**: TTL クリーンアップは現在、各実行時に `fsxn_auto_response` マーカーを持つ全ブロックを削除します。個別のブロック作成時刻は追跡しません。本番環境では DynamoDB による追跡テーブルの実装を検討してください。
+> **注記**
+>
+> TTL クリーンアップは現在、各実行時に `fsxn_auto_response` マーカーを持つ全ブロックを削除します。個別のブロック作成時刻は追跡しません。本番環境では DynamoDB による追跡テーブルの実装を検討してください。
 
 **確認ポイント**: TTL クリーンアップ Lambda が失効を検知し、SMB ブロックを削除した旨の CloudWatch Logs エントリがあること。
 

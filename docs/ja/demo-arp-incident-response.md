@@ -11,7 +11,9 @@
 - ブログ公開前の E2E 検証
 - 内部トレーニング
 
-> **エビデンス形式に関する注記 — 検証状況の更新（2026-07-12）**: Phase 1（EMS 配信パイプライン）と Phase 2（実際の ARP/AI 検知）の両方が ONTAP 9.17.1P7D1 でエンドツーエンドで検証済みです。検証からの主要な発見: (1) `attack simulate` CLI コマンドは ONTAP 9.17.1 に存在しない — 実際のファイル操作（暗号化 + 削除 + 新拡張子付与）が必要; (2) ARP/AI は学習期間不要で即座にアクティブ; (3) ARP はランサムウェア様のパターンを正しく検知（Attack Probability: moderate, Detected By: file_analysis）し、`Anti_ransomware_attack_backup` Snapshot を自動作成; (4) EMS イベント `callhome.arw.activity.seen` が severity=alert で発行された。Phase 3（インシデント対応の判断ステップ）は部分検証済み（`clear-suspect -false-positive true` は動作するが、`show-suspect-files` は CLI コマンドとして存在しない）。完全な検証結果: [`docs/screenshots/group-b-verification-results.md`](../screenshots/group-b-verification-results.md)。
+> **エビデンス形式に関する注記 — 検証状況の更新（2026-07-12）**
+>
+> Phase 1（EMS 配信パイプライン）と Phase 2（実際の ARP/AI 検知）の両方が ONTAP 9.17.1P7D1 でエンドツーエンドで検証済みです。検証からの主要な発見: (1) `attack simulate` CLI コマンドは ONTAP 9.17.1 に存在しない — 実際のファイル操作（暗号化 + 削除 + 新拡張子付与）が必要; (2) ARP/AI は学習期間不要で即座にアクティブ; (3) ARP はランサムウェア様のパターンを正しく検知（Attack Probability: moderate, Detected By: file_analysis）し、`Anti_ransomware_attack_backup` Snapshot を自動作成; (4) EMS イベント `callhome.arw.activity.seen` が severity=alert で発行された。Phase 3（インシデント対応の判断ステップ）は部分検証済み（`clear-suspect -false-positive true` は動作するが、`show-suspect-files` は CLI コマンドとして存在しない）。完全な検証結果: [`docs/screenshots/group-b-verification-results.md`](../screenshots/group-b-verification-results.md)。
 
 ---
 
@@ -84,7 +86,9 @@ ssh admin@<management-ip> "security anti-ransomware volume show -vserver <svm-na
 
 ### ステップ 2.2: 攻撃をシミュレート（テスト環境限定、廃棄可能なデータ）
 
-> **重要（ONTAP 9.16.1+ / ARP/AI）**: `security anti-ransomware volume attack simulate` コマンドは ONTAP 9.17.1 には**存在しません**。ARP/AI 検知をトリガーするには、実際のランサムウェア様のファイル操作を実行する必要があります。ARP/AI は即座にアクティブ（学習期間不要）で、高エントロピーデータ書き込み + ファイル削除 + 未知の拡張子のパターンを検知します。
+> **重要（ONTAP 9.16.1+ / ARP/AI）**
+>
+> `security anti-ransomware volume attack simulate` コマンドは ONTAP 9.17.1 には**存在しません**。ARP/AI 検知をトリガーするには、実際のランサムウェア様のファイル操作を実行する必要があります。ARP/AI は即座にアクティブ（学習期間不要）で、高エントロピーデータ書き込み + ファイル削除 + 未知の拡張子のパターンを検知します。
 
 マウント済みの NFS/SMB クライアントから実際のファイル操作で検知をトリガー:
 
@@ -108,7 +112,9 @@ ssh admin@<management-ip> "security anti-ransomware volume show -vserver <svm-na
 ```
 期待値: `Attack Probability: moderate`（以上）、`Attack Detected By: file_analysis`。
 
-> **検知閾値に関する補足**: ARP/AI は `never_seen_before_file_extension_count_notify_threshold: 5` を使用 — 拡張子は新しくかつ異なるものが必要です。同じ拡張子（多数のファイルでも）だけでは検知されない場合があります。暗号化 + 削除 + 新拡張子の組み合わせが最も確実なトリガーパターンです。
+> **検知閾値に関する補足**
+>
+> ARP/AI は `never_seen_before_file_extension_count_notify_threshold: 5` を使用 — 拡張子は新しくかつ異なるものが必要です。同じ拡張子（多数のファイルでも）だけでは検知されない場合があります。暗号化 + 削除 + 新拡張子の組み合わせが最も確実なトリガーパターンです。
 
 ### ステップ 2.3: ARP Snapshot が作成されたことを確認
 
@@ -147,7 +153,9 @@ ssh admin@<management-ip> "security anti-ransomware volume show -vserver <svm-na
 
 ### ステップ 3.1: 影響範囲の調査
 
-> **補足**: `show-suspect-files` サブコマンドは ONTAP 9.17.1 には存在しません。REST API で疑わしいファイルを照会するか、ARP 攻撃レポートを確認してください:
+> **補足**
+>
+> `show-suspect-files` サブコマンドは ONTAP 9.17.1 には存在しません。REST API で疑わしいファイルを照会するか、ARP 攻撃レポートを確認してください:
 
 ```bash
 # ARP 攻撃レポートの生成と閲覧
@@ -170,7 +178,9 @@ ssh admin@<management-ip> "security anti-ransomware volume attack clear-suspect 
 ```
 **確認ポイント**: コマンドがエラーなく完了し、続けて `security anti-ransomware volume show` を実行すると攻撃状態が表示されなくなっていること。ステップ 2.3 で作成した ARP Snapshot は、このアクションの一部として自動的に削除されます。
 
-> **補足**: `-false-positive` パラメータは**必須**です（省略不可）。誤検知クリアの場合は `true`、攻撃確認後のクリアの場合は `false` を使用してください。
+> **補足**
+>
+> `-false-positive` パラメータは**必須**です（省略不可）。誤検知クリアの場合は `true`、攻撃確認後のクリアの場合は `false` を使用してください。
 
 **攻撃確認の分岐** — [Step 4b](arp-incident-response-guide.md#step-4b-攻撃確認--封じ込め) を参照。ここで封じ込めコマンドを繰り返すのではなく、[自動応答デモ手順書](demo-automated-response.md) の Phase 4 に進んでください。これは、確認済みの ARP 攻撃がトリガーするはずの自動封じ込め経路（SMB ユーザーブロック、Snapshot、セッション切断）を実演します。
 

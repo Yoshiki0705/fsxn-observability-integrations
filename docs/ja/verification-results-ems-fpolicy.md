@@ -59,7 +59,9 @@ aws cloudformation deploy \
   --region ap-northeast-1
 ```
 
-> **注記**: テンプレートが名前付き IAM ロール (`RoleName`) を作成するため、`CAPABILITY_NAMED_IAM` が必要です（`CAPABILITY_IAM` では不十分）。
+> **注記**
+>
+> テンプレートが名前付き IAM ロール (`RoleName`) を作成するため、`CAPABILITY_NAMED_IAM` が必要です（`CAPABILITY_IAM` では不十分）。
 
 | 項目 | 内容 |
 |------|------|
@@ -216,7 +218,9 @@ aws cloudformation deploy \
   --region ap-northeast-1
 ```
 
-> **注記**: テンプレートが名前付き IAM ロール (`RoleName`) を作成するため、`CAPABILITY_NAMED_IAM` が必要です（`CAPABILITY_IAM` では不十分）。
+> **注記**
+>
+> テンプレートが名前付き IAM ロール (`RoleName`) を作成するため、`CAPABILITY_NAMED_IAM` が必要です（`CAPABILITY_IAM` では不十分）。
 
 | 項目 | 内容 |
 |------|------|
@@ -362,7 +366,9 @@ curl -X POST \
 | **実際の結果** | HTTP 200。レスポンスボディ: `{"status": "ok", "event_name": "arw.volume.state", "severity": "alert"}`。CloudWatch Logs にイベント正常記録 |
 | **判定** | ✅ PASS |
 
-> **注記**: curl によるシミュレーション実行。ONTAP CLI (`security anti-ransomware volume attack simulate`) による完全 E2E は SVM 管理エンドポイントへの SSH アクセスが必要。
+> **注記**
+>
+> curl によるシミュレーション実行。ONTAP CLI (`security anti-ransomware volume attack simulate`) による完全 E2E は SVM 管理エンドポイントへの SSH アクセスが必要。
 
 ---
 
@@ -415,7 +421,9 @@ curl -X POST \
 | **実際の結果** | HTTP 200。レスポンスボディ: `{"status": "ok", "event_name": "wafl.quota.softlimit.exceeded", "severity": "warning"}`。CloudWatch Logs にイベント正常記録 |
 | **判定** | ✅ PASS |
 
-> **注記**: curl によるシミュレーション実行。ONTAP CLI によるクォータルール設定 + データ書き込みによる完全 E2E は SVM 管理エンドポイントへの SSH アクセスが必要。
+> **注記**
+>
+> curl によるシミュレーション実行。ONTAP CLI によるクォータルール設定 + データ書き込みによる完全 E2E は SVM 管理エンドポイントへの SSH アクセスが必要。
 
 ---
 
@@ -450,7 +458,9 @@ aws logs filter-log-events \
 |---|---------|--------|-------------|---------|-----------|
 | - | 問題なし | - | - | - | - |
 
-> **注記**: 全ステップが PASS のため、問題は検出されなかった。
+> **注記**
+>
+> 全ステップが PASS のため、問題は検出されなかった。
 
 ### event-sources.md 修正事項
 
@@ -492,8 +502,8 @@ aws logs filter-log-events \
 
 ### 判定基準
 
-- **合格**: 全ステップが PASS
-- **不合格**: 1 つ以上のステップが FAIL（FAIL ステップ番号と失敗原因を上記問題点セクションに記載）
+- **合格** — 全ステップが PASS
+- **不合格** — 1 つ以上のステップが FAIL（FAIL ステップ番号と失敗原因を上記問題点セクションに記載）
 
 ---
 

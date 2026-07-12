@@ -4,8 +4,8 @@
 
 ## 実施概要
 
-- **検証日時**: 2026-05-24T09:24:00+09:00
-- **検証環境**: 検証環境（ap-northeast-1）
+- **検証日時** — 2026-05-24T09:24:00+09:00
+- **検証環境** — 検証環境（ap-northeast-1）
 
 ---
 
@@ -42,7 +42,7 @@
 
 ### ステップ 1: CloudFormation スタックデプロイ
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 ```bash
 aws cloudformation deploy \
@@ -57,9 +57,8 @@ aws cloudformation deploy \
   --region ap-northeast-1
 ```
 
-- **スタックステータス**: CREATE_COMPLETE
-- **作成されたリソース**:
-  - [x] Lambda 関数
+- **スタックステータス** — CREATE_COMPLETE
+- **作成されたリソース** — - [x] Lambda 関数
   - [x] IAM ロール
   - [x] EventBridge Rule
   - [x] Dead Letter Queue（KMS 暗号化）
@@ -70,7 +69,7 @@ aws cloudformation deploy \
 
 ### ステップ 2: Lambda テストイベント送信
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 ```bash
 aws lambda invoke \
@@ -81,8 +80,7 @@ aws lambda invoke \
   response.json
 ```
 
-- **レスポンス**:
-```json
+- **レスポンス** — ```json
 {
   "statusCode": 200,
   "body": {
@@ -93,25 +91,23 @@ aws lambda invoke \
 }
 ```
 
-- **確認項目**:
-  - [x] statusCode: 200
+- **確認項目** — - [x] statusCode: 200
   - [x] total_logs: 2
   - [x] total_shipped: 2
   - [x] errors: [] (空)
-- **Honeycomb API レスポンス**: HTTP 200
+- **Honeycomb API レスポンス** — HTTP 200
 
 ---
 
 ### ステップ 3: Honeycomb データセットでログ到着確認
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
-- **確認方法**: Honeycomb UI → Datasets → `fsxn-audit` → Explore Data
-- **到着イベント数**: 5件（複数回のテスト送信分）
-- **到着までの時間**: 即時（数秒以内）
+- **確認方法** — Honeycomb UI → Datasets → `fsxn-audit` → Explore Data
+- **到着イベント数** — 5件（複数回のテスト送信分）
+- **到着までの時間** — 即時（数秒以内）
 
-- **Honeycomb Explore Data 確認項目**:
-  - [x] COUNT グラフにイベントが表示
+- **Honeycomb Explore Data 確認項目** — - [x] COUNT グラフにイベントが表示
   - [x] Events テーブルにタイムスタンプ付きで表示
   - [x] Fields (13) が正しく認識されている
 
@@ -121,7 +117,7 @@ aws lambda invoke \
 
 ### ステップ 4: フィールドマッピング確認
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 Honeycomb の Explore Data で確認された 13 フィールド:
 
@@ -147,16 +143,16 @@ Honeycomb の Explore Data で確認された 13 フィールド:
 
 ### ステップ 5: セットアップガイド日英対応確認
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
-- **日本語**: `integrations/honeycomb/docs/ja/setup-guide.md` — 存在確認済み
-- **英語**: `integrations/honeycomb/docs/en/setup-guide.md` — 存在確認済み
+- **日本語** — `integrations/honeycomb/docs/ja/setup-guide.md` — 存在確認済み
+- **英語** — `integrations/honeycomb/docs/en/setup-guide.md` — 存在確認済み
 
 ---
 
 ### ステップ 6: スクリーンショット検証
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 | # | ファイル名 | 内容 | 判定 |
 |---|-----------|------|------|
@@ -176,9 +172,9 @@ Honeycomb の Explore Data で確認された 13 フィールド:
 
 ## 総合判定
 
-- **判定**: ✅ 監査ログパス本番環境利用可能
-- **合格基準数**: 6 / 6
-- **不合格基準**: なし
+- **判定** — ✅ 監査ログパス本番環境利用可能
+- **合格基準数** — 6 / 6
+- **不合格基準** — なし
 
 ---
 

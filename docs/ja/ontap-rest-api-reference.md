@@ -40,7 +40,9 @@ aws fsx describe-file-systems --file-system-ids <fs-id> \
   --output text
 ```
 
-> **セキュリティに関する補足**: テスト環境では自己署名証明書のため `verify=False` / `-k` を使用します。本番環境では `security certificate show -type root-ca -vserver <svm>` で CA 証明書を取得し、HTTP クライアントに提供してください。
+> **セキュリティに関する補足**
+>
+> テスト環境では自己署名証明書のため `verify=False` / `-k` を使用します。本番環境では `security certificate show -type root-ca -vserver <svm>` で CA 証明書を取得し、HTTP クライアントに提供してください。
 
 ---
 
@@ -123,7 +125,9 @@ if response.status_code == 202:
         raise RuntimeError(f"Job failed: {job.get('message')}")
 ```
 
-> **コストに関する補足**: HTTP ステータスだけを見て「成功」と判定するコードは、ジョブが実際には `state: failure` で終わっていることに気づかない。
+> **コストに関する補足**
+>
+> HTTP ステータスだけを見て「成功」と判定するコードは、ジョブが実際には `state: failure` で終わっていることに気づかない。
 
 ---
 
@@ -263,14 +267,40 @@ curl -sk -u "${ONTAP_USER}:${ONTAP_PASS}" -X POST \
 
 ### 挙動に関する重要な補足: ブロックのタイミング
 
-name-mapping ブロックは、既存の SMB セッションを**即座に切断しません**。`soft` オプションの既存マウントはセッショントークンが期限切れになるまで動作し続けます。
+name-mapping ブロック単体は既存セッションを終了しません（認証時に評価され、I/O ごとではない）。
 
-**新規接続（再認証）は即座に拒否されます。**
+しかし `contain_smb_threat` 複合アクションは、2 つのメカニズムの組み合わせで**実質的な即時遮断**を実現します:
 
-即座のセッション終了が必要な場合、`contain_smb_threat` 複合アクションはセッション切断エンドポイントも呼び出します:
-```
-DELETE /api/protocols/cifs/sessions/{svm-uuid}/{connection-id}/{identifier}
-```
+1. **name-mapping deny** — 以降の全ての認証試行をブロック
+2. **セッション切断** — 既存セッションを強制終了:
+   ```
+   DELETE /api/protocols/cifs/sessions/{svm-uuid}/{identifier}/{connection-id}
+   ```
+
+既存セッションが強制終了されると、SMB クライアントは自動的に再認証を試みますが、その時点で name-mapping deny が適用されアクセスは拒否されます。結果: 実行から数秒以内にユーザーは遮断されます。
+
+セッション切断が HTTP 404 を返す場合（セッションが既に消失）、これは想定内の動作です。name-mapping deny により以後の再接続は防止されます。
+
+---
+
+## NFS 即時遮断 — ネットワーク層（NACL）
+
+ONTAP export-policy deny rule はサーバー側の次の I/O チェック時に適用されますが、Linux NFS クライアントはアクセス判定を最大 60 秒間キャッシュします（`actimeo` デフォルト）。即時遮断には、export-policy rule に加えて VPC NACL deny rule を使用します。
+
+| アプローチ | レイヤー | タイミング | API |
+|-----------|---------|-----------|-----|
+| Export-policy rule | ONTAP | 次の I/O（最大 60 秒クライアントキャッシュ） | `POST /protocols/nfs/export-policies/{id}/rules` |
+| **NACL deny rule** | AWS VPC | **即時**（パケットレベル） | `ec2:CreateNetworkAclEntry` |
+
+`contain_nfs_threat` アクションは `FSX_SUBNET_ID` が設定されている場合、両方のレイヤーを自動的に適用します。
+
+> **NFSv4 リースに関する補足**
+>
+> NFSv4 は内部的にリースベースの状態管理を使用しますが、ONTAP は特定クライアントのリース強制取り消し用の REST API エンドポイントを公開していません。NACL アプローチはネットワーク層で動作するため、この制約を完全に回避し、NFSv3/NFSv4 の両方で有効です。
+
+> **VPC Endpoint の要件**
+>
+> Lambda が NACL ルールを管理するには EC2 API アクセスが必要です。VPC に NAT Gateway または EC2 Interface VPC Endpoint があることを確認してください。
 
 ---
 
@@ -291,7 +321,9 @@ ONTAP が EMS イベントを Webhook 宛先に送信する際、ペイロード
 }
 ```
 
-> **注意**: キャメルケース（`messageName`）やスネークケース（`message_name`）ではありません。ハイフン区切り: `message-name`、`message-severity`、`message-timestamp`。
+> **注意**
+>
+> キャメルケース（`messageName`）やスネークケース（`message_name`）ではありません。ハイフン区切り: `message-name`、`message-severity`、`message-timestamp`。
 
 ---
 

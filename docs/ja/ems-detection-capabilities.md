@@ -68,7 +68,9 @@ EventBridge Scheduler (5 分) → Lambda
 | スコープ | ファイルアクセス監査ログのみ（S3 上の EVTX/XML） |
 | EMS には使用しない | — |
 
-> **重要**: EventBridge Scheduler パスはファイルアクセス監査ログ（S3 上に保存される NFS/SMB ファイル操作の EVTX/XML）専用です。EMS イベントは上記の Push パスを使用します。
+> **重要**
+>
+> EventBridge Scheduler パスはファイルアクセス監査ログ（S3 上に保存される NFS/SMB ファイル操作の EVTX/XML）専用です。EMS イベントは上記の Push パスを使用します。
 
 ---
 

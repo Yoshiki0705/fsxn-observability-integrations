@@ -47,9 +47,9 @@ FPolicy: ONTAP → TCP:9898 → ECS Fargate → SQS → Lambda → ベンダー 
 
 FSx for ONTAP S3 Access Points は **S3 Event Notifications および EventBridge オブジェクトレベルイベントをサポートしていません**。本プロジェクトでは:
 
-- **EventBridge Scheduler ポーリング**: 定期的に Lambda を起動し、SSM Parameter Store にチェックポイントを保存して処理済みファイルを追跡
-- **CloudTrail データイベント**: ニアリアルタイムトリガーの代替手段として文書化
-- **通常の S3 バケット + S3 Event Notifications**: テストデータのバリデーション用途
+- **EventBridge Scheduler ポーリング** — 定期的に Lambda を起動し、SSM Parameter Store にチェックポイントを保存して処理済みファイルを追跡
+- **CloudTrail データイベント** — ニアリアルタイムトリガーの代替手段として文書化
+- **通常の S3 バケット + S3 Event Notifications** — テストデータのバリデーション用途
 
 ## 対応ベンダー
 
@@ -209,7 +209,9 @@ aws cloudformation delete-stack --stack-name fsxn-observability-prerequisites --
 # vserver audit disable -vserver <svm-name>
 ```
 
-> **注意**: スタックを削除しても、ONTAP 監査ログや FSx ボリューム上の既存データには影響しません。
+> **注意**
+>
+> スタックを削除しても、ONTAP 監査ログや FSx ボリューム上の既存データには影響しません。
 
 ## GUI 管理
 
@@ -222,7 +224,9 @@ aws cloudformation delete-stack --stack-name fsxn-observability-prerequisites --
 
 **選び方**: メトリクス・状態を VPC 外に送信できないデータレジデンシー要件がある場合、または AWS ネイティブ認証（Cognito/IAM）を使いたい場合は、セルフホスト Management Console を選択してください。既に NetApp SaaS との関係があり（または問題なく）、AWS リソースの運用不要で組み込みの System Manager UI を使いたい場合は、NetApp Console<!-- allow:naming --> を選択してください。両者は重複するが同一ではない機能を提供します — 詳細は [management-console/README.md](../../management-console/README.md#when-to-choose-this-approach) の比較表を参照してください。
 
-> **NetApp Console<!-- allow:naming --> アクセス方法**: [NetApp Console](https://console.netapp.com/) → Systems → SERVICES → "Open" (System Manager)
+> **NetApp Console<!-- allow:naming --> アクセス方法**
+>
+> [NetApp Console](https://console.netapp.com/) → Systems → SERVICES → "Open" (System Manager)
 
 📖 [管理・監視 Decision Tree](decision-tree-management-monitoring.md)
 
@@ -295,11 +299,11 @@ aws cloudformation delete-stack --stack-name fsxn-observability-prerequisites --
 
 ## 技術スタック
 
-- **Infrastructure**: CloudFormation (YAML) + CDK (TypeScript)
-- **Lambda**: Python 3.12 (ログ処理) + TypeScript (API連携)
-- **Test**: Jest + pytest
-- **CI/CD**: GitHub Actions
-- **Docs**: Markdown (日英バイリンガル)
+- **Infrastructure** — CloudFormation (YAML) + CDK (TypeScript)
+- **Lambda** — Python 3.12 (ログ処理) + TypeScript (API連携)
+- **Test** — Jest + pytest
+- **CI/CD** — GitHub Actions
+- **Docs** — Markdown (日英バイリンガル)
 
 ## 関連プロジェクト
 

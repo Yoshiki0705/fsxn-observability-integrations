@@ -6,8 +6,8 @@
 
 本ドキュメントでは、FSx for ONTAP の監査ログを Splunk に配信する 2 つのアーキテクチャパターンを比較します。
 
-- **EC2 ベースパターン**: EC2 インスタンス上の syslog-ng + Splunk Universal Forwarder
-- **サーバーレスパターン**: S3 Access Point + EventBridge + Lambda + Secrets Manager
+- **EC2 ベースパターン** — EC2 インスタンス上の syslog-ng + Splunk Universal Forwarder
+- **サーバーレスパターン** — S3 Access Point + EventBridge + Lambda + Secrets Manager
 
 EC2 ベースパターンは AWS 公式ブログで紹介されているアーキテクチャです:
 https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on-amazon-fsx-for-netapp-ontap-using-splunk/
@@ -151,10 +151,12 @@ https://aws.amazon.com/jp/blogs/news/auditing-user-and-administrative-actions-on
 
 ## まとめ
 
-- **コスト**: サーバーレスパターンは EC2 ベースの約 1/5〜1/10 のコスト
-- **運用**: サーバーレスパターンはインフラ管理が不要で運用負荷が大幅に低い
-- **レイテンシ**: EC2 ベースはリアルタイムに近い配信が可能（数十秒）。サーバーレスは数分の遅延あり
-- **スケーリング**: サーバーレスは自動スケーリング。EC2 は手動対応が必要
-- **推奨**: 大多数のユースケース（特に 1GB/日以下）ではサーバーレスパターンを推奨
+- **コスト** — サーバーレスパターンは EC2 ベースの約 1/5〜1/10 のコスト
+- **運用** — サーバーレスパターンはインフラ管理が不要で運用負荷が大幅に低い
+- **レイテンシ** — EC2 ベースはリアルタイムに近い配信が可能（数十秒）。サーバーレスは数分の遅延あり
+- **スケーリング** — サーバーレスは自動スケーリング。EC2 は手動対応が必要
+- **推奨** — 大多数のユースケース（特に 1GB/日以下）ではサーバーレスパターンを推奨
 
-> **注意**: レイテンシ要件が厳しい場合（10 秒以内の配信が必須）は EC2 ベースパターンまたは EMS Webhook パスを検討してください。
+> **注意**
+>
+> レイテンシ要件が厳しい場合（10 秒以内の配信が必須）は EC2 ベースパターンまたは EMS Webhook パスを検討してください。

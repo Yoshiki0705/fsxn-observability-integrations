@@ -4,8 +4,8 @@
 
 ## 実施概要
 
-- **検証日時**: 2026-05-24T10:51:00+09:00
-- **検証環境**: 検証環境（ap-northeast-1）
+- **検証日時** — 2026-05-24T10:51:00+09:00
+- **検証環境** — 検証環境（ap-northeast-1）
 
 ---
 
@@ -43,13 +43,13 @@
 
 ### ステップ 1: Elastic Cloud アカウント作成
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
-- **作成方法**: Google OAuth（Playwright 自動操作）
-- **プロジェクトタイプ**: Elasticsearch Serverless
-- **Cloud Provider**: AWS
-- **リージョン**: ap-northeast-1 (Tokyo)
-- **API Key 作成**: Kibana → Stack Management → Security → API Keys → Create
+- **作成方法** — Google OAuth（Playwright 自動操作）
+- **プロジェクトタイプ** — Elasticsearch Serverless
+- **Cloud Provider** — AWS
+- **リージョン** — ap-northeast-1 (Tokyo)
+- **API Key 作成** — Kibana → Stack Management → Security → API Keys → Create
 
 ```bash
 # API Key を Secrets Manager に登録
@@ -63,7 +63,7 @@ aws secretsmanager create-secret \
 
 ### ステップ 2: CloudFormation スタックデプロイ
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 ```bash
 aws cloudformation deploy \
@@ -78,9 +78,8 @@ aws cloudformation deploy \
   --region ap-northeast-1
 ```
 
-- **スタックステータス**: CREATE_COMPLETE
-- **作成されたリソース**:
-  - [x] Lambda 関数
+- **スタックステータス** — CREATE_COMPLETE
+- **作成されたリソース** — - [x] Lambda 関数
   - [x] IAM ロール
   - [x] EventBridge Rule
   - [x] Dead Letter Queue（KMS 暗号化）
@@ -91,7 +90,7 @@ aws cloudformation deploy \
 
 ### ステップ 3: Lambda テストイベント送信
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 ```bash
 aws lambda invoke \
@@ -102,8 +101,7 @@ aws lambda invoke \
   response.json
 ```
 
-- **レスポンス**:
-```json
+- **レスポンス** — ```json
 {
   "statusCode": 200,
   "body": {
@@ -114,26 +112,24 @@ aws lambda invoke \
 }
 ```
 
-- **確認項目**:
-  - [x] statusCode: 200
+- **確認項目** — - [x] statusCode: 200
   - [x] total_logs: 2
   - [x] total_shipped: 2
   - [x] errors: [] (空)
-- **Elasticsearch Bulk API レスポンス**: HTTP 200
+- **Elasticsearch Bulk API レスポンス** — HTTP 200
 
 ---
 
 ### ステップ 4: Kibana Discover でログ到着確認
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
-- **確認方法**: Kibana → Discover → データが表示されていることを確認
-- **到着ドキュメント数**: 2件
-- **到着までの時間**: 即時（数秒以内）
-- **インデックスパターン**: `fsxn-audit-YYYY.MM.DD`（日次インデックス）
+- **確認方法** — Kibana → Discover → データが表示されていることを確認
+- **到着ドキュメント数** — 2件
+- **到着までの時間** — 即時（数秒以内）
+- **インデックスパターン** — `fsxn-audit-YYYY.MM.DD`（日次インデックス）
 
-- **ECS フィールドマッピング確認**:
-  - [x] `@timestamp` — ISO 8601 形式
+- **ECS フィールドマッピング確認** — - [x] `@timestamp` — ISO 8601 形式
   - [x] `event.type` — イベント ID
   - [x] `user.name` — ユーザー名
   - [x] `fsxn.operation` — 操作タイプ
@@ -149,16 +145,16 @@ aws lambda invoke \
 
 ### ステップ 5: セットアップガイド日英対応確認
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
-- **日本語**: `integrations/elastic/docs/ja/setup-guide.md` — 存在確認済み
-- **英語**: `integrations/elastic/docs/en/setup-guide.md` — 存在確認済み
+- **日本語** — `integrations/elastic/docs/ja/setup-guide.md` — 存在確認済み
+- **英語** — `integrations/elastic/docs/en/setup-guide.md` — 存在確認済み
 
 ---
 
 ### ステップ 6: スクリーンショット検証
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 | # | ファイル名 | 内容 | 判定 |
 |---|-----------|------|------|
@@ -177,9 +173,9 @@ aws lambda invoke \
 
 ## 総合判定
 
-- **判定**: ✅ 監査ログパス本番環境利用可能
-- **合格基準数**: 6 / 6
-- **不合格基準**: なし
+- **判定** — ✅ 監査ログパス本番環境利用可能
+- **合格基準数** — 6 / 6
+- **不合格基準** — なし
 
 ---
 

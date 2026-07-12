@@ -2,9 +2,15 @@
 
 🌐 **日本語**（このページ） | [English](../../en/runbooks/log-alarm-triggered.md)
 
-> **対象**: `fsxn-sensitive-file-access-*`, `fsxn-failed-access-*`, `fsxn-bulk-delete-*`, `fsxn-user-activity-*` アラーム
-> **想定初動者**: セキュリティ運用チーム / SRE / ストレージ管理者
-> **対応目標**: MTTA < 5 分、原因特定 < 30 分
+> **対象**
+>
+> `fsxn-sensitive-file-access-*`, `fsxn-failed-access-*`, `fsxn-bulk-delete-*`, `fsxn-user-activity-*` アラーム
+> **想定初動者**
+>
+> セキュリティ運用チーム / SRE / ストレージ管理者
+> **対応目標**
+>
+> MTTA < 5 分、原因特定 < 30 分
 
 ---
 
@@ -14,9 +20,9 @@
 
 SNS 通知メールまたは Slack 通知に含まれる以下を確認:
 
-- **アラーム名**: どの検知パターンか（sensitive-file-access / failed-access / bulk-delete / user-activity）
-- **ログ行**: 通知に含まれるログ行（最大 50 行）から状況を把握
-- **タイムスタンプ**: いつ発生したか
+- **アラーム名** — どの検知パターンか（sensitive-file-access / failed-access / bulk-delete / user-activity）
+- **ログ行** — 通知に含まれるログ行（最大 50 行）から状況を把握
+- **タイムスタンプ** — いつ発生したか
 
 ### 1.2 CloudWatch コンソールで確認
 
@@ -28,7 +34,9 @@ CloudWatch Console → Alarms → 該当アラーム → History タブ
 - Query 結果の数値（count）
 - マッチしたログ件数
 
-> **注**: 疎なパターン（`count(*) > 0`）のアラームは、マッチを含むウィンドウが評価された瞬間だけ ALARM になり直後に OK へ戻る（フラップする）ことがあります。OK に戻っていても、OK→ALARM 遷移時に SNS 通知は発報済みです。History タブで過去の遷移を確認してください。
+> **注**
+>
+> 疎なパターン（`count(*) > 0`）のアラームは、マッチを含むウィンドウが評価された瞬間だけ ALARM になり直後に OK へ戻る（フラップする）ことがあります。OK に戻っていても、OK→ALARM 遷移時に SNS 通知は発報済みです。History タブで過去の遷移を確認してください。
 
 ### 1.3 Logs Insights で詳細調査
 
@@ -171,7 +179,7 @@ fields @timestamp, @message
 - `EvaluationFrequencyMinutes` を短縮（5 → 1 分）
 - クエリのフィルタパターンを拡張
 - `AlarmThreshold` を下げる
-- **疎なパターンに注意**: `stats count(*)` は 0 件のとき結果行を返さない（欠損扱い）。イベントが評価ウィンドウに入らないと発火しないため、頻度を短くしてウィンドウの取りこぼしを減らす（詳細は[セットアップガイドの落とし穴節](../cloudwatch-log-alarm.md#よくある落とし穴-疎なパターンは-alarm-になりにくいe2e-検証で確認)）
+- **疎なパターンに注意** — `stats count(*)` は 0 件のとき結果行を返さない（欠損扱い）。イベントが評価ウィンドウに入らないと発火しないため、頻度を短くしてウィンドウの取りこぼしを減らす（詳細は[セットアップガイドの落とし穴節](../cloudwatch-log-alarm.md#よくある落とし穴-疎なパターンは-alarm-になりにくいe2e-検証で確認)）
 
 ### コストが高い場合
 

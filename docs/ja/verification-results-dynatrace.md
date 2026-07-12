@@ -4,8 +4,8 @@
 
 ## 実施概要
 
-- **検証日時**: 2026-05-24T11:47:00+09:00
-- **検証環境**: 検証環境（ap-northeast-1）
+- **検証日時** — 2026-05-24T11:47:00+09:00
+- **検証環境** — 検証環境（ap-northeast-1）
 
 ---
 
@@ -43,23 +43,23 @@
 
 ### ステップ 1: Dynatrace トライアルアカウント作成
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
-- **作成方法**: https://www.dynatrace.com/trial/ からメールアドレスで登録（Playwright 自動操作）
-- **Cloud Provider**: AWS
-- **Deployment Region**: Asia Pacific (Tokyo)
-- **トライアル期間**: 14日間
+- **作成方法** — https://www.dynatrace.com/trial/ からメールアドレスで登録（Playwright 自動操作）
+- **Cloud Provider** — AWS
+- **Deployment Region** — Asia Pacific (Tokyo)
+- **トライアル期間** — 14日間
 
 ---
 
 ### ステップ 2: API Token 生成
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
-- **作成方法**: Access Tokens ページ（iframe 内）で Playwright 経由で自動生成
-- **Token 名**: fsxn-log-ingest
-- **スコープ**: `logs.ingest`（Ingest logs）
-- **Token 形式**: `dt0c01.<ID>.<SECRET>`
+- **作成方法** — Access Tokens ページ（iframe 内）で Playwright 経由で自動生成
+- **Token 名** — fsxn-log-ingest
+- **スコープ** — `logs.ingest`（Ingest logs）
+- **Token 形式** — `dt0c01.<ID>.<SECRET>`
 
 ```bash
 # Token を Secrets Manager に登録
@@ -69,13 +69,13 @@ aws secretsmanager create-secret \
   --region ap-northeast-1
 ```
 
-- **注意**: Access Tokens ページは `live.dynatrace.com` ドメインの iframe 内で動作。Playwright の `frameLocator('iframe[src*="live.dynatrace.com"]')` でアクセス可能。
+- **注意** — Access Tokens ページは `live.dynatrace.com` ドメインの iframe 内で動作。Playwright の `frameLocator('iframe[src*="live.dynatrace.com"]')` でアクセス可能。
 
 ---
 
 ### ステップ 3: CloudFormation スタックデプロイ
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 ```bash
 aws cloudformation deploy \
@@ -90,9 +90,8 @@ aws cloudformation deploy \
   --region ap-northeast-1
 ```
 
-- **スタックステータス**: CREATE_COMPLETE
-- **作成されたリソース**:
-  - [x] Lambda 関数
+- **スタックステータス** — CREATE_COMPLETE
+- **作成されたリソース** — - [x] Lambda 関数
   - [x] IAM ロール
   - [x] EventBridge Rule
   - [x] Dead Letter Queue（KMS 暗号化）
@@ -103,7 +102,7 @@ aws cloudformation deploy \
 
 ### ステップ 4: Lambda テストイベント送信
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 ```bash
 aws lambda invoke \
@@ -114,8 +113,7 @@ aws lambda invoke \
   response.json
 ```
 
-- **レスポンス**:
-```json
+- **レスポンス** — ```json
 {
   "statusCode": 200,
   "body": {
@@ -126,12 +124,11 @@ aws lambda invoke \
 }
 ```
 
-- **確認項目**:
-  - [x] statusCode: 200
+- **確認項目** — - [x] statusCode: 200
   - [x] total_logs: 2
   - [x] total_shipped: 2
   - [x] errors: [] (空)
-- **Dynatrace API レスポンス**: HTTP 204（成功、ボディなし）
+- **Dynatrace API レスポンス** — HTTP 204（成功、ボディなし）
 
 #### 直接 curl テスト
 
@@ -148,19 +145,17 @@ curl -s -w "\nHTTP:%{http_code}" \
 
 ### ステップ 5: Dynatrace Logs Viewer でログ到着確認
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
-- **確認方法**: Dynatrace Platform → Logs アプリ → View logs → Run query
-- **到着レコード数**: 1件（取り込みラグ後に表示）
-- **到着までの時間**: 約1-2分（トライアル環境の取り込みラグ）
+- **確認方法** — Dynatrace Platform → Logs アプリ → View logs → Run query
+- **到着レコード数** — 1件（取り込みラグ後に表示）
+- **到着までの時間** — 約1-2分（トライアル環境の取り込みラグ）
 
-- **表示されたログエントリ**:
-  - timestamp: May 24, 12:32:13.000
+- **表示されたログエントリ** — - timestamp: May 24, 12:32:13.000
   - status: INFO
   - Log message: "Direct curl test from fsxn pipeline"
 
-- **Logs Viewer アクセス方法**:
-  - Dynatrace Platform → 左メニュー「Logs」→「View logs」→「Run query」
+- **Logs Viewer アクセス方法** — - Dynatrace Platform → 左メニュー「Logs」→「View logs」→「Run query」
   - 時間範囲: Last 30 minutes（ログ送信後1-2分待機が必要）
 
 ![Dynatrace Logs Viewer — ログ到着確認（1 record）](../screenshots/dynatrace/dynatrace-logs-1record.png)
@@ -169,16 +164,16 @@ curl -s -w "\nHTTP:%{http_code}" \
 
 ### ステップ 6: セットアップガイド日英対応確認
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
-- **日本語**: `integrations/dynatrace/docs/ja/setup-guide.md` — 存在確認済み
-- **英語**: `integrations/dynatrace/docs/en/setup-guide.md` — 存在確認済み
+- **日本語** — `integrations/dynatrace/docs/ja/setup-guide.md` — 存在確認済み
+- **英語** — `integrations/dynatrace/docs/en/setup-guide.md` — 存在確認済み
 
 ---
 
 ### ステップ 7: スクリーンショット検証
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 | # | ファイル名 | 内容 | 判定 |
 |---|-----------|------|------|
@@ -202,9 +197,9 @@ curl -s -w "\nHTTP:%{http_code}" \
 
 ## 総合判定
 
-- **判定**: ✅ 監査ログパス本番環境利用可能
-- **合格基準数**: 7 / 7
-- **不合格基準**: なし
+- **判定** — ✅ 監査ログパス本番環境利用可能
+- **合格基準数** — 7 / 7
+- **不合格基準** — なし
 
 ---
 

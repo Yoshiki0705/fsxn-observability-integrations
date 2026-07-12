@@ -138,7 +138,9 @@ ECS タスクロールに以下のポリシーを追加:
 }
 ```
 
-> **Note**: CloudFormation テンプレート (`fpolicy-apigw.yaml`) では `EcsTaskRole` に
+> **Note**
+>
+> CloudFormation テンプレート (`fpolicy-apigw.yaml`) では `EcsTaskRole` に
 > この権限が含まれています。手動デプロイ時に忘れやすいポイントです。
 
 ---
