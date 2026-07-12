@@ -395,9 +395,87 @@ aws cloudformation delete-stack --stack-name fsxn-automated-response
 
 ---
 
+## E2E 検証済み出力（2026年7月、ONTAP 9.17.1P7D1）
+
+以下は実機 E2E 検証で取得した出力です。自身のデプロイ検証の参考にしてください。
+
+### NFS ブロック: Before/After
+
+**Before（アクセス許可）**:
+```
+$ ls -la /mnt/fsxn/
+total 12
+-rw-r--r--. 1 root root   46 Jul 12 16:00 hr-salary.txt
+-rw-r--r--. 1 root root   43 Jul 12 16:00 project-spec.txt
+drwxr-xr-x. 2 root root 4096 Jul 12 16:00 reports
+
+$ cat /mnt/fsxn/hr-salary.txt
+Confidential HR Record - Employee Salary Data
+```
+
+**After（export-policy deny rule 適用後）**:
+```
+$ ls /mnt/fsxn/
+ls: cannot access '/mnt/fsxn/': Permission denied
+
+$ cat /mnt/fsxn/hr-salary.txt
+cat: /mnt/fsxn/hr-salary.txt: Permission denied
+```
+
+### SMB ブロック: Before/After（AD参加SVM, testuser）
+
+**Before（アクセス許可）**:
+```
+PS> net use X: \\SVM\data /user:DEMO\testuser TestP@ss2026!
+The command completed successfully.
+
+PS> Get-ChildItem X:\
+Mode   Length Name
+----   ------ ----
+d-----        reports
+-a---- 46     hr-salary.txt
+-a---- 43     project-spec.txt
+
+PS> Get-Content X:\hr-salary.txt
+Confidential HR Record - Employee Salary Data
+```
+
+**After（block_smb_user 実行 → nobody mapping + 750 パーミッション）**:
+```
+PS> net use X: \\SVM\data /user:DEMO\testuser TestP@ss2026!
+The command completed successfully.
+
+PS> Test-Path X:\
+False
+
+[Result] ACCESS DENIED - Drive not accessible
+```
+
+### スクリーンショット撮影ポイント
+
+プレゼンテーションやブログ用にデモを実行する際、以下のタイミングでスクリーンショットを撮影してください:
+
+| # | タイミング | 撮影対象 | ファイル名 |
+|---|----------|---------|----------|
+| 1 | Phase 2 Before | Windows ファイルエクスプローラーで共有ファイルが見える状態 | `smb-access-granted.png` |
+| 2 | Phase 2 After | Windows のアクセス拒否ダイアログまたは空のドライブ | `smb-access-denied.png` |
+| 3 | Phase 3 Before | ターミナルで `ls /mnt/fsxn/` がファイル一覧を表示 | `nfs-access-granted.png` |
+| 4 | Phase 3 After | ターミナルで `Permission denied` エラー | `nfs-access-denied.png` |
+| 5 | Phase 4 | CloudWatch Logs の Lambda 実行ログ | `lambda-execution-log.png` |
+| 6 | オプション | Step Functions グラフビュー（restore-verification 実行時） | `stepfunctions-graph.png` |
+| 7 | オプション | Datadog/CloudWatch での ARP 検知表示 | `detection-alert.png` |
+
+**マスキング**: スクリーンショットをコミットする前に実行:
+```bash
+python3 docs/screenshots/mask_screenshots.py
+```
+
+---
+
 ## 関連ドキュメント
 
 - [自動応答ガイド](automated-response-guide.md)
+- [デプロイメントガイド](deployment-guide.md) — VPC Endpoint 競合、AD 連携、パラメータファイル
 - [ARP インシデント対応ガイド](arp-incident-response-guide.md)
 - [EMS 検知機能リファレンス](ems-detection-capabilities.md)
 - [デモシナリオ（全ベンダー）](demo-scenarios.md)

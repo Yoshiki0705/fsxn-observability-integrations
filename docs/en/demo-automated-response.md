@@ -417,9 +417,89 @@ For a shorter demo (meeting): Phase 1 + Phase 2 + Phase 4 = ~13 minutes.
 
 ---
 
+## E2E Verified Output (July 2026, ONTAP 9.17.1P7D1)
+
+The following outputs were captured during live E2E verification. Use these as reference when validating your own deployment.
+
+### NFS Block: Before/After
+
+**Before (access granted)**:
+```
+$ ls -la /mnt/fsxn/
+total 12
+drwxr-xr-x. 3 root root 4096 Jul 12 16:00 .
+drwxr-xr-x. 3 root root   18 Jul 12 14:51 ..
+-rw-r--r--. 1 root root   46 Jul 12 16:00 hr-salary.txt
+-rw-r--r--. 1 root root   43 Jul 12 16:00 project-spec.txt
+drwxr-xr-x. 2 root root 4096 Jul 12 16:00 reports
+
+$ cat /mnt/fsxn/hr-salary.txt
+Confidential HR Record - Employee Salary Data
+```
+
+**After (export-policy deny rule applied)**:
+```
+$ ls /mnt/fsxn/
+ls: cannot access '/mnt/fsxn/': Permission denied
+
+$ cat /mnt/fsxn/hr-salary.txt
+cat: /mnt/fsxn/hr-salary.txt: Permission denied
+```
+
+### SMB Block: Before/After (AD-joined SVM, testuser)
+
+**Before (access granted)**:
+```
+PS> net use X: \\SVM\data /user:DEMO\testuser TestP@ss2026!
+The command completed successfully.
+
+PS> Get-ChildItem X:\
+Mode   Length Name
+----   ------ ----
+d-----        reports
+-a---- 46     hr-salary.txt
+-a---- 43     project-spec.txt
+
+PS> Get-Content X:\hr-salary.txt
+Confidential HR Record - Employee Salary Data
+```
+
+**After (block_smb_user executed → nobody mapping + 750 permissions)**:
+```
+PS> net use X: \\SVM\data /user:DEMO\testuser TestP@ss2026!
+The command completed successfully.
+
+PS> Test-Path X:\
+False
+
+[Result] ACCESS DENIED - Drive not accessible
+```
+
+### Screenshot Capture Points
+
+When running this demo for presentation or blog purposes, capture screenshots at:
+
+| # | When | What to Capture | File Name |
+|---|------|-----------------|-----------|
+| 1 | Phase 2 Before | Windows File Explorer showing shared files | `smb-access-granted.png` |
+| 2 | Phase 2 After | Windows "Access Denied" dialog or empty drive | `smb-access-denied.png` |
+| 3 | Phase 3 Before | Terminal with `ls /mnt/fsxn/` showing files | `nfs-access-granted.png` |
+| 4 | Phase 3 After | Terminal with `Permission denied` errors | `nfs-access-denied.png` |
+| 5 | Phase 4 | CloudWatch Logs showing Lambda execution | `lambda-execution-log.png` |
+| 6 | Optional | Step Functions graph view (if running restore-verification) | `stepfunctions-graph.png` |
+| 7 | Optional | Datadog/CloudWatch showing ARP detection | `detection-alert.png` |
+
+**Masking**: Before committing screenshots, run:
+```bash
+python3 docs/screenshots/mask_screenshots.py
+```
+
+---
+
 ## Related Documents
 
 - [Automated Response Guide](automated-response-guide.md)
+- [Deployment Guide](deployment-guide.md) — VPC Endpoint conflicts, AD integration, parameter files
 - [ARP Incident Response Guide](arp-incident-response-guide.md)
 - [EMS Detection Capabilities](ems-detection-capabilities.md)
 - [Demo Scenarios (all vendors)](demo-scenarios.md)
