@@ -503,3 +503,11 @@ A: Check CloudWatch Logs for the `RecordVerdict` Lambda for a `"Verdict notifica
 
 **Q: We changed the DynamoDB table's key schema and now the old verification history is gone — what happened?**
 A: A CloudFormation stack update that changes `VerificationLedgerTable`'s `KeySchema` or `AttributeDefinitions` forces DynamoDB table replacement rather than an in-place update, and this template does not set `DeletionPolicy: Retain` on that table (see the Stack-update note under Deployment above) — CloudFormation deleted the old table as part of applying the replacement. This is recoverable only if Point-in-Time Recovery was enabled and you restore within its retention window; going forward, run `aws cloudformation create-change-set` before any schema-affecting update and check for `Replacement: True` in the output.
+
+
+---
+
+## See Also
+
+- [Deployment Guide](deployment-guide.md) — Pre-flight validation, VPC Endpoint conflict avoidance, and parameter file setup for this stack
+- [Automated Response Guide](automated-response-guide.md) — Incident response actions that precede recovery verification

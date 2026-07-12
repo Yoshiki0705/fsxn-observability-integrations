@@ -595,3 +595,11 @@ A: 通知パイプライン全体が壊れていると結論する前に、`Reco
 
 **Q: DynamoDB テーブルのキースキーマを変更したところ、過去の検証履歴が消えてしまいました。何が起きたのですか？**
 A: `VerificationLedgerTable` の `KeySchema` や `AttributeDefinitions` を変更する CloudFormation スタックの更新は、インプレース更新ではなく DynamoDB テーブルの置き換えを強制します。本テンプレートはそのテーブルに `DeletionPolicy: Retain` を設定していないため（上記デプロイ節のスタック更新に関する補足参照）、置き換えを適用する過程で CloudFormation が古いテーブルを削除しました。これが復旧可能なのは、Point-in-Time Recovery が有効になっていて、その保持期間内にリストアする場合のみです。今後は、スキーマに影響する更新の前に必ず `aws cloudformation create-change-set` を実行し、出力に `Replacement: True` がないか確認してください。
+
+
+---
+
+## 関連ドキュメント
+
+- [デプロイメントガイド](deployment-guide.md) — デプロイ前検証、VPC Endpoint 競合回避、パラメータファイルの設定方法
+- [Automated Response ガイド](automated-response-guide.md) — リカバリ検証に先立つインシデント対応アクション

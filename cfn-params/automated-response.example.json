@@ -1,0 +1,16 @@
+[
+  {"ParameterKey": "OntapMgmtIp", "ParameterValue": "<your-fsx-management-ip>"},
+  {"ParameterKey": "OntapCredentialsSecretArn", "ParameterValue": "arn:aws:secretsmanager:<region>:<account-id>:secret:<secret-name>-XXXXXX"},
+  {"ParameterKey": "VpcId", "ParameterValue": "vpc-0123456789abcdef0"},
+  {"ParameterKey": "SubnetIds", "ParameterValue": "subnet-aaaaaaaaaaaaa,subnet-bbbbbbbbbbbbb"},
+  {"ParameterKey": "SecurityGroupId", "ParameterValue": "sg-0123456789abcdef0"},
+  {"ParameterKey": "DefaultSvmName", "ParameterValue": "svm-prod-01"},
+  {"ParameterKey": "CooldownMinutes", "ParameterValue": "15"},
+  {"ParameterKey": "LambdaMemorySize", "ParameterValue": "256"},
+  {"ParameterKey": "LambdaTimeout", "ParameterValue": "60"},
+  {"ParameterKey": "NotificationEmail", "ParameterValue": ""},
+  {"ParameterKey": "ProtectedAccountsExtra", "ParameterValue": ""},
+  {"ParameterKey": "SharedPythonLayerArn", "ParameterValue": ""},
+  {"ParameterKey": "FsxSubnetId", "ParameterValue": ""},
+  {"ParameterKey": "CreateVpcEndpoints", "ParameterValue": "true"}
+]

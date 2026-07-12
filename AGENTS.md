@@ -49,6 +49,10 @@ cfn-guard validate -d integrations/*/template*.yaml -r guard/rules/critical-secu
 # Check bilingual documentation sync
 bash shared/scripts/check-bilingual-sync.sh
 
+# Pre-flight deployment validation (check VPC Endpoints, SG, ONTAP S3 server)
+bash shared/scripts/preflight-check.sh --vpc-id vpc-xxx --profile automated-response
+bash shared/scripts/preflight-check.sh --list-profiles
+
 # Deploy a vendor integration
 bash integrations/<vendor>/scripts/deploy.sh
 
@@ -510,6 +514,9 @@ All scripts use environment variables with sensible defaults:
 - `integrations/otel-collector/docs/en/pii-redaction-cookbook.md` — 7 OTel Collector redaction recipes
 - `docs/en/automated-response-guide.md` — Automated incident response (user/IP blocking via ONTAP REST API)
 - `docs/en/ems-detection-capabilities.md` — EMS event catalog (30+ events, delivery patterns, latency comparison)
+- `docs/en/deployment-guide.md` — Comprehensive deployment guide (stack catalog, parameter mapping, VPC EP conflict matrix, verified paths, cost, Day 2)
+- `cfn-params/README.md` — Parameter file usage instructions (create-stack vs deploy syntax)
+- `shared/scripts/preflight-check.sh` — Pre-deployment environment validation (5 profiles, VPC EP conflict detection, ONTAP S3 server check)
 
 ## Deploying Prerequisites
 

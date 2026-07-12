@@ -746,3 +746,11 @@ A: SMB name-mapping blocks are effective immediately for new connections. Existi
 
 **Q: Is there a risk of blocking legitimate users?**
 A: Yes — this is true for any automated response system. Mitigations: (1) set detection thresholds conservatively, (2) use the notification topic to alert operators immediately, (3) implement time-limited blocks with auto-unblock, (4) maintain a runbook for rapid manual reversal.
+
+
+---
+
+## See Also
+
+- [Deployment Guide](deployment-guide.md) — Full deployment instructions including VPC Endpoint setup, parameter files, and pre-flight validation
+- [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md) — Post-incident snapshot verification workflow

@@ -1,0 +1,15 @@
+[
+  {"ParameterKey": "FsxS3AccessPointArn", "ParameterValue": "arn:aws:s3:<region>:<account-id>:accesspoint/<access-point-name>"},
+  {"ParameterKey": "DatadogApiKeySecretArn", "ParameterValue": "arn:aws:secretsmanager:<region>:<account-id>:secret:datadog-api-key-XXXXXX"},
+  {"ParameterKey": "DatadogSite", "ParameterValue": "ap1.datadoghq.com"},
+  {"ParameterKey": "AuditLogPrefix", "ParameterValue": "audit/"},
+  {"ParameterKey": "ScheduleRate", "ParameterValue": "rate(5 minutes)"},
+  {"ParameterKey": "LogLevel", "ParameterValue": "INFO"},
+  {"ParameterKey": "Environment", "ParameterValue": "production"},
+  {"ParameterKey": "EnableGzip", "ParameterValue": "false"},
+  {"ParameterKey": "LambdaMemorySize", "ParameterValue": "256"},
+  {"ParameterKey": "LambdaTimeout", "ParameterValue": "300"},
+  {"ParameterKey": "VpcEnabled", "ParameterValue": "false"},
+  {"ParameterKey": "VpcSubnetIds", "ParameterValue": ""},
+  {"ParameterKey": "VpcSecurityGroupIds", "ParameterValue": ""}
+]

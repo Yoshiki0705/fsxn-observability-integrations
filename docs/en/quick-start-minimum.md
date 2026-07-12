@@ -65,3 +65,5 @@ After confirming log arrival:
 1. Review the [field mapping](../../integrations/datadog/docs/en/field-mapping.md)
 2. Try [investigation queries](../../integrations/datadog/docs/en/field-mapping.md#datadog-search-queries)
 3. Set up Monitors (blog series Part 3)
+
+4. For production deployment with VPC Endpoints, cost planning, and multi-stack coordination, see the [Deployment Guide](deployment-guide.md)

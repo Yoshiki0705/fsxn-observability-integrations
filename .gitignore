@@ -62,3 +62,8 @@ cdk.out/
 integrations/netapp-console/system-manager/screenshots/
 .playwright-mcp/
 shared/python/dist/
+
+# CloudFormation parameter files (contain account-specific values)
+cfn-params/*.json
+!cfn-params/*.example.json
+!cfn-params/README.md

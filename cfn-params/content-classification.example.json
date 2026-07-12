@@ -1,0 +1,12 @@
+[
+  {"ParameterKey": "VpcId", "ParameterValue": ""},
+  {"ParameterKey": "SubnetIds", "ParameterValue": ""},
+  {"ParameterKey": "SecurityGroupId", "ParameterValue": ""},
+  {"ParameterKey": "RouteTableIds", "ParameterValue": ""},
+  {"ParameterKey": "CreateVpcEndpoints", "ParameterValue": "true"},
+  {"ParameterKey": "LambdaMemorySize", "ParameterValue": "512"},
+  {"ParameterKey": "LambdaTimeoutSeconds", "ParameterValue": "600"},
+  {"ParameterKey": "DefaultLanguageCode", "ParameterValue": "en"},
+  {"ParameterKey": "DefaultMaxFiles", "ParameterValue": "500"},
+  {"ParameterKey": "NotificationTopicArn", "ParameterValue": ""}
+]
