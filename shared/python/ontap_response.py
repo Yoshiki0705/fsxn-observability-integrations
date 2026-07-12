@@ -217,6 +217,21 @@ class OntapResponseClient:
             raise OntapResponseError(f"SVM not found: {svm_name}", status_code=404)
         return records[0]["uuid"]
 
+    def _is_svm_ad_joined(self, svm_name: str) -> bool:
+        """Check if SVM is joined to Active Directory.
+
+        On AD-joined SVMs, name-mapping entries with replacement=" " (space)
+        are auto-deleted by ONTAP's background validation process within 30-60s.
+        This method detects AD membership so callers can use an alternative
+        replacement value ("nobody") that persists.
+        """
+        data = self._request(
+            "GET",
+            f"/protocols/cifs/services?svm.name={svm_name}&fields=name",
+        )
+        # If CIFS service exists, SVM is AD-joined (CIFS requires AD)
+        return len(data.get("records", [])) > 0
+
     def _get_volume_uuid(self, svm_name: str, volume_name: str) -> str:
         """Resolve volume name to UUID within a specific SVM."""
         data = self._request(
@@ -265,17 +280,25 @@ class OntapResponseClient:
         svm_uuid = self._get_svm_uuid(svm_name)
         pattern = f"{domain}\\\\{username}"
 
+        # On AD-joined SVMs, ONTAP 9.17.1+ auto-deletes name-mappings with
+        # unresolvable replacement values (space " ") within 30-60 seconds.
+        # Use "nobody" (UID 65535, standard unprivileged user) instead — it
+        # persists and effectively denies access on UNIX/MIXED style volumes
+        # when combined with restrictive permissions (750/700).
+        ad_joined = self._is_svm_ad_joined(svm_name)
+        replacement = "nobody" if ad_joined else " "
+
         body = {
             "direction": "win_unix",
             "index": position,
             "pattern": pattern,
-            "replacement": " ",  # Empty replacement = access denied
+            "replacement": replacement,
             "svm": {"uuid": svm_uuid, "name": svm_name},
         }
 
         logger.info(
-            "Blocking SMB user: %s\\%s on SVM %s (position %d)",
-            domain, username, svm_name, position,
+            "Blocking SMB user: %s\\%s on SVM %s (position %d, replacement=%r, ad_joined=%s)",
+            domain, username, svm_name, position, replacement, ad_joined,
         )
 
         self._request("POST", "/name-services/name-mappings", body=body)
@@ -745,19 +768,25 @@ class OntapResponseClient:
         """
         svm_uuid = self._get_svm_uuid(svm_name)
 
-        # Find SMB blocks (name-mappings with empty replacement)
+        # Find SMB blocks (name-mappings with space or "nobody" replacement)
         smb_blocks = []
         try:
+            # Query all win_unix mappings and filter client-side
+            # (ONTAP REST API rejects replacement=%20 as a filter on some versions)
             data = self._request(
                 "GET",
                 f"/name-services/name-mappings"
-                f"?svm.uuid={svm_uuid}&direction=win_unix&replacement=%20",
+                f"?svm.uuid={svm_uuid}&direction=win_unix"
+                f"&fields=pattern,replacement",
             )
             for record in data.get("records", []):
-                smb_blocks.append({
-                    "pattern": record.get("pattern", ""),
-                    "index": record.get("index", 0),
-                })
+                replacement = record.get("replacement", "")
+                if replacement in (" ", "nobody"):
+                    smb_blocks.append({
+                        "pattern": record.get("pattern", ""),
+                        "index": record.get("index", 0),
+                        "replacement": replacement,
+                    })
         except OntapResponseError:
             pass
 

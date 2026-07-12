@@ -59,10 +59,10 @@ class TestBlockSmbUser:
 
     def test_block_smb_user_success(self, client):
         """Block an SMB user via name-mapping."""
-        # Mock: SVM lookup
+        # Mock: SVM lookup, CIFS services check (no AD), name-mapping creation
         client._http.request.side_effect = [
             make_response(200, {"records": [{"uuid": "svm-uuid-123", "name": "svm-prod"}]}),
-            # Mock: name-mapping creation
+            make_response(200, {"records": []}),  # No CIFS service = not AD-joined
             make_response(201, {}),
         ]
 
@@ -78,12 +78,33 @@ class TestBlockSmbUser:
         assert result["svm"] == "svm-prod"
         assert result["position"] == 1
 
-        # Verify the POST body
-        post_call = client._http.request.call_args_list[1]
+        # Verify the POST body — non-AD SVM uses space replacement
+        post_call = client._http.request.call_args_list[2]
         assert post_call[0][0] == "POST"
         body = json.loads(post_call[1]["body"])
         assert body["direction"] == "win_unix"
         assert body["replacement"] == " "
+
+    def test_block_smb_user_ad_joined_svm(self, client):
+        """AD-joined SVM uses 'nobody' replacement instead of space."""
+        client._http.request.side_effect = [
+            make_response(200, {"records": [{"uuid": "svm-uuid-123", "name": "svm-ad"}]}),
+            # CIFS services check: AD-joined (has CIFS service)
+            make_response(200, {"records": [{"name": "ADSERVER"}]}),
+            make_response(201, {}),
+        ]
+
+        result = client.block_smb_user(
+            svm_name="svm-ad",
+            domain="DEMO",
+            username="jdoe",
+        )
+
+        assert result["status"] == "blocked"
+        # Verify replacement is "nobody" for AD-joined SVMs
+        post_call = client._http.request.call_args_list[2]
+        body = json.loads(post_call[1]["body"])
+        assert body["replacement"] == "nobody"
 
     def test_block_smb_user_svm_not_found(self, client):
         """Raise error when SVM does not exist."""
@@ -427,6 +448,8 @@ class TestContainSmbThreat:
             make_response(201, {}),
             # block_smb_user: SVM lookup
             make_response(200, {"records": [{"uuid": "svm-uuid-123"}]}),
+            # block_smb_user: CIFS services check (not AD-joined)
+            make_response(200, {"records": []}),
             # block_smb_user: create mapping
             make_response(201, {}),
             # disconnect: SVM lookup
@@ -460,6 +483,8 @@ class TestContainSmbThreat:
             make_response(200, {"records": []}),
             # block_smb_user: SVM lookup
             make_response(200, {"records": [{"uuid": "svm-uuid-123"}]}),
+            # block_smb_user: CIFS services check (not AD-joined)
+            make_response(200, {"records": []}),
             # block_smb_user: create mapping
             make_response(201, {}),
             # disconnect: SVM lookup
@@ -640,9 +665,9 @@ class TestListActiveBlocks:
         client._http.request.side_effect = [
             # SVM lookup
             make_response(200, {"records": [{"uuid": "svm-uuid-123"}]}),
-            # SMB blocks (name-mappings with space replacement)
+            # SMB blocks (name-mappings — filtered client-side for space/nobody)
             make_response(200, {"records": [
-                {"pattern": "CORP\\\\jdoe", "index": 1},
+                {"pattern": "CORP\\\\jdoe", "index": 1, "replacement": " "},
             ]}),
             # Export policies
             make_response(200, {"records": [{"id": 42, "name": "default"}]}),
