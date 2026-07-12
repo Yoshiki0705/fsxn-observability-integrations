@@ -399,6 +399,20 @@ done
 
 For most FSx deployments (client and FSx ENI in the same subnet), **export-policy deny rule is the reliable mechanism**. NACL is useful as defense-in-depth only when client and FSx are in different subnets.
 
+#### "Same-Subnet but I Need Packet-Level Blocking" — Options
+
+If your security policy requires network-layer blocking even when client and FSx share a subnet, here are your options:
+
+| Option | How | Trade-off |
+|--------|-----|-----------|
+| **1. Move client to a different subnet** | Separate application subnets from storage subnets. FSx ENI in `subnet-storage`, clients in `subnet-app`. | Requires re-architecture; best practice for production regardless |
+| **2. Security Group deny (indirect)** | Remove the client's SG from the FSx ENI's allowed inbound sources. Not instant — existing TCP connections persist until timeout. | SG changes affect all clients in that group, not just the attacker |
+| **3. Export-policy deny (recommended)** | Already implemented in this module. Effective immediately, even for root. No network-layer change needed. | Cannot block non-NFS traffic from the same IP (DNS, SSH, etc.) |
+| **4. Host-level firewall (iptables/nftables)** | Push an iptables rule to the client via SSM: `iptables -A OUTPUT -d <FSx-IP> -j DROP` | Requires SSM access to the attacker's host (may be compromised) |
+| **5. Subnet re-routing (advanced)** | Add a blackhole route for the client IP in the subnet's route table | Affects all traffic to/from that IP, not just NFS |
+
+**Recommendation for same-subnet deployments**: Use export-policy deny rule (Option 3) as the primary mechanism. It is immediate, per-IP, and does not require network infrastructure changes. If you also need to block the IP's non-NFS traffic, consider Option 1 as a long-term architectural improvement.
+
 ### DNS / Route 53
 
 No stack creates Route 53 records. VPC Endpoint private DNS is handled automatically by AWS (PrivateDnsEnabled=true). No custom DNS configuration required.
