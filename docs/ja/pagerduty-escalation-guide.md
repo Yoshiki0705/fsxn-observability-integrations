@@ -100,7 +100,9 @@ Level 3 (30分後):   インフラ責任者       — 電話
 
 ## Severity（重大度）のマッピング
 
-> **重要**: 本テンプレートの `EscalationLevel` パラメータは **SNS トピック名を決めるだけ**（`fsxn-pagerduty-critical` 等）で、PagerDuty 側のインシデント severity を自動設定するものではありません。
+> **重要**
+>
+> 本テンプレートの `EscalationLevel` パラメータは **SNS トピック名を決めるだけ**（`fsxn-pagerduty-critical` 等）で、PagerDuty 側のインシデント severity を自動設定するものではありません。
 
 CloudWatch Alarm → SNS → PagerDuty Events API v2 の標準連携では、以下の挙動になります。
 
@@ -119,8 +121,8 @@ CloudWatch Alarm → SNS → PagerDuty Events API v2 の標準連携では、以
 
 ## セキュリティ注記
 
-- **Integration URL は秘密情報**: URL に PagerDuty integration key が埋め込まれています。CloudFormation パラメータは `NoEcho: true` でコンソール/API から隠蔽していますが、SNS サブスクリプションのエンドポイントには保存されます。デプロイ権限を持つプリンシパルと SNS トピックポリシーを機密として扱ってください
-- **キーのローテーション**: PagerDuty 側で integration key をローテーションした場合、スタックを更新して新しい URL を反映してください
+- **Integration URL は秘密情報** — URL に PagerDuty integration key が埋め込まれています。CloudFormation パラメータは `NoEcho: true` でコンソール/API から隠蔽していますが、SNS サブスクリプションのエンドポイントには保存されます。デプロイ権限を持つプリンシパルと SNS トピックポリシーを機密として扱ってください
+- **キーのローテーション** — PagerDuty 側で integration key をローテーションした場合、スタックを更新して新しい URL を反映してください
 
 ## コスト
 

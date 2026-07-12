@@ -2,19 +2,19 @@
 
 🌐 **日本語**（このページ） | [English](../en/verification-results-splunk.md)
 
-- **検証日時**: <検証日>
-- **検証者**: <検証者名> / <役職>
+- **検証日時** — <検証日>
+- **検証者** — <検証者名> / <役職>
 
 ### 検証環境
 
-- **AWS リージョン**: ap-northeast-1
-- **CloudFormation スタック名**: <スタック名>
-- **Lambda 関数名**: fsxn-splunk-log-shipper
-- **Splunk HEC エンドポイント**: <HEC エンドポイント URL>
-- **Splunk インデックス**: fsxn_audit
-- **FSx for ONTAP ファイルシステム**: <ファイルシステム ID>
-- **S3 Access Point**: <S3 Access Point ARN>
-- **HEC Token Secret ARN**: <Secrets Manager ARN>
+- **AWS リージョン** — ap-northeast-1
+- **CloudFormation スタック名** — <スタック名>
+- **Lambda 関数名** — fsxn-splunk-log-shipper
+- **Splunk HEC エンドポイント** — <HEC エンドポイント URL>
+- **Splunk インデックス** — fsxn_audit
+- **FSx for ONTAP ファイルシステム** — <ファイルシステム ID>
+- **S3 Access Point** — <S3 Access Point ARN>
+- **HEC Token Secret ARN** — <Secrets Manager ARN>
 
 ---
 
@@ -37,7 +37,7 @@
 
 ### ステップ 1: CloudFormation スタックデプロイ
 
-- **結果**: <PASS/FAIL>
+- **結果** — <PASS/FAIL>
 
 ```bash
 aws cloudformation deploy \
@@ -51,28 +51,28 @@ aws cloudformation deploy \
   --region ap-northeast-1
 ```
 
-- **スタックステータス**: <CREATE_COMPLETE / FAILED>
-- **作成されたリソース**: Lambda 関数、IAM ロール、DLQ、CloudWatch Alarms、EventBridge Rule
+- **スタックステータス** — <CREATE_COMPLETE / FAILED>
+- **作成されたリソース** — Lambda 関数、IAM ロール、DLQ、CloudWatch Alarms、EventBridge Rule
 
 ---
 
 ### ステップ 2: HEC Token 検証
 
-- **結果**: <PASS/FAIL>
+- **結果** — <PASS/FAIL>
 
 ```bash
 python3 scripts/verification/splunk_token_validator.py \
   --secret-arn <Secrets Manager ARN>
 ```
 
-- **トークン形式**: <UUID 形式一致 / 不一致>
-- **検証出力**: <出力内容>
+- **トークン形式** — <UUID 形式一致 / 不一致>
+- **検証出力** — <出力内容>
 
 ---
 
 ### ステップ 3: Lambda テストイベント送信
 
-- **結果**: <PASS/FAIL>
+- **結果** — <PASS/FAIL>
 
 ```bash
 aws lambda invoke \
@@ -83,13 +83,11 @@ aws lambda invoke \
   response.json
 ```
 
-- **レスポンス**:
-```json
+- **レスポンス** — ```json
 {"statusCode": <ステータスコード>, "body": {"total_logs": <件数>, "total_shipped": <件数>, "errors": []}}
 ```
 
-- **確認項目**:
-  - [ ] statusCode: 200
+- **確認項目** — - [ ] statusCode: 200
   - [ ] total_logs > 0
   - [ ] total_shipped == total_logs
   - [ ] errors: [] (空)
@@ -98,7 +96,7 @@ aws lambda invoke \
 
 ### ステップ 4: CloudWatch Logs 確認
 
-- **結果**: <PASS/FAIL>
+- **結果** — <PASS/FAIL>
 
 ```bash
 aws logs filter-log-events \
@@ -108,15 +106,14 @@ aws logs filter-log-events \
   --region ap-northeast-1
 ```
 
-- **確認項目**:
-  - [ ] "Successfully shipped" を含むログ行が存在
+- **確認項目** — - [ ] "Successfully shipped" を含むログ行が存在
   - [ ] タイムスタンプがテストイベント送信後
 
 ---
 
 ### ステップ 5: Splunk Search ログ到着確認
 
-- **結果**: <PASS/FAIL>
+- **結果** — <PASS/FAIL>
 
 以下の SPL クエリを Splunk Search で実行:
 
@@ -124,11 +121,10 @@ aws logs filter-log-events \
 index=fsxn_audit sourcetype=fsxn:ontap:audit earliest=-15m
 ```
 
-- **返却イベント数**: <件数>
-- **到着までの時間**: <秒数>
+- **返却イベント数** — <件数>
+- **到着までの時間** — <秒数>
 
-- **確認項目**:
-  - [ ] 1件以上のイベントが返却される
+- **確認項目** — - [ ] 1件以上のイベントが返却される
   - [ ] sourcetype が `fsxn:ontap:audit` である
   - [ ] index が `fsxn_audit` である
 
@@ -136,7 +132,7 @@ index=fsxn_audit sourcetype=fsxn:ontap:audit earliest=-15m
 
 ### ステップ 6: フィールド検証
 
-- **結果**: <PASS/FAIL>
+- **結果** — <PASS/FAIL>
 
 Splunk Search でイベントを展開し、以下のフィールドを確認:
 
@@ -175,7 +171,7 @@ Splunk Search でイベントを展開し、以下のフィールドを確認:
 
 ## セットアップガイド日英対応確認
 
-- **結果**: <PASS/FAIL>
+- **結果** — <PASS/FAIL>
 
 ```bash
 python3 scripts/verification/bilingual_comparator.py \
@@ -183,10 +179,10 @@ python3 scripts/verification/bilingual_comparator.py \
   --en integrations/splunk-serverless/docs/en/setup-guide.md
 ```
 
-- **見出し数**: <件数>（一致 / 不一致）
-- **コードブロック数**: <件数>（一致 / 不一致）
-- **テーブル数**: <件数>（一致 / 不一致）
-- **差異件数**: <件数>
+- **見出し数** — <件数>（一致 / 不一致）
+- **コードブロック数** — <件数>（一致 / 不一致）
+- **テーブル数** — <件数>（一致 / 不一致）
+- **差異件数** — <件数>
 
 | # | セクション | 差異種別 | 内容 |
 |---|-----------|---------|------|

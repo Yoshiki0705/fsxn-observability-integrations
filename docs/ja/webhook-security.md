@@ -63,7 +63,9 @@ vserver ems destination create -name grafana-webhook \
   -certificate-authority <ca-name>
 ```
 
-> **注意**: ONTAP EMS Webhook のカスタムヘッダー設定は ONTAP バージョンによって異なります。`Authorization: Bearer <token>` ヘッダーを Webhook リクエストに追加する正しい構文については、ONTAP ドキュメントを参照してください。
+> **注意**
+>
+> ONTAP EMS Webhook のカスタムヘッダー設定は ONTAP バージョンによって異なります。`Authorization: Bearer <token>` ヘッダーを Webhook リクエストに追加する正しい構文については、ONTAP ドキュメントを参照してください。
 
 ### シークレットローテーション
 

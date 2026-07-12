@@ -103,6 +103,51 @@ Forcefully terminates active sessions so the blocked user cannot continue operat
 - Deletes each session via REST API
 - Used in combination with user blocking for immediate effect
 
+### NFS Immediate Blocking: Multi-Layer Options
+
+Unlike SMB (where session disconnect forces re-authentication), NFS has no equivalent session-terminate API. The ONTAP export-policy deny rule takes effect on the next I/O, but Linux NFS clients cache access decisions for up to 60 seconds (`actimeo` default). Three options are available, and can be combined:
+
+| Option | Layer | Effect Timing | Scope | Configuration |
+|--------|-------|---------------|-------|---------------|
+| **NACL deny rule** (recommended) | Network (VPC) | **Immediate** (packet-level) | All traffic from IP to subnet | `FsxSubnetId` parameter + `block_nfs_ip_network` action |
+| Export-policy deny rule | ONTAP | Next I/O (up to 60s cache) | NFS volumes using that policy | `block_nfs_ip` action (existing) |
+| Security Group modification | Network (ENI) | Immediate | Allow-only (cannot deny specific IP without removing broader allow) | Manual or custom automation |
+
+**Recommended approach**: Use `contain_nfs_threat` with `FsxSubnetId` configured. This executes both layers automatically:
+1. ONTAP export-policy deny rule (persistent, survives NACL removal)
+2. NACL deny rule (immediate, network-level, no client cache bypass)
+
+```bash
+# Deploy with network-layer blocking enabled:
+aws cloudformation deploy \
+  --template-file shared/templates/automated-response.yaml \
+  --stack-name fsxn-automated-response \
+  --parameter-overrides \
+    ... \
+    FsxSubnetId=<subnet-where-fsx-enis-reside> \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+**Standalone network block** (without ONTAP-layer):
+```json
+{"action": "block_nfs_ip_network", "svm_name": "svm-prod", "client_ip": "10.0.5.99", "reason": "Mass deletion"}
+```
+
+**Unblock**:
+```json
+{"action": "unblock_nfs_ip_network", "svm_name": "svm-prod", "client_ip": "10.0.5.99"}
+```
+
+> **Scope note**: NACL deny rules block ALL traffic from the specified IP to the entire subnet (not just NFS port 2049). Set `block_all_ports: false` in the SNS message to restrict blocking to NFS port only. The ONTAP export-policy rule is NFS-specific and more granular.
+
+> **Cleanup note**: NACL rules created by this module use rule numbers 50-99. Rules outside this range are never modified. Use `unblock_nfs_ip_network` or the TTL auto-cleanup to remove rules.
+
+> **VPC Endpoint requirement**: The Lambda calls the EC2 API (`CreateNetworkAclEntry`) to manage NACL rules. If your VPC has a NAT Gateway, this works automatically. If not, add an EC2 Interface VPC Endpoint (`com.amazonaws.<region>.ec2`). Without EC2 API access, the NACL block will timeout (non-fatal — the ONTAP export-policy block still succeeds as a fallback).
+
+> **NFSv4 lease note**: NFSv4 has internal lease management, but ONTAP does not expose a REST API endpoint for forced lease revocation of a specific client. The NACL approach works for both NFSv3 and NFSv4 regardless of protocol version.
+
+> **Blast radius note**: By default, the NACL rule blocks ALL protocols from the IP (not just NFS port 2049). If the blocked IP is also used for monitoring or management, set `"block_all_ports": false` in the SNS message to restrict blocking to NFS port only.
+
 ---
 
 ## Comparison: This Approach vs Dedicated Storage Security Products

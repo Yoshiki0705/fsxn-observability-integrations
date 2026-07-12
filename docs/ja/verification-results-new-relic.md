@@ -4,8 +4,8 @@
 
 ## 実施概要
 
-- **検証日時**: 2026-05-24T00:00:00+09:00
-- **検証環境**: 検証環境（ap-northeast-1）
+- **検証日時** — 2026-05-24T00:00:00+09:00
+- **検証環境** — 検証環境（ap-northeast-1）
 
 ---
 
@@ -44,7 +44,7 @@
 
 ### ステップ 1: CloudFormation スタックデプロイ
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 ```bash
 aws cloudformation deploy \
@@ -59,21 +59,20 @@ aws cloudformation deploy \
   --region ap-northeast-1
 ```
 
-- **スタックステータス**: CREATE_COMPLETE
-- **作成されたリソース**:
-  - [x] Lambda 関数
+- **スタックステータス** — CREATE_COMPLETE
+- **作成されたリソース** — - [x] Lambda 関数
   - [x] IAM ロール（Named IAM）
   - [x] EventBridge Rule
   - [x] Dead Letter Queue（KMS 暗号化）
   - [x] CloudWatch LogGroup（30日保持）
   - [x] CloudWatch Alarm（エラー閾値）
-- **備考**: `CAPABILITY_NAMED_IAM` が必要（テンプレートが Named IAM Role を作成するため）
+- **備考** — `CAPABILITY_NAMED_IAM` が必要（テンプレートが Named IAM Role を作成するため）
 
 ---
 
 ### ステップ 2: Lambda テストイベント送信
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 ```bash
 aws lambda invoke \
@@ -84,8 +83,7 @@ aws lambda invoke \
   response.json
 ```
 
-- **レスポンス**:
-```json
+- **レスポンス** — ```json
 {
   "statusCode": 200,
   "body": {
@@ -96,26 +94,24 @@ aws lambda invoke \
 }
 ```
 
-- **確認項目**:
-  - [x] statusCode: 200
+- **確認項目** — - [x] statusCode: 200
   - [x] total_logs: 3
   - [x] total_shipped: 3
   - [x] errors: [] (空)
-- **CloudWatch ログ確認**: `Processing event with 1 records` → 正常処理完了
-- **New Relic API レスポンス**: HTTP 202 + requestId
+- **CloudWatch ログ確認** — `Processing event with 1 records` → 正常処理完了
+- **New Relic API レスポンス** — HTTP 202 + requestId
 
 ---
 
 ### ステップ 3: New Relic ログ到着確認
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
-- **NRQL フィルタ**: `SELECT count(*) FROM Log WHERE source='fsxn-ontap' SINCE 1 hour ago`
-- **到着ログ数**: 1件（タイムスタンプ修正後の送信分）
-- **到着までの時間**: 約30秒
+- **NRQL フィルタ** — `SELECT count(*) FROM Log WHERE source='fsxn-ontap' SINCE 1 hour ago`
+- **到着ログ数** — 1件（タイムスタンプ修正後の送信分）
+- **到着までの時間** — 約30秒
 
-- **属性確認**:
-  - [x] `source` = `fsxn-ontap`
+- **属性確認** — - [x] `source` = `fsxn-ontap`
   - [x] `service` = `ontap-audit`
   - [x] `event_type` = `4663`
   - [x] `svm` = `svm-prod-01`
@@ -124,9 +120,7 @@ aws lambda invoke \
   - [x] `result` = `Success`
   - [x] `path` = `/vol/data/test.txt`
 
-- **属性マッピング検証**:
-
-| ソースフィールド | New Relic 属性 | 値 | 判定 |
+- **属性マッピング検証** — | ソースフィールド | New Relic 属性 | 値 | 判定 |
 |----------------|---------------|-----|------|
 | EventID | event_type | 4663 | ✅ OK |
 | SVMName | svm | svm-prod-01 | ✅ OK |
@@ -142,7 +136,7 @@ aws lambda invoke \
 
 ### ステップ 4: NRQL クエリ実行
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 #### クエリ 1: ログ件数確認
 
@@ -150,9 +144,9 @@ aws lambda invoke \
 SELECT count(*) FROM Log WHERE source='fsxn-ontap' SINCE 1 hour ago
 ```
 
-- **実行時刻**: 2026-05-24T00:07:00Z
-- **結果**: 1件
-- **判定**: ✅ PASS
+- **実行時刻** — 2026-05-24T00:07:00Z
+- **結果** — 1件
+- **判定** — ✅ PASS
 
 #### クエリ 2: 属性確認
 
@@ -160,9 +154,9 @@ SELECT count(*) FROM Log WHERE source='fsxn-ontap' SINCE 1 hour ago
 SELECT message, source, operation, svm, user, result FROM Log WHERE source='fsxn-ontap' SINCE 1 hour ago LIMIT 5
 ```
 
-- **実行時刻**: 2026-05-24T00:07:00Z
-- **結果**: 全属性が正しくマッピングされていることを確認
-- **判定**: ✅ PASS
+- **実行時刻** — 2026-05-24T00:07:00Z
+- **結果** — 全属性が正しくマッピングされていることを確認
+- **判定** — ✅ PASS
 
 ![New Relic Query Builder — NRQL クエリ結果](../screenshots/new-relic/nrql-query-result.png)
 
@@ -170,10 +164,10 @@ SELECT message, source, operation, svm, user, result FROM Log WHERE source='fsxn
 
 ### ステップ 5: Alert Condition 設定
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
-- **Alert Policy 名**: FSx for ONTAP Audit Alerts（NerdGraph API 経由で作成）
-- **Alert Condition 名**: FSx for ONTAP Failed Access Spike
+- **Alert Policy 名** — FSx for ONTAP Audit Alerts（NerdGraph API 経由で作成）
+- **Alert Condition 名** — FSx for ONTAP Failed Access Spike
 
 #### Alert Condition 設定詳細
 
@@ -215,26 +209,26 @@ mutation {
 
 ### ステップ 6: デモシナリオ3「クォータ閾値超過アラート」
 
-- **結果**: ⏸️ 未実施
+- **結果** — ⏸️ 未実施
 
-- **理由**: EMS Webhook インフラ（API Gateway + Lambda）が未デプロイのため、ONTAP EMS イベントの受信パスが未構築
-- **次回実施条件**: `shared/templates/ems-webhook-apigw.yaml` デプロイ後に実施
+- **理由** — EMS Webhook インフラ（API Gateway + Lambda）が未デプロイのため、ONTAP EMS イベントの受信パスが未構築
+- **次回実施条件** — `shared/templates/ems-webhook-apigw.yaml` デプロイ後に実施
 
 ---
 
 ### ステップ 7: セットアップガイド日英対応確認
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
-- **日本語**: `integrations/new-relic/docs/ja/setup-guide.md` — 存在確認済み
-- **英語**: `integrations/new-relic/docs/en/setup-guide.md` — 存在確認済み
-- **構造一致**: 見出し構造とコードブロックが一致
+- **日本語** — `integrations/new-relic/docs/ja/setup-guide.md` — 存在確認済み
+- **英語** — `integrations/new-relic/docs/en/setup-guide.md` — 存在確認済み
+- **構造一致** — 見出し構造とコードブロックが一致
 
 ---
 
 ### ステップ 8: スクリーンショット検証
 
-- **結果**: ✅ PASS
+- **結果** — ✅ PASS
 
 | # | ファイル名 | サイズ | フォーマット | 判定 |
 |---|-----------|--------|-----------|------|
@@ -258,9 +252,9 @@ mutation {
 | 3 | `alert-condition-config.png` | Alert Condition 設定画面（NRQL + 閾値表示） | ステップ 5 |
 | 4 | `alert-policy-overview.png` | Alert Policy 概要（条件一覧表示） | ステップ 5 |
 
-- **保存先ディレクトリ**: `docs/screenshots/new-relic/`
-- **フォーマット**: PNG
-- **ファイルサイズ制限**: ≤ 500KB（全ファイル準拠）
+- **保存先ディレクトリ** — `docs/screenshots/new-relic/`
+- **フォーマット** — PNG
+- **ファイルサイズ制限** — ≤ 500KB（全ファイル準拠）
 
 ---
 
@@ -284,11 +278,10 @@ mutation {
 
 ### 判定結果
 
-- **判定**: ✅ 監査ログパス本番環境利用可能（EMS/FPolicy パスは別途検証）
-- **合格基準数**: 7 / 8（デモシナリオ6 は EMS インフラ未デプロイのため未実施）
-- **不合格基準**: なし
-- **未実施基準**:
-  - ステップ 6: EMS Webhook インフラデプロイ後に実施予定
+- **判定** — ✅ 監査ログパス本番環境利用可能（EMS/FPolicy パスは別途検証）
+- **合格基準数** — 7 / 8（デモシナリオ6 は EMS インフラ未デプロイのため未実施）
+- **不合格基準** — なし
+- **未実施基準** — - ステップ 6: EMS Webhook インフラデプロイ後に実施予定
 
 ---
 

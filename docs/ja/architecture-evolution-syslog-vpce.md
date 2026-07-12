@@ -3,8 +3,12 @@
 🌐 **日本語**（このページ） | [English](../en/architecture-evolution-syslog-vpce.md)
 
 > **ステータス**: 検証中（2026-06-28）
-> **関連**: [AWS 発表 — CloudWatch Logs supports managed syslog ingestion](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-cloudwatch-syslog-ingestion/)
-> **参考**: [Classmethod ブログ](https://dev.classmethod.jp/articles/amazon-fsx-for-netapp-ontap-security-audit-log-syslog-to-cw-logs/)
+> **関連**
+>
+> [AWS 発表 — CloudWatch Logs supports managed syslog ingestion](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-cloudwatch-syslog-ingestion/)
+> **参考**
+>
+> [Classmethod ブログ](https://dev.classmethod.jp/articles/amazon-fsx-for-netapp-ontap-security-audit-log-syslog-to-cw-logs/)
 
 ---
 
@@ -190,7 +194,9 @@ aws cloudformation deploy \
 
 ### Syslog Configuration の作成手順（AWS Console）
 
-> **注記**: 2026 年 6 月時点で `PutSyslogConfiguration` API は AWS CLI v2.35.x では未対応です。Console から作成してください。
+> **注記**
+>
+> 2026 年 6 月時点で `PutSyslogConfiguration` API は AWS CLI v2.35.x では未対応です。Console から作成してください。
 
 1. AWS Console → **CloudWatch** → **Logs** → 左メニュー **Syslog configurations**
 2. **Create syslog configuration** をクリック

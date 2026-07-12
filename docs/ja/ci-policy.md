@@ -56,9 +56,9 @@ guard/rules/
 ```
 
 すべての Lambda 関数が直接 DLQ を必要とするわけではありません:
-- **Audit poller**: Scheduler DLQ を使用（Lambda DLQ ではない）
-- **EMS webhook**: API Gateway の同期呼び出し。失敗レスポンス + アラームが主要な対応手段
-- **FPolicy handler**: SQS ソース側の DLQ が障害を処理
+- **Audit poller** — Scheduler DLQ を使用（Lambda DLQ ではない）
+- **EMS webhook** — API Gateway の同期呼び出し。失敗レスポンス + アラームが主要な対応手段
+- **FPolicy handler** — SQS ソース側の DLQ が障害を処理
 
 ## セキュリティスキャンのカバレッジ
 

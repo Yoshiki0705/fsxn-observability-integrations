@@ -32,7 +32,9 @@
 | Elastic Cloud | 14日間トライアル | ~$30 (最小構成) | ~$95 | ~$300+ | ストレージ + コンピュート |
 | OTel Collector | N/A (セルフホスト) | $0 (インフラのみ) | $0 (インフラのみ) | $0 (インフラのみ) | バックエンドコストのみ |
 
-> **注意**: 価格は概算であり、リージョン、契約形態、コミットメントにより変動します。最新の価格は各ベンダーの料金ページで確認してください。AWS インフラコスト（Lambda, EventBridge, S3, Secrets Manager）は通常 $5-50/月です。
+> **注意**
+>
+> 価格は概算であり、リージョン、契約形態、コミットメントにより変動します。最新の価格は各ベンダーの料金ページで確認してください。AWS インフラコスト（Lambda, EventBridge, S3, Secrets Manager）は通常 $5-50/月です。
 
 ### AWS インフラコスト推定
 
@@ -48,26 +50,26 @@
 ## 選定ガイド
 
 ### コスト重視
-- **New Relic**: 無料枠が最大（100 GB/月、永続）
-- **Grafana Cloud**: 無料枠あり（50 GB/月）+ OSS エコシステム
-- **Sumo Logic**: 無料枠あり（1.25 credits/日、7 日保持）
-- **Elastic**: セルフホスト可能（取り込みコストなし）
+- **New Relic** — 無料枠が最大（100 GB/月、永続）
+- **Grafana Cloud** — 無料枠あり（50 GB/月）+ OSS エコシステム
+- **Sumo Logic** — 無料枠あり（1.25 credits/日、7 日保持）
+- **Elastic** — セルフホスト可能（取り込みコストなし）
 
 ### 既存環境との統合
-- **Datadog**: 既に Datadog を APM/インフラ監視で使用している場合
-- **Splunk**: 既存 Splunk 環境がある場合（EC2 UF からのサーバーレス移行）
-- **Dynatrace**: AI 駆動の根本原因分析と APM 相関が必要な場合
+- **Datadog** — 既に Datadog を APM/インフラ監視で使用している場合
+- **Splunk** — 既存 Splunk 環境がある場合（EC2 UF からのサーバーレス移行）
+- **Dynatrace** — AI 駆動の根本原因分析と APM 相関が必要な場合
 
 ### ベンダーロックイン回避
-- **OTel Collector**: ベンダー中立、コード変更なしでバックエンド切り替え可能
-- **Grafana Cloud**: OSS ベースのスタック（Loki, Grafana）
-- **Honeycomb**: OTel Collector 経由で強力
+- **OTel Collector** — ベンダー中立、コード変更なしでバックエンド切り替え可能
+- **Grafana Cloud** — OSS ベースのスタック（Loki, Grafana）
+- **Honeycomb** — OTel Collector 経由で強力
 
 ### エンタープライズ / コンプライアンス
-- **Splunk**: 確立された SIEM、コンプライアンスレポート
-- **CrowdStrike Falcon LogScale**: 次世代 SIEM、Falcon XDR エコシステムと統合
-- **Elastic**: セルフホストによるデータ主権確保
-- **Datadog**: SOC 2, HIPAA, FedRAMP オプション
+- **Splunk** — 確立された SIEM、コンプライアンスレポート
+- **CrowdStrike Falcon LogScale** — 次世代 SIEM、Falcon XDR エコシステムと統合
+- **Elastic** — セルフホストによるデータ主権確保
+- **Datadog** — SOC 2, HIPAA, FedRAMP オプション
 
 ## アーキテクチャパターン比較
 
@@ -217,7 +219,9 @@ index=fsxn_fpolicy sourcetype="fsxn:ontap:fpolicy" operation_type="create"
 - パネル: クライアント IP 別トップトーカー（テーブル）
 - アラートアクション: 「AWS SNS notification」アクション（Splunk Add-on for AWS）で自動封じ込めをトリガー
 
-> **補足**: Splunk Cloud トライアルでは HEC DNS がプロビジョニングされません。ローカル検証には Splunk Enterprise（Docker）を使用してください。[トライアル・検証に関する注意事項](#トライアル検証に関する注意事項) を参照。
+> **補足**
+>
+> Splunk Cloud トライアルでは HEC DNS がプロビジョニングされません。ローカル検証には Splunk Enterprise（Docker）を使用してください。[トライアル・検証に関する注意事項](#トライアル検証に関する注意事項) を参照。
 
 ---
 

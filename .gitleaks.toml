@@ -85,4 +85,6 @@ paths = [
   '''integrations/.*/tests/''',
   '''scripts/verification/tests/''',
   '''shared/scripts/datadog-screenshot-continuation-prompt\.md''',
+  '''shared/python/network_block\.py''',
+  '''shared/python/tests/test_network_block\.py''',
 ]

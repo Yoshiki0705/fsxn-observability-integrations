@@ -96,6 +96,16 @@ Parameters:
       Example: arn:aws:lambda:ap-northeast-1:123456789012:layer:fsxn-shared-python:2
     Default: ''
 
+  FsxSubnetId:
+    Type: String
+    Description: >-
+      Subnet ID where FSx for ONTAP ENIs reside (for network-layer NFS
+      blocking via NACL). When provided, the block_nfs_ip_network action
+      adds a deny rule to this subnet's NACL for immediate packet-level
+      blocking — bypassing NFS client-side attribute caching. Leave empty
+      to disable network-layer blocking (ONTAP export-policy only).
+    Default: ''
+
   CreateVpcEndpoints:
     Type: String
     Description: >-
@@ -229,6 +239,16 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-handler:*'
+              - Sid: NetworkAclBlock
+                Effect: Allow
+                Action:
+                  - ec2:CreateNetworkAclEntry
+                  - ec2:DeleteNetworkAclEntry
+                  - ec2:DescribeNetworkAcls
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'aws:RequestedRegion': !Ref 'AWS::Region'
 
   # CloudWatch Log Group with retention (compliance: immutable audit trail)
   ResponseLogGroup:
@@ -266,6 +286,7 @@ Resources:
           COOLDOWN_MINUTES: !Ref CooldownMinutes
           NOTIFICATION_TOPIC_ARN: !Ref ResponseNotificationTopic
           PROTECTED_ACCOUNTS_EXTRA: !Ref ProtectedAccountsExtra
+          FSX_SUBNET_ID: !Ref FsxSubnetId
       Code:
         ZipFile: |
           """Automated Response Lambda — executes containment via ONTAP REST API.
@@ -341,6 +362,21 @@ Resources:
               return _client
 
 
+          # Network-layer blocking client (NACL-based)
+          _net_client = None
+
+          def _get_network_client():
+              """Get or create network block client."""
+              global _net_client
+              if _net_client is None:
+                  try:
+                      from network_block import NetworkBlockClient
+                  except ImportError:
+                      from shared.python.network_block import NetworkBlockClient
+                  _net_client = NetworkBlockClient()
+              return _net_client
+
+
           def _notify(result: dict, action: str):
               """Send notification about completed response action."""
               topic_arn = os.environ.get("NOTIFICATION_TOPIC_ARN")
@@ -404,6 +440,20 @@ Resources:
                               volume_name=payload.get("volume_name"),
                               reason=reason,
                           )
+                          # Also apply network-layer block for immediate effect
+                          fsx_subnet = os.environ.get("FSX_SUBNET_ID", "")
+                          if fsx_subnet and payload.get("client_ip"):
+                              try:
+                                  net_client = _get_network_client()
+                                  net_result = net_client.block_ip(
+                                      subnet_id=fsx_subnet,
+                                      client_ip=payload["client_ip"],
+                                      reason=reason,
+                                  )
+                                  result["network_block"] = net_result
+                              except Exception as ne:
+                                  logger.warning("Network block failed (non-fatal): %s", ne)
+                                  result["network_block"] = {"status": "failed", "error": str(ne)}
                       elif action == "contain_multiprotocol_threat":
                           result = client.contain_multiprotocol_threat(
                               svm_name=svm_name,
@@ -449,6 +499,28 @@ Resources:
                           result = client.list_active_blocks(svm_name=svm_name)
                       elif action == "health_check":
                           result = client.health_check(svm_name=svm_name)
+                      elif action == "block_nfs_ip_network":
+                          fsx_subnet = os.environ.get("FSX_SUBNET_ID", "")
+                          if not fsx_subnet:
+                              result = {"action": action, "status": "error", "error": "FSX_SUBNET_ID not configured"}
+                          else:
+                              net_client = _get_network_client()
+                              result = net_client.block_ip(
+                                  subnet_id=fsx_subnet,
+                                  client_ip=payload.get("client_ip", ""),
+                                  reason=reason,
+                                  block_all_ports=payload.get("block_all_ports", True),
+                              )
+                      elif action == "unblock_nfs_ip_network":
+                          fsx_subnet = os.environ.get("FSX_SUBNET_ID", "")
+                          if not fsx_subnet:
+                              result = {"action": action, "status": "error", "error": "FSX_SUBNET_ID not configured"}
+                          else:
+                              net_client = _get_network_client()
+                              result = net_client.unblock_ip(
+                                  subnet_id=fsx_subnet,
+                                  client_ip=payload.get("client_ip", ""),
+                              )
                       else:
                           result = {"action": action, "status": "error", "error": f"Unknown action: {action}"}
 

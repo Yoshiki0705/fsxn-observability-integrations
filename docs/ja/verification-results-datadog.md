@@ -2,17 +2,17 @@
 
 🌐 **日本語**（このページ） | [English](../en/verification-results-datadog.md)
 
-- **検証日時**: 2026-05-16T21:33:03+09:00
-- **検証者**: Yoshiki Fujiwara / Solutions Architect
+- **検証日時** — 2026-05-16T21:33:03+09:00
+- **検証者** — Yoshiki Fujiwara / Solutions Architect
 
 ### 検証環境
 
-- **AWS リージョン**: ap-northeast-1
-- **CloudFormation スタック名**: fsxn-datadog-integration
-- **Lambda 関数名**: fsxn-datadog-integration-shipper
-- **Datadog サイト**: ap1.datadoghq.com (AP1 Tokyo)
-- **FSx for ONTAP ファイルシステム**: fs-0123456789abcdef0
-- **S3 Access Point**: arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-observability
+- **AWS リージョン** — ap-northeast-1
+- **CloudFormation スタック名** — fsxn-datadog-integration
+- **Lambda 関数名** — fsxn-datadog-integration-shipper
+- **Datadog サイト** — ap1.datadoghq.com (AP1 Tokyo)
+- **FSx for ONTAP ファイルシステム** — fs-0123456789abcdef0
+- **S3 Access Point** — arn:aws:s3:ap-northeast-1:123456789012:accesspoint/fsxn-audit-observability
 
 ---
 
@@ -20,7 +20,7 @@
 
 ### ステップ 1: CloudFormation スタックデプロイ
 
-- **結果**: ✅ 成功
+- **結果** — ✅ 成功
 
 ```bash
 aws cloudformation deploy \
@@ -35,15 +35,15 @@ aws cloudformation deploy \
   --region ap-northeast-1
 ```
 
-- **出力**: `Successfully created/updated stack - fsxn-datadog-integration`
-- **スタックステータス**: CREATE_COMPLETE
-- **作成されたリソース**: Lambda 関数、IAM ロール、DLQ、CloudWatch Alarms、EventBridge Rule、Log Group
+- **出力** — `Successfully created/updated stack - fsxn-datadog-integration`
+- **スタックステータス** — CREATE_COMPLETE
+- **作成されたリソース** — Lambda 関数、IAM ロール、DLQ、CloudWatch Alarms、EventBridge Rule、Log Group
 
 ---
 
 ### ステップ 2: Lambda コードデプロイ
 
-- **結果**: ✅ 成功
+- **結果** — ✅ 成功
 
 ```bash
 cd integrations/datadog/lambda
@@ -54,13 +54,13 @@ aws lambda update-function-code \
   --region ap-northeast-1
 ```
 
-- **備考**: CloudFormation テンプレートはプレースホルダーコードでデプロイされるため、実際の handler.py を別途デプロイする必要がある
+- **備考** — CloudFormation テンプレートはプレースホルダーコードでデプロイされるため、実際の handler.py を別途デプロイする必要がある
 
 ---
 
 ### ステップ 3: Lambda テストイベント送信
 
-- **結果**: ✅ 成功
+- **結果** — ✅ 成功
 
 ```bash
 aws lambda invoke \
@@ -71,13 +71,11 @@ aws lambda invoke \
   response.json
 ```
 
-- **レスポンス**:
-```json
+- **レスポンス** — ```json
 {"statusCode": 200, "body": {"total_logs": 5, "total_shipped": 5, "errors": []}}
 ```
 
-- **確認項目**:
-  - [x] statusCode: 200
+- **確認項目** — - [x] statusCode: 200
   - [x] total_logs: 5
   - [x] total_shipped: 5
   - [x] errors: [] (空)
@@ -86,14 +84,13 @@ aws lambda invoke \
 
 ### ステップ 4: Datadog ログ到着確認
 
-- **結果**: ✅ 成功
+- **結果** — ✅ 成功
 
-- **検索クエリ**: `source:fsxn`
-- **到着ログ数**: 5件（Lambda 送信分）+ 2件（直接 API テスト分）
-- **到着までの時間**: 約30-45秒
+- **検索クエリ** — `source:fsxn`
+- **到着ログ数** — 5件（Lambda 送信分）+ 2件（直接 API テスト分）
+- **到着までの時間** — 約30-45秒
 
-- **確認項目**:
-  - [x] `source:fsxn` で1件以上のログが表示される
+- **確認項目** — - [x] `source:fsxn` で1件以上のログが表示される
   - [x] 各ログに `attributes.svm` = `svm-prod-01`
   - [x] 各ログに `attributes.user` = `admin@corp.local` 等
   - [x] 各ログに `attributes.operation` = `ReadData` 等
@@ -107,11 +104,11 @@ aws lambda invoke \
 
 ### ステップ 5: Log Pipeline 設定
 
-- **結果**: ✅ 成功
+- **結果** — ✅ 成功
 
-- **Pipeline 名**: FSx for ONTAP Audit Logs
-- **フィルタ**: `source:fsxn`
-- **作成方法**: Datadog UI (Logs → Configuration → Pipelines → New Pipeline)
+- **Pipeline 名** — FSx for ONTAP Audit Logs
+- **フィルタ** — `source:fsxn`
+- **作成方法** — Datadog UI (Logs → Configuration → Pipelines → New Pipeline)
 
 ![Log Pipeline 設定](../screenshots/datadog-pipeline-config.png)
 
@@ -119,13 +116,12 @@ aws lambda invoke \
 
 ### ステップ 6: ダッシュボード作成
 
-- **結果**: ✅ 成功
+- **結果** — ✅ 成功
 
-- **ダッシュボード名**: FSx for ONTAP Audit Log Overview
-- **ダッシュボード ID**: ggx-7ad-6e4
-- **作成方法**: Datadog Dashboard API (`POST /api/v1/dashboard`)
-- **ウィジェット**:
-  - ログ量推移 (Timeseries)
+- **ダッシュボード名** — FSx for ONTAP Audit Log Overview
+- **ダッシュボード ID** — ggx-7ad-6e4
+- **作成方法** — Datadog Dashboard API (`POST /api/v1/dashboard`)
+- **ウィジェット** — - ログ量推移 (Timeseries)
   - 操作別内訳 (Top List)
   - ユーザー別アクティビティ (Top List)
   - エラー率 (Query Value)
@@ -136,18 +132,16 @@ aws lambda invoke \
 
 ### ステップ 7: デモシナリオ1「不正アクセス検知」
 
-- **結果**: ✅ 成功
+- **結果** — ✅ 成功
 
-- **検索クエリ**: `source:fsxn @attributes.result:Failure`
-- **検出されたイベント**:
-  - ユーザー: `unknown@external.com`
+- **検索クエリ** — `source:fsxn @attributes.result:Failure`
+- **検出されたイベント** — - ユーザー: `unknown@external.com`
   - 操作: `Open`
   - パス: `/vol/data/confidential/secret.pdf`
   - クライアントIP: `192.168.1.100`
   - 結果: `Failure`
 
-- **確認項目**:
-  - [x] `@attributes.result:Failure` で1件以上表示
+- **確認項目** — - [x] `@attributes.result:Failure` で1件以上表示
   - [x] `@attributes.user` が空でない（`unknown@external.com`）
   - [x] `@attributes.path` が空でない（`/vol/data/confidential/secret.pdf`）
   - [x] `@attributes.client_ip` が空でない（`192.168.1.100`）
@@ -158,7 +152,7 @@ aws lambda invoke \
 
 ### ステップ 8: セットアップガイド日英対応確認
 
-- **結果**: ⚠️ 条件付き合格
+- **結果** — ⚠️ 条件付き合格
 
 ```bash
 python3 scripts/compare-bilingual.py \
@@ -166,17 +160,19 @@ python3 scripts/compare-bilingual.py \
   --en integrations/datadog/docs/en/setup-guide.md
 ```
 
-- **見出し数**: 25（一致）
-- **コードブロック数**: 9
-- **テーブル数**: 3（一致）
-- **差異件数**: 2件（コードブロック内コメントのローカライズ — 意図的）
+- **見出し数** — 25（一致）
+- **コードブロック数** — 9
+- **テーブル数** — 3（一致）
+- **差異件数** — 2件（コードブロック内コメントのローカライズ — 意図的）
 
 | # | セクション | 差異種別 | 内容 |
 |---|-----------|---------|------|
 | 1 | Grok Parser | code_block | コメント行が日本語/英語で異なる（意図的） |
 | 2 | 動作確認 | code_block | コメント行が日本語/英語で異なる（意図的） |
 
-> **判定**: コードブロック内のコメントは各言語で自然な表現を使用しており、実行に影響しないため合格とする。
+> **判定**
+>
+> コードブロック内のコメントは各言語で自然な表現を使用しており、実行に影響しないため合格とする。
 
 ---
 
@@ -217,17 +213,17 @@ python3 scripts/compare-bilingual.py \
 
 ### 検証環境（追加）
 
-- **EMS/FPolicy スタック名**: fsxn-datadog-ems-fpolicy
-- **EMS Lambda 関数名**: fsxn-datadog-ems-fpolicy-ems
-- **FPolicy Lambda 関数名**: fsxn-datadog-ems-fpolicy-fpolicy
-- **EMS Webhook スタック**: fsxn-ems-webhook（既存）
-- **FPolicy サーバースタック**: fsxn-fp-srv（既存）
+- **EMS/FPolicy スタック名** — fsxn-datadog-ems-fpolicy
+- **EMS Lambda 関数名** — fsxn-datadog-ems-fpolicy-ems
+- **FPolicy Lambda 関数名** — fsxn-datadog-ems-fpolicy-fpolicy
+- **EMS Webhook スタック** — fsxn-ems-webhook（既存）
+- **FPolicy サーバースタック** — fsxn-fp-srv（既存）
 
 ---
 
 ### ステップ E1: EMS/FPolicy Lambda デプロイ
 
-- **結果**: ✅ 成功
+- **結果** — ✅ 成功
 
 ```bash
 aws cloudformation deploy \
@@ -240,8 +236,8 @@ aws cloudformation deploy \
   --region ap-northeast-1
 ```
 
-- **スタックステータス**: CREATE_COMPLETE
-- **作成されたリソース**: EMS Lambda, FPolicy Lambda, IAM Roles, EventBridge Rule, Log Groups
+- **スタックステータス** — CREATE_COMPLETE
+- **作成されたリソース** — EMS Lambda, FPolicy Lambda, IAM Roles, EventBridge Rule, Log Groups
 
 ![EMS Lambda CloudWatch Logs](../screenshots/aws-ems-lambda-logs.png)
 
@@ -249,7 +245,7 @@ aws cloudformation deploy \
 
 ### ステップ E2: ARP ランサムウェア検知テスト（EMS → Datadog）
 
-- **結果**: ✅ 成功
+- **結果** — ✅ 成功
 
 ```bash
 aws lambda invoke \
@@ -259,10 +255,10 @@ aws lambda invoke \
   --region ap-northeast-1 response.json
 ```
 
-- **Lambda レスポンス**: `{"statusCode": 200, "body": {"total_events": 1, "shipped": 1}}`
-- **Datadog 検索**: `source:fsxn-ems` → 1件到着確認
-- **ログ内容**: `Anti-ransomware: Volume vol_data state changed to attack-detected`
-- **到着時間**: 約30秒
+- **Lambda レスポンス** — `{"statusCode": 200, "body": {"total_events": 1, "shipped": 1}}`
+- **Datadog 検索** — `source:fsxn-ems` → 1件到着確認
+- **ログ内容** — `Anti-ransomware: Volume vol_data state changed to attack-detected`
+- **到着時間** — 約30秒
 
 ![ARP ランサムウェア検知 — Datadog ログ一覧](../screenshots/datadog-arp-detection.png)
 
@@ -272,17 +268,17 @@ aws lambda invoke \
 
 ### ステップ E3: クォータ閾値超過テスト（EMS → Datadog）
 
-- **結果**: ✅ 成功
+- **結果** — ✅ 成功
 
-- **Lambda レスポンス**: `{"statusCode": 200, "body": {"total_events": 1, "shipped": 1}}`
-- **イベント名**: `wafl.quota.softlimit.exceeded`
-- **パラメータ**: volume_name=vol_data, quota_target=user1, used_bytes=62914560, limit_bytes=52428800
+- **Lambda レスポンス** — `{"statusCode": 200, "body": {"total_events": 1, "shipped": 1}}`
+- **イベント名** — `wafl.quota.softlimit.exceeded`
+- **パラメータ** — volume_name=vol_data, quota_target=user1, used_bytes=62914560, limit_bytes=52428800
 
 ---
 
 ### ステップ E4: FPolicy ファイル操作テスト（FPolicy → Datadog）
 
-- **結果**: ✅ 成功
+- **結果** — ✅ 成功
 
 ```bash
 aws lambda invoke \
@@ -292,10 +288,10 @@ aws lambda invoke \
   --region ap-northeast-1 response.json
 ```
 
-- **Lambda レスポンス**: `{"statusCode": 200, "body": {"total_events": 1, "shipped": 1}}`
-- **Datadog 検索**: `source:fsxn-fpolicy` → 1件到着確認
-- **ログ内容**: `FPolicy: create /vol/data/test-fpolicy.txt by admin@corp.local from 10.0.1.50`
-- **到着時間**: 約30秒
+- **Lambda レスポンス** — `{"statusCode": 200, "body": {"total_events": 1, "shipped": 1}}`
+- **Datadog 検索** — `source:fsxn-fpolicy` → 1件到着確認
+- **ログ内容** — `FPolicy: create /vol/data/test-fpolicy.txt by admin@corp.local from 10.0.1.50`
+- **到着時間** — 約30秒
 
 ![FPolicy ファイル操作 — Datadog ログ一覧](../screenshots/datadog-fpolicy-suspect-activity.png)
 
@@ -316,9 +312,9 @@ aws lambda invoke \
 
 ## FPolicy フルパス E2E 検証（ECS Fargate 経由）
 
-- **検証日時**: 2026-05-17T23:35〜23:50 JST
-- **スタック名**: fsxn-fpolicy-server (Fargate) + fsxn-datadog-ems-fpolicy (Lambda)
-- **パイプライン**: ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Datadog
+- **検証日時** — 2026-05-17T23:35〜23:50 JST
+- **スタック名** — fsxn-fpolicy-server (Fargate) + fsxn-datadog-ems-fpolicy (Lambda)
+- **パイプライン** — ONTAP FPolicy → ECS Fargate (TCP:9898) → SQS → Lambda → Datadog
 
 ### 検証環境
 
@@ -336,10 +332,9 @@ aws lambda invoke \
 
 ### ステップ F1: Fargate デプロイ
 
-- **結果**: ✅ 成功
-- **注意点**: ECR イメージは `linux/amd64` でビルドが必須（Apple Silicon でビルドすると arm64 のみになり Fargate で起動失敗）
-- **コマンド**:
-```bash
+- **結果** — ✅ 成功
+- **注意点** — ECR イメージは `linux/amd64` でビルドが必須（Apple Silicon でビルドすると arm64 のみになり Fargate で起動失敗）
+- **コマンド** — ```bash
 docker buildx build --platform linux/amd64 \
   -t 123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/fsxn-fpolicy-server:v2-timeout-fix \
   --push shared/fpolicy-server/
@@ -347,9 +342,9 @@ docker buildx build --platform linux/amd64 \
 
 ### ステップ F2: ONTAP FPolicy 接続
 
-- **結果**: ✅ 成功
-- **接続確認**: KeepAlive メッセージ受信（2ノードから接続）
-- **注意点**: External Engine の IP 更新にはポリシーの一時無効化が必要
+- **結果** — ✅ 成功
+- **接続確認** — KeepAlive メッセージ受信（2ノードから接続）
+- **注意点** — External Engine の IP 更新にはポリシーの一時無効化が必要
 
 ```
 [INFO] fpolicy-server: [+] Connection from ('10.0.x.x', 44107)
@@ -360,9 +355,9 @@ docker buildx build --platform linux/amd64 \
 
 ### ステップ F3: ファイル操作 → Datadog 到着
 
-- **結果**: ✅ 成功
-- **テスト操作**: SMB 経由で create (smbclient)
-- **到着時間**: 約6〜8秒
+- **結果** — ✅ 成功
+- **テスト操作** — SMB 経由で create (smbclient)
+- **到着時間** — 約6〜8秒
 
 ```bash
 smbclient //10.0.x.x/smb_test -U 'FPOLSMB\Administrator%<password>' \
@@ -427,9 +422,8 @@ Processing complete: {"statusCode": 200, "body": {"shipped": 1}}
 
 ### ステップ F5: Fargate タスク再起動レジリエンステスト
 
-- **結果**: ✅ 成功
-- **テスト手順**:
-  1. Fargate 起動 → タスク IP: 10.0.x.x → ONTAP 接続確認 → イベントフロー確認
+- **結果** — ✅ 成功
+- **テスト手順** — 1. Fargate 起動 → タスク IP: 10.0.x.x → ONTAP 接続確認 → イベントフロー確認
   2. Fargate 停止（scale to 0）→ タスク停止確認
   3. Fargate 再起動（scale to 1）→ 新タスク IP: 10.0.x.x
   4. ONTAP External Engine IP 更新 → 再接続確認
@@ -457,23 +451,23 @@ Processing complete: {"statusCode": 200, "body": {"shipped": 1}}
 
 ## 有料プラン検証（2026年6月）
 
-- **検証日時**: 2026-06-10
-- **プラン**: Datadog Conventional Pricing (AP1)
-- **目的**: Log Pipeline API、Monitors API、有料プランでの完全フィールド抽出を検証
+- **検証日時** — 2026-06-10
+- **プラン** — Datadog Conventional Pricing (AP1)
+- **目的** — Log Pipeline API、Monitors API、有料プランでの完全フィールド抽出を検証
 
 ### ステップ P1: XML 監査ログ E2E テスト（有料プラン）
 
-- **結果**: ✅ 成功
+- **結果** — ✅ 成功
 
 ```bash
 python3 shared/scripts/test-xml-e2e.py --vendor datadog
 # ✅ datadog OK (HTTP 202, 5 events)
 ```
 
-- **Log Explorer 表示件数**: 15件（複数テスト実行分）
-- **フィールド抽出**: 全フィールド検索可能（user, path, client_ip, event_type, result, svm, operation, timestamp）
-- **Service**: `ontap-audit`
-- **Host**: `ProductionSVM`
+- **Log Explorer 表示件数** — 15件（複数テスト実行分）
+- **フィールド抽出** — 全フィールド検索可能（user, path, client_ip, event_type, result, svm, operation, timestamp）
+- **Service** — `ontap-audit`
+- **Host** — `ProductionSVM`
 
 ![Log Explorer — XML 監査イベント](../../integrations/datadog/screenshots/datadog-log-explorer-fsxn-xml.png)
 
@@ -481,11 +475,11 @@ python3 shared/scripts/test-xml-e2e.py --vendor datadog
 
 ### ステップ P2: Log Pipeline 作成（API）
 
-- **結果**: ✅ 成功
-- **方法**: Datadog Logs Pipeline API (`POST /api/v1/logs/config/pipelines`)
-- **Pipeline ID**: `qlElyf7BSnmASoI8iJtZrg`
-- **Pipeline 名**: `FSx for ONTAP Audit Logs`
-- **フィルタ**: `source:fsxn`
+- **結果** — ✅ 成功
+- **方法** — Datadog Logs Pipeline API (`POST /api/v1/logs/config/pipelines`)
+- **Pipeline ID** — `qlElyf7BSnmASoI8iJtZrg`
+- **Pipeline 名** — `FSx for ONTAP Audit Logs`
+- **フィルタ** — `source:fsxn`
 
 | プロセッサ | 種別 | 説明 |
 |-----------|------|------|
@@ -514,8 +508,8 @@ python3 shared/scripts/test-xml-e2e.py --vendor datadog
 
 ### ステップ P3: セキュリティモニター作成（API）
 
-- **結果**: ✅ 成功
-- **方法**: Datadog Monitors API (`POST /api/v1/monitor`)
+- **結果** — ✅ 成功
+- **方法** — Datadog Monitors API (`POST /api/v1/monitor`)
 
 | Monitor ID | 名称 | 種別 | 閾値 | 重要度 |
 |-----------|------|------|------|--------|
@@ -535,10 +529,10 @@ python3 shared/scripts/test-xml-e2e.py --vendor datadog
 
 ### ステップ P4: ダッシュボード確認（有料プラン）
 
-- **結果**: ✅ 成功
-- **ダッシュボード名**: FSx for ONTAP Audit Log Overview
-- **ダッシュボード ID**: ggx-7ad-6e4
-- **ステータス**: アクティブ、データ受信中
+- **結果** — ✅ 成功
+- **ダッシュボード名** — FSx for ONTAP Audit Log Overview
+- **ダッシュボード ID** — ggx-7ad-6e4
+- **ステータス** — アクティブ、データ受信中
 
 ![ダッシュボード — 有料プラン](../../integrations/datadog/screenshots/datadog-dashboard-fsxn-overview.png)
 
@@ -557,9 +551,9 @@ python3 shared/scripts/test-xml-e2e.py --vendor datadog
 
 ### ステップ P5: モニターアラート発火検証（有料プラン）
 
-- **結果**: ✅ 成功
-- **検証日**: 2026-06-14
-- **方法**: Logs API 経由でモニター閾値超過のイベントを送信
+- **結果** — ✅ 成功
+- **検証日** — 2026-06-14
+- **方法** — Logs API 経由でモニター閾値超過のイベントを送信
 
 | モニター | クエリ（概要） | 閾値 | 送信イベント数 | 結果 |
 |---------|--------------|------|------------|------|
@@ -576,8 +570,8 @@ python3 shared/scripts/test-xml-e2e.py --vendor datadog
 
 ### ステップ P6: Pipeline フィールド検証（有料プラン）
 
-- **結果**: ✅ 成功
-- **方法**: Logs Search API で `source:fsxn` を検索し、`operation_name` 属性を確認
+- **結果** — ✅ 成功
+- **方法** — Logs Search API で `source:fsxn` を検索し、`operation_name` 属性を確認
 
 | EventID | 期待する `operation_name` | 検証結果 |
 |---------|--------------------------|----------|
@@ -607,9 +601,9 @@ python3 shared/scripts/test-xml-e2e.py --vendor datadog
 
 ### ステップ P7: Facets 作成（有料プラン）
 
-- **結果**: ✅ 成功
-- **検証日**: 2026-06-14
-- **方法**: Playwright UI 自動化 — フィールド行ホバー → 歯車アイコン → "Create facet" → "Add"
+- **結果** — ✅ 成功
+- **検証日** — 2026-06-14
+- **方法** — Playwright UI 自動化 — フィールド行ホバー → 歯車アイコン → "Create facet" → "Add"
 
 | Facet パス | 表示名 | ステータス |
 |-----------|--------|----------|

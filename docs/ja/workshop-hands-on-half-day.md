@@ -97,7 +97,9 @@ aws cloudformation deploy \
   --region ap-northeast-1
 ```
 
-> **FSx for ONTAP がない場合**: サンプルデータモードを使用 — 通常の S3 バケットにテストファイルをアップロードし、テンプレートをそのバケットに向けます。
+> **FSx for ONTAP がない場合**
+>
+> サンプルデータモードを使用 — 通常の S3 バケットにテストファイルをアップロードし、テンプレートをそのバケットに向けます。
 
 ### Step 2: サンプルデータのアップロード（サンプルモードの場合）
 
@@ -148,14 +150,14 @@ cat /tmp/response.json
 ### Step 1: ベンダープラットフォームで確認
 
 README のベンダー固有クエリを使用：
-- **Datadog**: `source:fsxn`
-- **Grafana**: `{service_name="fsxn-audit"}`
-- **Splunk**: `index=fsxn_audit`
-- **Sumo Logic**: `_sourceCategory=aws/fsxn/audit`
-- **Elastic**: `fsxn.result: *`（Kibana Discover）
-- **Honeycomb**: `WHERE service = "ontap-audit"`
-- **Dynatrace**: `fetch logs | filter log.source == "fsxn-ontap"`
-- **New Relic**: `SELECT * FROM Log WHERE source = 'fsxn-ontap'`
+- **Datadog** — `source:fsxn`
+- **Grafana** — `{service_name="fsxn-audit"}`
+- **Splunk** — `index=fsxn_audit`
+- **Sumo Logic** — `_sourceCategory=aws/fsxn/audit`
+- **Elastic** — `fsxn.result: *`（Kibana Discover）
+- **Honeycomb** — `WHERE service = "ontap-audit"`
+- **Dynatrace** — `fetch logs | filter log.source == "fsxn-ontap"`
+- **New Relic** — `SELECT * FROM Log WHERE source = 'fsxn-ontap'`
 
 ### Step 2: パイプライン健全性の確認
 

@@ -16,7 +16,9 @@ ARP は以下の異常を AI/ML で検知します:
 | ファイル拡張子変化 | 通常使用されない拡張子の出現（48 時間以内に 5 種類以上） |
 | IOPS 異常 | 暗号化データを伴う異常なボリュームアクティビティの急増 |
 
-> **ARP/AI（ONTAP 9.16.1+）**: ARP/AI は有効化後**即座にアクティブ**になります。学習期間は不要です。`security anti-ransomware volume attack simulate` コマンドは ONTAP 9.17.1 には存在しません。ARP 検知をテストするには、実際のランサムウェア様のファイル操作（暗号化 + 削除 + 新拡張子付与）を実行してください。詳細は [ONTAP REST API クイックリファレンス](ontap-rest-api-reference.md) を参照。
+> **ARP/AI（ONTAP 9.16.1+）**
+>
+> ARP/AI は有効化後**即座にアクティブ**になります。学習期間は不要です。`security anti-ransomware volume attack simulate` コマンドは ONTAP 9.17.1 には存在しません。ARP 検知をテストするには、実際のランサムウェア様のファイル操作（暗号化 + 削除 + 新拡張子付与）を実行してください。詳細は [ONTAP REST API クイックリファレンス](ontap-rest-api-reference.md) を参照。
 
 検知時の動作:
 1. **ARP スナップショットの自動作成** — `Anti_ransomware_backup`（または最新バージョンでは `Anti_ransomware_attack_backup`）プレフィックス付き
@@ -61,10 +63,10 @@ source:fsxn-ems @attributes.event_name:arw.volume.state
 ```
 
 確認すべき情報:
-- **severity**: `alert`（高確率）or `warning`（中確率）
-- **volume_name**: 影響を受けたボリューム名
-- **state**: `attack-detected` or `attack-suspected`
-- **timestamp**: 検知時刻
+- **severity** — `alert`（高確率）or `warning`（中確率）
+- **volume_name** — 影響を受けたボリューム名
+- **state** — `attack-detected` or `attack-suspected`
+- **timestamp** — 検知時刻
 
 ### 即座に実施すべきアクション
 
@@ -92,7 +94,9 @@ ssh admin@<management-ip> "security anti-ransomware volume show -vserver <svm-na
 ssh admin@<management-ip> "security anti-ransomware volume attack generate-report -vserver <svm-name> -volume <volume-name> -dest-path <svm-name>:/<volume-name>/"
 ```
 
-> **ONTAP バージョンに関する補足**: `show-suspect-files` は最新の ONTAP バージョンでは削除されています。REST API または `attack generate-report` を使用してください。
+> **ONTAP バージョンに関する補足**
+>
+> `show-suspect-files` は最新の ONTAP バージョンでは削除されています。REST API または `attack generate-report` を使用してください。
 
 ### Observability プラットフォームでの追加調査
 

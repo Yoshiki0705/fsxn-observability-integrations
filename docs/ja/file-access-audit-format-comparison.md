@@ -6,7 +6,9 @@
 
 FSx for ONTAP と FSx for Windows File Server のファイルアクセス監査ログのフォーマット、CloudWatch Logs 連携、大量ログ処理のアーキテクチャ選択肢を整理します。
 
-> **よくある誤解**: 「FSx for ONTAP はファイルアクセス監査ログを JSON で直接 CloudWatch Logs に送れる」— これは誤りです。この機能は FSx for Windows File Server にのみ存在し、そのフォーマットも JSON ではなく XML です。
+> **よくある誤解**
+>
+> 「FSx for ONTAP はファイルアクセス監査ログを JSON で直接 CloudWatch Logs に送れる」— これは誤りです。この機能は FSx for Windows File Server にのみ存在し、そのフォーマットも JSON ではなく XML です。
 
 ---
 
@@ -117,7 +119,9 @@ ONTAP volume (EVTX)
 | 案 1: Step Functions + Lambda -> S3 + Athena | EC2 ベースラインと同程度 | Lambda + S3 + Athena (EC2 管理不要) |
 | 案 4: ハイブリッド（全量->S3、フィルタ->CW） | ベースラインをやや上回る | フィルタ済みサブセットのみ CW Logs コスト追加 |
 
-> **重要**: 大量のファイルアクセスログ（数十 GB/日）を全て CloudWatch Logs に送るのはコスト的に非現実的です。実用的なアプローチは、全量データは S3（Athena 用）に保持し、セキュリティ関連イベントのみ CloudWatch Logs に流す（リアルタイム検知・アラーム用）ことです。
+> **重要**
+>
+> 大量のファイルアクセスログ（数十 GB/日）を全て CloudWatch Logs に送るのはコスト的に非現実的です。実用的なアプローチは、全量データは S3（Athena 用）に保持し、セキュリティ関連イベントのみ CloudWatch Logs に流す（リアルタイム検知・アラーム用）ことです。
 
 ---
 
