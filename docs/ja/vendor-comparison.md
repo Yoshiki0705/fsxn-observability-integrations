@@ -211,7 +211,7 @@ index=fsxn_fpolicy sourcetype="fsxn:ontap:fpolicy" operation_type="create"
 ```
 
 **ダッシュボード推奨構成**:
-- 「FSx ONTAP セキュリティ運用」ダッシュボードを作成
+- 「FSx for ONTAP セキュリティ運用」ダッシュボードを作成
 - パネル: ARP イベントタイムライン（シングルバリュー + タイムチャート）
 - パネル: FPolicy ファイル操作タイプ別（円グラフ）
 - パネル: クライアント IP 別トップトーカー（テーブル）

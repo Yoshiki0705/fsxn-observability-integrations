@@ -213,7 +213,7 @@ index=fsxn_fpolicy sourcetype="fsxn:ontap:fpolicy" operation_type="create"
 ```
 
 **Dashboard recommendations**:
-- Create an "FSx ONTAP Security Operations" dashboard
+- Create an "FSx for ONTAP Security Operations" dashboard
 - Panel: ARP events timeline (single value + time chart)
 - Panel: FPolicy file operations by type (pie chart)
 - Panel: Top talkers by client IP (table)
