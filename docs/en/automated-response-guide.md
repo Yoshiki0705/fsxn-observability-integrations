@@ -245,6 +245,8 @@ Before deploying, verify the following (most common causes of deployment failure
 
 ### Finding Your Parameter Values
 
+> **Automated pre-flight check**: Run `bash shared/scripts/preflight-check.sh --vpc-id <vpc-id> --profile automated-response` to automatically detect existing VPC Endpoints, verify security group egress, and generate recommended parameter values. See the [Deployment Guide](deployment-guide.md) for the full pre-flight workflow.
+
 ```bash
 # 1. FSx for ONTAP Management IP
 aws fsx describe-file-systems --file-system-ids <fs-id> \
