@@ -5,6 +5,8 @@
 Screenshots required for E2E verification of the automated incident response feature.
 Used in: Blog Part 18, live demos, internal documentation.
 
+**Status**: none of the 20 screenshots below have been captured as of this writing. This file specifies what to capture and how; it is not a record that capture has happened. See [`e2e-verification-results.md`](e2e-verification-results.md) in this directory for the CLI-based evidence that was actually captured for the underlying stack deployment (a different, already-completed verification pass that used CLI output instead of screenshots).
+
 ## Required Screenshots (20 total)
 
 ### Phase 1: Deployment (1 screenshot)

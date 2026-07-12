@@ -392,6 +392,67 @@ aws cloudformation deploy \
 2. Confirm resource ARN uses `<access-point-arn>/object/*` format
 3. If VPC-restricted, ensure Lambda is in the same VPC
 
+### FPolicy Fargate: ECR image pull timeout
+
+**Symptom**: ECS task fails to start with `CannotPullContainerError` or `dial tcp ...ecr...: i/o timeout`.
+
+**Cause**: The template defaults to `AssignPublicIp: DISABLED`. Without a NAT Gateway or ECR VPC Endpoints, Fargate cannot reach ECR.
+
+**Solutions** (choose one):
+1. Set `AssignPublicIp=ENABLED` parameter (simplest, suitable for testing)
+2. Add a NAT Gateway to the subnet (production recommended)
+3. Create Interface VPC Endpoints: `com.amazonaws.<region>.ecr.api`, `com.amazonaws.<region>.ecr.dkr`, plus a Gateway Endpoint for S3
+
+### FPolicy Fargate: ONTAP cannot connect to FPolicy server
+
+**Symptom**: No `[+] Connection from` entries in the Fargate container log.
+
+**Cause**: Security Group misconfiguration or incorrect FPolicy engine IP.
+
+**Solution**:
+1. Verify the FPolicy server Security Group allows inbound TCP on port 9898 from the FSx SVM Security Group
+2. If the Fargate task restarted, the IP changed — check that the ONTAP FPolicy engine `primary_servers` matches the current task IP:
+   ```bash
+   # Get current task IP
+   TASK_ARN=$(aws ecs list-tasks --cluster <cluster> --service <service> --query 'taskArns[0]' --output text)
+   aws ecs describe-tasks --cluster <cluster> --tasks $TASK_ARN \
+     --query 'tasks[0].attachments[0].details[?name==`privateIPv4Address`].value' --output text
+   ```
+3. The template includes an IP Updater Lambda that automatically updates the engine IP on task restart (configure `FsxnMgmtIp`, `FsxnSvmUuid`, `FsxnEngineName`, `FsxnPolicyName`, `FsxnCredentialsSecret` parameters)
+
+### Automated Response Lambda: ModuleNotFoundError
+
+**Symptom**: Lambda invocation fails with `ModuleNotFoundError: No module named 'ontap_response'`
+
+**Cause**: The `fsxn-shared-python` Lambda Layer is not attached to the function.
+
+**Solution**: Provide the `SharedPythonLayerArn` parameter during stack deployment, or attach manually:
+```bash
+# Build and publish layer
+bash shared/python/build-layer.sh
+LAYER_ARN=$(aws lambda publish-layer-version \
+  --layer-name fsxn-shared-python \
+  --zip-file fileb://shared/python/dist/fsxn-shared-python-layer.zip \
+  --compatible-runtimes python3.12 \
+  --query 'LayerVersionArn' --output text)
+
+# Attach to function
+aws lambda update-function-configuration \
+  --function-name <stack-name>-handler \
+  --layers $LAYER_ARN
+```
+
+### Automated Response Lambda: Timeout (60s)
+
+**Symptom**: Lambda times out without completing the action.
+
+**Cause**: Lambda in VPC cannot reach Secrets Manager or SNS APIs.
+
+**Solution**:
+1. Deploy with `CreateVpcEndpoints=true` (default), or
+2. Ensure the VPC has Interface VPC Endpoints for `secretsmanager` and `sns`
+3. Verify the VPC Endpoint Security Group allows TCP 443 from the Lambda Security Group
+
 ---
 
 ## References

@@ -11,6 +11,8 @@ Use this runbook for:
 - E2E verification before blog publication
 - Internal training
 
+> **Evidence format note**: This runbook describes, after each step, what a successful result looks like ("what to check for") in plain language, rather than a screenshot placeholder or a fabricated sample output block. As of this writing, this specific runbook has not been executed end-to-end and no real screenshots or command output have been captured for it — do not treat anything shown in this guide as evidence that these steps have actually been run. When you do execute this runbook, capture your own real command output or screenshots (masking account IDs/IPs/ARNs per `docs/screenshots/mask_screenshots.py`) and record them, following the format in [`e2e-verification-results.md`](../screenshots/automated-response/e2e-verification-results.md) for the [Automated Response Guide](automated-response-guide.md) itself.
+
 ---
 
 ## Prerequisites
@@ -55,7 +57,7 @@ aws cloudformation describe-stacks \
   --output table
 ```
 
-📸 **Screenshot 1**: CloudFormation stack outputs showing TriggerTopicArn and NotificationTopicArn
+**What to check**: the output table includes both `TriggerTopicArn` and `NotificationTopicArn` keys, each with a non-empty SNS topic ARN value. Confirm both before proceeding.
 
 ### Step 1.3: Set CLI Environment
 
@@ -84,7 +86,7 @@ cat //fsxn-share/test-data/sample-file.txt
 echo "write test" > //fsxn-share/test-data/write-test.txt
 ```
 
-📸 **Screenshot 2**: Terminal showing successful file operations (ls, read, write) by test user
+**What to check**: all three commands succeed with no permission errors — `ls` lists the expected files, `cat` prints the file content, and the `write-test.txt` file is created.
 
 ### Step 2.2: Trigger SMB User Block
 
@@ -106,7 +108,7 @@ aws sns publish \
   }'
 ```
 
-📸 **Screenshot 3**: CLI output showing successful SNS publish (MessageId returned)
+**What to check**: the CLI helper or `aws sns publish` returns successfully with a `MessageId` field populated (a non-empty UUID-like string).
 
 ### Step 2.3: Verify Lambda Execution
 
@@ -123,7 +125,7 @@ aws logs filter-log-events \
   --output text | tail -5
 ```
 
-📸 **Screenshot 4**: CloudWatch Logs showing Lambda execution with "Blocking SMB user" log line
+**What to check**: a log line indicating the Lambda blocked the target user on the target SVM, tagged with the reason string you passed in, and a `RequestId` you can correlate against other log lines from the same invocation.
 
 ### Step 2.4: Verify Block on ONTAP
 
@@ -131,7 +133,7 @@ aws logs filter-log-events \
 ssh fsxadmin@<management-ip> "vserver name-mapping show -direction win-unix -replacement \" \""
 ```
 
-📸 **Screenshot 5**: ONTAP CLI showing name-mapping entry (DOMAIN\\user → " ")
+**What to check**: a `name-mapping` entry exists for `win-unix` direction, matching `DOMAIN\<test-user>`, with an empty (`" "`) replacement — this is the deny mapping the Lambda creates.
 
 ### Step 2.5: Verify Access Denied (After Block)
 
@@ -146,7 +148,7 @@ cat //fsxn-share/test-data/sample-file.txt
 # → Expected: Permission denied
 ```
 
-📸 **Screenshot 6**: Terminal showing "Permission denied" or "Access denied" for the blocked user
+**What to check**: both commands now fail with a permission/access-denied error (the exact wording depends on your SMB client OS), where they succeeded in Step 2.1.
 
 ### Step 2.6: Unblock User
 
@@ -165,7 +167,7 @@ ls //fsxn-share/test-data/
 # → Expected: Success
 ```
 
-📸 **Screenshot 7**: Terminal showing restored access after unblock
+**What to check**: `ls` succeeds again, confirming the unblock restored access.
 
 ---
 
@@ -179,7 +181,7 @@ ls /mnt/fsxn/test-data/
 touch /mnt/fsxn/test-data/nfs-write-test.txt
 ```
 
-📸 **Screenshot 8**: Terminal showing successful NFS file operations
+**What to check**: both commands succeed with no permission errors.
 
 ### Step 3.2: Trigger NFS IP Block
 
@@ -193,7 +195,7 @@ echo "Blocking IP: $CLIENT_IP"
   --reason "Demo: simulated mass deletion from suspicious IP"
 ```
 
-📸 **Screenshot 9**: CLI output showing NFS IP block published
+**What to check**: same as Step 2.2 — the publish returns a `MessageId`.
 
 ### Step 3.3: Verify Block on ONTAP
 
@@ -201,7 +203,7 @@ echo "Blocking IP: $CLIENT_IP"
 ssh fsxadmin@<management-ip> "export-policy rule show -clientmatch *fsxn_auto_response*"
 ```
 
-📸 **Screenshot 10**: ONTAP CLI showing export-policy rule with fsxn_auto_response marker
+**What to check**: an export-policy rule exists whose `clientmatch` includes the blocked IP and carries the `fsxn_auto_response` marker, with read/write access denied.
 
 ### Step 3.4: Verify NFS Access Denied
 
@@ -214,7 +216,7 @@ ls /mnt/fsxn/test-data/
 
 > **NFS Cache Note**: Linux NFS clients cache access decisions for up to 60 seconds (`actimeo` default). After blocking, you may need to wait up to 60s or remount with `mount -o actimeo=0` (test only) for the deny to take effect immediately.
 
-📸 **Screenshot 11**: Terminal showing NFS access denied after IP block
+**What to check**: the remount fails, or `ls` on the mount fails with a permission-denied-class error — see the NFS Cache Note above if access still appears to succeed immediately after the block.
 
 ### Step 3.5: Unblock IP
 
@@ -232,7 +234,7 @@ ls /mnt/fsxn/test-data/
 ssh fsxadmin@<management-ip> "security anti-ransomware volume show -vserver $DEFAULT_SVM"
 ```
 
-📸 **Screenshot 12**: ONTAP showing ARP in "active" state on target volume
+**What to check**: the target volume's ARP state shows as active/enabled in the command output.
 
 ### Step 4.2: Connect EMS Webhook to Response Pipeline
 
@@ -255,7 +257,7 @@ ssh fsxadmin@<management-ip> \
   "security anti-ransomware volume attack simulate -vserver $DEFAULT_SVM -volume <test-vol>"
 ```
 
-📸 **Screenshot 13**: ONTAP CLI showing ARP attack simulation command
+**What to check**: the command completes without error, and a follow-up `security anti-ransomware volume show` reflects the simulated attack state on the target volume.
 
 ### Step 4.4: Observe Detection Chain
 
@@ -270,7 +272,7 @@ aws logs filter-log-events \
   --query 'events[*].message' --output text
 ```
 
-📸 **Screenshot 14**: Lambda log showing `arw.volume.state` EMS event received
+**What to check**: a log line referencing the `arw.volume.state` EMS event and the target volume name, arriving roughly 30 seconds after the simulate command in the previous step.
 
 ### Step 4.5: Trigger Full Containment
 
@@ -294,7 +296,7 @@ aws logs filter-log-events \
   --query 'events[*].message' --output text
 ```
 
-📸 **Screenshot 15**: Lambda log showing all 3 containment steps (snapshot + block + disconnect)
+**What to check**: log lines for all three containment steps — snapshot created, user blocked, sessions disconnected — sharing the same `RequestId`, confirming they ran within a single `contain_smb_threat` invocation.
 
 ### Step 4.7: Verify Snapshot Created
 
@@ -303,11 +305,13 @@ ssh fsxadmin@<management-ip> \
   "volume snapshot show -vserver $DEFAULT_SVM -volume <test-vol> -snapshot incident_response_*"
 ```
 
-📸 **Screenshot 16**: ONTAP showing incident_response snapshot with timestamp
+**What to check**: an `incident_response_*`-named snapshot appears, with a timestamp matching when containment was triggered.
 
 ### Step 4.8: Verify SNS Notification Received
 
-📸 **Screenshot 17**: Email notification showing containment result JSON (from notification topic)
+Check the inbox for `NotificationEmail` for the containment result JSON.
+
+**What to check**: an email arrived containing the containment result as JSON (snapshot name, blocked user, disconnected sessions). If you'd rather not rely on email as evidence, the Lambda logs the same JSON payload it publishes — check that via the same `filter-log-events` pattern used in Step 4.6, and separately confirm `aws sns get-topic-attributes --topic-arn <NotificationTopicArn> --query 'Attributes.NumberOfNotificationsFailed'` reports no failed deliveries.
 
 ---
 
@@ -355,7 +359,7 @@ timeout 420 aws logs tail /aws/lambda/fsxn-automated-response-ttl-cleanup --foll
 
 > **Note**: The TTL cleanup currently removes ALL blocks with the `fsxn_auto_response` marker on each run. It does not track individual block creation times. For production, consider implementing a DynamoDB tracking table.
 
-📸 **Screenshot 18**: CloudWatch Logs showing "TTL expired — removed SMB block" message
+**What to check**: a CloudWatch Logs entry indicating the TTL cleanup Lambda expired and removed the SMB block.
 
 ### Step 5.4: Verify Auto-Unblock
 
@@ -364,7 +368,7 @@ ssh fsxadmin@<management-ip> "vserver name-mapping show -direction win-unix -rep
 # → Expected: no entries (block auto-removed)
 ```
 
-📸 **Screenshot 19**: ONTAP showing empty name-mapping (block auto-removed by TTL)
+**What to check**: the name-mapping entry created in Step 2.4 is gone, confirming the TTL cleanup removed it automatically.
 
 ---
 
@@ -376,34 +380,7 @@ ssh fsxadmin@<management-ip> "vserver name-mapping show -direction win-unix -rep
 ssh fsxadmin@<management-ip> "export-policy rule show -clientmatch *fsxn_auto_response*"
 ```
 
-📸 **Screenshot 20**: ONTAP showing current state of all active blocks (or empty if all cleared)
-
----
-
-## Screenshot Summary
-
-| # | Content | Filename | Phase |
-|---|---------|----------|-------|
-| 1 | CloudFormation stack outputs | `01-cfn-stack-outputs.png` | Deploy |
-| 2 | SMB access working (before block) | `02-smb-access-before.png` | SMB Block |
-| 3 | SNS publish success (MessageId) | `03-sns-publish-block-smb.png` | SMB Block |
-| 4 | Lambda log: "Blocking SMB user" | `04-lambda-log-block-smb.png` | SMB Block |
-| 5 | ONTAP name-mapping entry | `05-ontap-name-mapping-blocked.png` | SMB Block |
-| 6 | SMB access denied (after block) | `06-smb-access-denied.png` | SMB Block |
-| 7 | SMB access restored (after unblock) | `07-smb-access-restored.png` | SMB Block |
-| 8 | NFS access working (before block) | `08-nfs-access-before.png` | NFS Block |
-| 9 | SNS publish success (NFS block) | `09-sns-publish-block-nfs.png` | NFS Block |
-| 10 | ONTAP export-policy rule with marker | `10-ontap-export-policy-blocked.png` | NFS Block |
-| 11 | NFS access denied (after block) | `11-nfs-access-denied.png` | NFS Block |
-| 12 | ONTAP ARP active state | `12-ontap-arp-active.png` | Full Containment |
-| 13 | ARP attack simulate command | `13-ontap-arp-simulate.png` | Full Containment |
-| 14 | Lambda log: arw.volume.state received | `14-lambda-ems-arp-event.png` | Full Containment |
-| 15 | Lambda log: contain_smb_threat steps | `15-lambda-containment-steps.png` | Full Containment |
-| 16 | ONTAP incident_response snapshot | `16-ontap-incident-snapshot.png` | Full Containment |
-| 17 | Email notification (containment result) | `17-email-notification-containment.png` | Full Containment |
-| 18 | Lambda log: TTL expired auto-remove | `18-lambda-ttl-cleanup.png` | TTL |
-| 19 | ONTAP empty name-mapping (auto-cleared) | `19-ontap-ttl-cleared.png` | TTL |
-| 20 | ONTAP active blocks summary | `20-ontap-active-blocks-status.png` | Operational |
+**What to check**: both commands show the current set of active blocks (empty if you've unblocked everything from the earlier phases).
 
 ---
 

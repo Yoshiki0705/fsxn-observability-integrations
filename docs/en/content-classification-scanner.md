@@ -4,7 +4,7 @@
 
 ## Executive Summary
 
-The [DII Capability Map](dii-capability-map.md) is direct about a gap in the Identify function: this repository's [Data Classification Guide](data-classification.md) defines a schema-level classification (which *fields* — `UserName`, `ObjectName` — are PII), but does not scan file *contents* the way NetApp's data classification tooling does for the CSF 2.0 Identify function.
+The [Cyber Resilience Capability Map](cyber-resilience-capability-map.md#identify-id) is direct about a gap in the Identify function: this repository's [Data Classification Guide](data-classification.md) defines a schema-level classification (which *fields* — `UserName`, `ObjectName` — are PII), but does not scan file *contents* the way NetApp's data classification tooling does for the CSF 2.0 Identify function.
 
 This guide implements that content-level scan using Amazon Comprehend's managed PII entity detection, exposed as a standalone Lambda function that reads files through an existing S3 Access Point:
 
@@ -256,6 +256,52 @@ To scan the same isolated FlexClone used for ransomware verification (rather tha
 
 > **This chaining pattern requires Deploy Mode 2 (In-VPC)**: `AttachAccessPoint` always creates a VPC-scoped access point, and this scanner must run inside that same VPC to reach it — see the network-origin note in [Prerequisites](#an-existing-s3-access-point) above. Deploying this stack in standalone mode (no `VpcId`) against a chained FlexClone access point will fail at the `ListObjectsV2` call every time, since there is no network route to try intermittently.
 
+### Quick Validation
+
+Before pointing this scanner at real data, confirm it works end-to-end against a synthetic file — this exact sequence is what this project's own E2E verification used, against Deploy Mode 1 (standalone, no `VpcId`):
+
+```bash
+# 1. Create a synthetic PII file — no real personal data, safe to commit
+#    to a scratch location or delete immediately after the test
+cat > /tmp/pii-test-sample.txt <<'EOF'
+Customer Support Ticket #48213
+Name: John Sample Doe
+Email: john.sample.doe@example.com
+Phone: 555-0142-9981
+SSN: 078-05-1120
+Address: 123 Example Street, Springfield, IL 62704
+EOF
+
+# 2. Upload it through an S3 Access Point that has write access to your
+#    FSx for ONTAP volume (a read-only access point, if that's what you
+#    have, will reject the PutObject — see Prerequisites above for the
+#    read-only-vs-read-write access point distinction)
+aws s3api put-object \
+  --bucket <your-access-point-arn> \
+  --key validation/pii-test-sample.txt \
+  --body /tmp/pii-test-sample.txt
+
+# 3. Invoke the scanner directly (bypasses any EventBridge/Step Functions
+#    trigger you may wire up later, isolating the Lambda + Comprehend path)
+aws lambda invoke \
+  --function-name fsxn-content-classification-scanner \
+  --payload '{"access_point_arn":"<your-access-point-arn>","max_files":50}' \
+  --cli-binary-format raw-in-base64-out \
+  /tmp/scan-response.json
+cat /tmp/scan-response.json
+
+# 4. Confirm the finding landed in the ledger, not just the Lambda response
+aws dynamodb get-item \
+  --table-name fsxn-content-classification-reports \
+  --key '{"access_point_arn":{"S":"<your-access-point-arn>"},"started_at":{"S":"<started_at from step 3 response>"}}'
+
+# 5. Clean up the synthetic file so it doesn't linger in production storage
+aws s3api delete-object --bucket <your-access-point-arn> --key validation/pii-test-sample.txt
+rm -f /tmp/pii-test-sample.txt /tmp/scan-response.json
+```
+
+A successful run reports `"files_with_pii": 1` (or more, if other scannable files already exist under the access point) with `pii-test-sample.txt` listed in `findings`, showing `NAME`/`EMAIL`/`PHONE`/`SSN`/`ADDRESS` entity types at confidence scores typically above 0.9 for the well-formed fields (`EMAIL`, `PHONE`, `SSN`, `ADDRESS`) and lower for `NAME` (Comprehend's name-detection confidence varies more with surrounding context than the other types). If step 3 times out or returns an access-denied error instead, revisit [Prerequisites](#an-existing-s3-access-point) — the most common cause is invoking against a VPC-scoped access point ARN from a standalone (non-VPC) deployment, or vice versa.
+
 ---
 
 ## Configuration Reference
@@ -320,7 +366,7 @@ python3 -m pytest shared/python/tests/test_content_classifier.py -v
 
 ## Related Documents
 
-- [DII Capability Map](dii-capability-map.md) — the Identify-function Remaining Gap this scanner implements a fix for
+- [Cyber Resilience Capability Map](cyber-resilience-capability-map.md#identify-id) — the Identify-function gap this scanner implements a fix for
 - [Data Classification Guide](data-classification.md) — the schema-level (field-name) classification this scanner complements at the content level
 - [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md) — the FlexClone + S3 Access Point pattern this scanner can chain after, for zero-production-impact scanning
 - [Automated Response Guide](automated-response-guide.md) — the containment-phase module whose protective snapshots are a natural scan target via the recovery verification workflow

@@ -1,14 +1,30 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: |
+Description: >-
   FSx for ONTAP Automated Response — User/IP blocking and snapshot creation
-  via ONTAP REST API. Triggered by SNS (from CloudWatch Alarms, SIEM monitors,
-  or manual invocation). Requires VPC access to ONTAP management endpoint.
+  via ONTAP REST API. Triggered by SNS. Requires VPC access to ONTAP management
+  endpoint and the fsxn-shared-python Lambda Layer.
 
-  This provides the same containment capabilities as DII Storage Workload
-  Security (user blocking, IP blocking, snapshot) using AWS-native detection
-  pipelines and ONTAP REST API for response execution.
-
-  Stack name pattern: fsxn-automated-response
+# DEPLOYMENT PREREQUISITES:
+# 1. Deploy the fsxn-shared-python Lambda Layer first (shared/lambda-layers/).
+#    This provides ontap_response.py and auth_cache.py used by the handler.
+#    Without this layer, the handler will fail with ModuleNotFoundError.
+# 2. Ensure the VPC has outbound HTTPS (443) access to the ONTAP management IP.
+# 3. Either set CreateVpcEndpoints=true OR ensure the VPC already has
+#    Secrets Manager + SNS Interface VPC Endpoints (or a NAT Gateway).
+#
+# Example:
+#   aws cloudformation deploy \
+#     --template-file automated-response.yaml \
+#     --stack-name fsxn-automated-response \
+#     --parameter-overrides \
+#       OntapMgmtIp=<management-ip> \
+#       OntapCredentialsSecretArn=arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:fsx-ontap-creds-XXXXXX \
+#       VpcId=vpc-0123456789abcdef0 \
+#       SubnetIds=subnet-aaa,subnet-bbb \
+#       SecurityGroupId=sg-0123456789abcdef0 \
+#       DefaultSvmName=svm-prod \
+#       SharedPythonLayerArn=arn:aws:lambda:ap-northeast-1:123456789012:layer:fsxn-shared-python:2 \
+#     --capabilities CAPABILITY_NAMED_IAM
 
 Parameters:
   OntapMgmtIp:
@@ -71,6 +87,15 @@ Parameters:
       built-in protection list (fsxadmin, administrator, vsadmin, system).
     Default: ''
 
+  SharedPythonLayerArn:
+    Type: String
+    Description: >-
+      ARN of the fsxn-shared-python Lambda Layer containing ontap_response.py
+      and auth_cache.py. Required for the handler to function. Deploy the layer
+      first (shared/lambda-layers/), then provide its ARN here.
+      Example: arn:aws:lambda:ap-northeast-1:123456789012:layer:fsxn-shared-python:2
+    Default: ''
+
   CreateVpcEndpoints:
     Type: String
     Description: >-
@@ -83,6 +108,7 @@ Parameters:
 Conditions:
   HasNotificationEmail: !Not [!Equals [!Ref NotificationEmail, '']]
   HasDefaultSvm: !Not [!Equals [!Ref DefaultSvmName, '']]
+  HasSharedLayer: !Not [!Equals [!Ref SharedPythonLayerArn, '']]
   ShouldCreateVpcEndpoints: !Equals [!Ref CreateVpcEndpoints, 'true']
 
 Resources:
@@ -221,6 +247,11 @@ Resources:
       MemorySize: !Ref LambdaMemorySize
       Timeout: !Ref LambdaTimeout
       Role: !GetAtt LambdaExecutionRole.Arn
+      Layers:
+        !If
+          - HasSharedLayer
+          - - !Ref SharedPythonLayerArn
+          - !Ref AWS::NoValue
       DeadLetterConfig:
         TargetArn: !GetAtt DeadLetterQueue.Arn
       VpcConfig:

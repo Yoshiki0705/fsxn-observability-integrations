@@ -15,6 +15,11 @@
 - 侵害ユーザーの CIFS セッション即時切断
 - 上記を一括実行する複合封じ込めアクション
 
+**応答タイミング（ONTAP 9.17.1P7D1 で実測済み）**:
+- Lambda 実行（contain_smb_threat）: **1.8 秒**（Snapshot + ブロック + セッション切断）
+- E2E（検知 → ルーティング → 応答）: **2 分以内**（通常）、**3 分以内**（worst-case: Lambda コールドスタート + VPC ENI アタッチ込み）
+- SMB ブロック有効化: 次回認証試行時に即座に拒否（既存セッションはトークン期限切れまたはセッション切断まで継続）
+
 **検知ソース（任意の組み合わせ）:**
 - CloudWatch Log Alarm（管理監査ログの異常検知）
 - EMS Webhook（ARP ランサムウェア検知、クォータイベント）
@@ -68,6 +73,8 @@ ONTAP の name-mapping を利用してアクセスを拒否します:
 | 4 | SVM 内の全ボリュームに影響 | name-mapping は SVM 全体に適用 |
 
 **スコープ**: ブロックは SVM 全体に適用されます。SVM 内の全ボリューム、共有、エクスポートでアクセスが拒否されます。
+
+> **運用安全性に関する補足（position 1 挿入）**: 拒否マッピングはデフォルトで position 1 に挿入され、既存の name-mapping よりも *先に* 評価されます。サービスアカウントや自動化ワークフロー用の既存 name-mapping がある SVM では、新しいエントリがそれらを shadowing する可能性があります。常に `health_check` + 非本番ユーザーで事前テストしてください。誤ブロックを即座に解除するには: `./automated-response-cli.sh unblock-smb --domain <DOMAIN> --user <username>`。マルチテナント SVM では、あるテナントの侵害ユーザーをブロックした際に、より高い position の共有サービスアカウントに影響しないことを確認してください。
 
 **解除**: name-mapping エントリを削除するとアクセスが復元されます。
 
@@ -239,12 +246,15 @@ aws cloudformation deploy \
     SubnetIds=<subnet-id> \
     SecurityGroupId=<sg-id> \
     DefaultSvmName=<svm-name> \
+    SharedPythonLayerArn=<layer-arn> \
     NotificationEmail=<your-email> \
     CreateVpcEndpoints=true \
   --capabilities CAPABILITY_NAMED_IAM
 ```
 
-> **`CreateVpcEndpoints` パラメータ**: Secrets Manager と SNS のインターフェース VPC Endpoint をデフォルトで作成します。VPC 内の Lambda は VPC Endpoint（または NAT Gateway）なしでは AWS API に到達**できません**。既にこれらの VPC Endpoint がある場合は `false` に設定してください。
+> **`SharedPythonLayerArn` パラメータ（新規）**: `ontap_response.py` を含む `fsxn-shared-python` Lambda Layer の ARN を指定します。未指定の場合、ハンドラーは `ModuleNotFoundError` で失敗します。事前に `bash shared/python/build-layer.sh` でビルド・発行してください。
+
+> **`CreateVpcEndpoints` パラメータ**: Secrets Manager と SNS のインターフェース VPC Endpoint をデフォルトで作成します。VPC 内の Lambda は VPC Endpoint（または NAT Gateway）なしでは AWS API に到達**できません**。既にこれらの VPC Endpoint がある場合は `false` に設定してください。VPC に NAT Gateway がある場合も `false` にすることで追加の ~$14/月 を避けられます。
 
 ### デプロイ後: Lambda Layer の接続
 
@@ -354,6 +364,8 @@ aws sns publish \
 
 ## SNS メッセージフォーマット
 
+### 基本フォーマット（最低限必須）
+
 ```json
 {
   "action": "contain_smb_threat",
@@ -362,7 +374,25 @@ aws sns publish \
   "username": "jdoe",
   "volume_name": "vol_data",
   "policy_name": "default",
-  "reason": "ARP ランサムウェア検知 - arw.volume.state alert"
+  "reason": "ARP ランサムウェア検知 - callhome.arw.activity.seen alert"
+}
+```
+
+### 拡張フォーマット（コンプライアンス/監査向け推奨）
+
+```json
+{
+  "action": "contain_smb_threat",
+  "svm_name": "svm-prod-01",
+  "domain": "CORP",
+  "username": "jdoe",
+  "volume_name": "vol_data",
+  "policy_name": "default",
+  "reason": "ARP ランサムウェア検知 - callhome.arw.activity.seen alert",
+  "incident_id": "INC-2026-0712-001",
+  "detection_source": "datadog-monitor-fsxn-arp",
+  "severity": "critical",
+  "trigger_id": "msg-abc123-def456"
 }
 ```
 
@@ -375,7 +405,13 @@ aws sns publish \
 | client_ip | NFS アクション | クライアント IP アドレス |
 | volume_name | Snapshot / 複合アクション | 保護対象ボリューム |
 | policy_name | NFS アクション | エクスポートポリシー（デフォルト: "default"） |
-| reason | いいえ | 人間が読める理由（ログに記録） |
+| reason | はい（ブロックアクション） | 人間が読める理由（ログに記録） |
+| incident_id | いいえ（推奨） | 外部インシデント追跡 ID（PagerDuty、ServiceNow 等） |
+| detection_source | いいえ（推奨） | どのシステムが脅威を検知したか（フォレンジック相関用） |
+| severity | いいえ（推奨） | `critical` / `high` / `medium` / `low` |
+| trigger_id | いいえ | SNS MessageId または上流の相関 ID |
+
+> **コンプライアンス補足（HIPAA/FISC/SOC2）**: 規制環境では、常に `incident_id`、`detection_source`、`severity` を含めてください。これらのフィールドは CloudWatch Logs と通知メッセージにパススルーされ、監査証跡を形成します。
 
 ---
 

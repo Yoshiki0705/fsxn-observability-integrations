@@ -262,7 +262,7 @@ aws cloudformation delete-stack --stack-name fsxn-observability-prerequisites --
 > 📝 上記の `../en/` リンクは英語版ドキュメントです。技術的な内容のため英語のまま提供しています。
 
 ### セキュリティ・コンプライアンス
-- [DII 機能マップ](dii-capability-map.md) — DII Storage Workload Security の全機能（Protect/Detect/Respond/Recover/Forensics）と本リポジトリの対応関係、ユーザー/IP/ファイルパス/アクションを可視化するベンダー別フォレンジック調査ダッシュボードの実装方法
+- [サイバーレジリエンス機能マップ](cyber-resilience-capability-map.md) — NIST CSF 2.0 の機能マッピング（Govern/Identify/Protect/Detect/Respond/Recover）に基づく本リポジトリの FSx for ONTAP 実装、機能ごとの代替 AWS ネイティブ/SaaS 実装パス、ユーザー/IP/ファイルパス/アクションを可視化するベンダー別フォレンジック調査ダッシュボードの実装方法
 - [自動インシデント対応ガイド](automated-response-guide.md) — ユーザー/IP ブロック、Snapshot、セッション切断（ONTAP REST API）
   > 🔍 AD 連携によるユーザー/IP レベルでのストレージ層アクセス遮断（DII Storage Workload Security などの専用ストレージセキュリティ製品が提供する機能）の AWS ネイティブな実現方法をお探しの場合は、このガイド内の比較表・FAQ を参照してください。スコープ: ストレージ層での遮断と証拠保全のみ — 侵害端末の隔離、マルウェア除去、認証情報のローテーションは範囲外です。
 - [検証済みクリーン復旧ポイントガイド](verified-recovery-point-guide.md) — FlexClone + 隔離された S3 Access Point スキャンにより、リストア前に Snapshot がクリーンであることを検証（CSF 2.0 RC.RP）

@@ -393,6 +393,67 @@ aws cloudformation deploy \
 2. リソース ARN が `<access-point-arn>/object/*` 形式か確認
 3. VPC 制限がある場合、Lambda が同じ VPC 内にあるか確認
 
+### FPolicy Fargate: ECR イメージ pull タイムアウト
+
+**症状**: ECS タスクが `CannotPullContainerError` または `dial tcp ...ecr...: i/o timeout` で起動失敗。
+
+**原因**: テンプレートのデフォルトは `AssignPublicIp: DISABLED`。NAT Gateway も ECR VPC Endpoint もない場合、Fargate は ECR に到達できない。
+
+**解決策**（いずれか）:
+1. `AssignPublicIp=ENABLED` パラメータを設定（最も簡単、検証向き）
+2. サブネットに NAT Gateway を追加（本番推奨）
+3. Interface VPC Endpoint を作成: `com.amazonaws.<region>.ecr.api`、`com.amazonaws.<region>.ecr.dkr`、S3 Gateway Endpoint
+
+### FPolicy Fargate: ONTAP が FPolicy サーバーに接続できない
+
+**症状**: Fargate コンテナログに `[+] Connection from` エントリが表示されない。
+
+**原因**: Security Group の設定ミス、または FPolicy エンジンの IP が古い。
+
+**解決策**:
+1. FPolicy サーバーの Security Group が、FSx SVM の Security Group からのインバウンド TCP 9898 を許可しているか確認
+2. Fargate タスクが再起動した場合、IP が変更されている — ONTAP の FPolicy エンジン `primary_servers` が現在のタスク IP と一致しているか確認:
+   ```bash
+   # 現在のタスク IP を取得
+   TASK_ARN=$(aws ecs list-tasks --cluster <cluster> --service <service> --query 'taskArns[0]' --output text)
+   aws ecs describe-tasks --cluster <cluster> --tasks $TASK_ARN \
+     --query 'tasks[0].attachments[0].details[?name==`privateIPv4Address`].value' --output text
+   ```
+3. テンプレートには IP Updater Lambda が含まれており、タスク再起動時にエンジン IP を自動更新する（`FsxnMgmtIp`、`FsxnSvmUuid`、`FsxnEngineName`、`FsxnPolicyName`、`FsxnCredentialsSecret` パラメータを設定）
+
+### Automated Response Lambda: ModuleNotFoundError
+
+**症状**: Lambda 実行が `ModuleNotFoundError: No module named 'ontap_response'` で失敗。
+
+**原因**: `fsxn-shared-python` Lambda Layer が関数にアタッチされていない。
+
+**解決策**: スタックデプロイ時に `SharedPythonLayerArn` パラメータを指定するか、手動でアタッチ:
+```bash
+# Layer をビルドして発行
+bash shared/python/build-layer.sh
+LAYER_ARN=$(aws lambda publish-layer-version \
+  --layer-name fsxn-shared-python \
+  --zip-file fileb://shared/python/dist/fsxn-shared-python-layer.zip \
+  --compatible-runtimes python3.12 \
+  --query 'LayerVersionArn' --output text)
+
+# 関数にアタッチ
+aws lambda update-function-configuration \
+  --function-name <stack-name>-handler \
+  --layers $LAYER_ARN
+```
+
+### Automated Response Lambda: タイムアウト (60秒)
+
+**症状**: Lambda が何のアクションも完了せずタイムアウトする。
+
+**原因**: VPC 内の Lambda が Secrets Manager や SNS の API に到達できない。
+
+**解決策**:
+1. `CreateVpcEndpoints=true`（デフォルト）でデプロイする、または
+2. VPC に `secretsmanager` と `sns` の Interface VPC Endpoint があることを確認
+3. VPC Endpoint の Security Group が Lambda の Security Group からの TCP 443 を許可しているか確認
+
 ---
 
 ## 参考リンク

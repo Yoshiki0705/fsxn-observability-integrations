@@ -6,6 +6,8 @@
 
 Deploy FSx for ONTAP observability pipelines across multiple AWS accounts using CloudFormation StackSets. This pattern enables centralized management of audit log pipelines while keeping data processing local to each account.
 
+> **Verification status**: `shared/templates/multi-account-stackset.yaml` passes `cfn-lint` and `cfn-guard`, and the design decisions below are grounded in documented AWS StackSets behavior. However, this guide's procedure has not been executed end-to-end against a real multi-account AWS Organization (creating the StackSet, deploying to at least two target accounts, and confirming per-account isolation) as of this writing — this is a genuinely harder bar to clear than a single-account deployment, since it requires an Organization with multiple member accounts available for testing. Treat the steps below as reviewed-but-unexecuted guidance, and validate against your own Organization's account structure before relying on it for a production rollout. If you do execute this end-to-end, consider recording the result the same way the [Automated Response Guide](automated-response-guide.md)'s deployment was verified — dated, with the specific accounts/regions and any issues encountered.
+
 ## Architecture
 
 ```

@@ -150,7 +150,7 @@ source:fsxn @client_ip:"{{client_ip}}"
 source:fsxn @path:"{{path}}"
 ```
 
-Export findings via Log Explorer's CSV export, scoped to your investigation time range. See [DII Capability Map](../../docs/en/dii-capability-map.md) for how this maps to DII SWS's four Forensics views and what data-source caveats apply (FPolicy vs audit log coverage, PII handling).
+Export findings via Log Explorer's CSV export, scoped to your investigation time range. See [Cyber Resilience Capability Map](../../docs/en/cyber-resilience-capability-map.md#respond-rs) for how this maps to the CSF 2.0 Respond function's forensic-investigation coverage and what data-source caveats apply (FPolicy vs audit log coverage, PII handling).
 
 ![Saved Views](screenshots/datadog-saved-views.png)
 

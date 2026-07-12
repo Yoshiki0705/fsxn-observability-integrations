@@ -24,8 +24,8 @@ This index provides navigation across all security-related documentation in this
 |------|----------|-------------|
 | Understand automated storage-layer blocking | [Automated Response Guide](automated-response-guide.md) | How Blocking Works |
 | Run the full demo for evaluation | [Demo Runbook](demo-automated-response.md) | All phases |
-| Compare full DII SWS capability set (Protect/Detect/Respond/Recover/Forensics), not just containment | [DII Capability Map](dii-capability-map.md) | Capability Parity Table |
-| Build a user/IP/file-path forensic investigation dashboard (who accessed what, from where) | [DII Capability Map](dii-capability-map.md) | Per-Vendor Forensics Dashboard Implementation |
+| Understand this repo's coverage across all six NIST CSF 2.0 functions, not just containment | [Cyber Resilience Capability Map](cyber-resilience-capability-map.md) | NIST CSF 2.0 Overview |
+| Build a user/IP/file-path forensic investigation dashboard (who accessed what, from where) | [Cyber Resilience Capability Map](cyber-resilience-capability-map.md) | Respond (RS) |
 | Verify a snapshot is clean before relying on it as a recovery point (RC.RP) | [Verified-Clean Recovery Point Guide](verified-recovery-point-guide.md) | How Verification Works |
 | Discover PII in file contents, not just field-level classification | [Content-Level PII Classification Scanner](content-classification-scanner.md) | How Classification Works |
 | Compare with dedicated security products (e.g., DII Storage Workload Security) | [Automated Response Guide](automated-response-guide.md) | Comparison table, FAQ |
@@ -71,8 +71,8 @@ This index provides navigation across all security-related documentation in this
     └─→ Runbooks (runbooks/)
 
 [3.5] Forensic Investigation (cross-cutting, any phase)
-    └─→ DII Capability Map (dii-capability-map.md)
-    └─→ Splunk / Datadog / Grafana / Elastic dashboards (per-vendor guidance in the map)
+    └─→ Cyber Resilience Capability Map (cyber-resilience-capability-map.md)
+    └─→ Splunk / Datadog / Grafana / Elastic dashboards (per-vendor guidance under Respond)
 
 [3.6] Recovery Verification & Data Discovery (Recover / Identify functions)
     └─→ Verified-Clean Recovery Point Guide (verified-recovery-point-guide.md)

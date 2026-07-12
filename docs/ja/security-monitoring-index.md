@@ -24,8 +24,8 @@
 |-----------|-----------|-------------|
 | 自動ストレージ層遮断の理解 | [自動応答ガイド](automated-response-guide.md) | ブロックの仕組み |
 | 評価用の完全デモ実行 | [デモ手順書](demo-automated-response.md) | 全フェーズ |
-| DII SWS の全体機能（Protect/Detect/Respond/Recover/Forensics）を封じ込め以外も含めて比較したい | [DII 機能マップ](dii-capability-map.md) | 機能対応表 |
-| ユーザー/IP/ファイルパス単位のフォレンジック調査ダッシュボード（誰が、どこから、何にアクセスしたか）を構築したい | [DII 機能マップ](dii-capability-map.md) | ベンダー別 Forensics ダッシュボード実装 |
+| NIST CSF 2.0 の 6 機能全体における本リポジトリの対応範囲を、封じ込め以外も含めて理解したい | [サイバーレジリエンス機能マップ](cyber-resilience-capability-map.md) | NIST CSF 2.0 の概要 |
+| ユーザー/IP/ファイルパス単位のフォレンジック調査ダッシュボード（誰が、どこから、何にアクセスしたか）を構築したい | [サイバーレジリエンス機能マップ](cyber-resilience-capability-map.md) | Respond（対応） |
 | リストア前に Snapshot がクリーンであることを検証したい（RC.RP） | [検証済みクリーン復旧ポイントガイド](verified-recovery-point-guide.md) | 検証の仕組み |
 | フィールドレベルの分類だけでなく、ファイル内容の PII を発見したい | [コンテンツレベル PII 分類スキャナー](content-classification-scanner.md) | 分類の仕組み |
 | 専用セキュリティ製品との比較（DII Storage Workload Security など） | [自動応答ガイド](automated-response-guide.md) | 比較テーブル、FAQ |
@@ -71,8 +71,8 @@
     └─→ ランブック (runbooks/)
 
 [3.5] フォレンジック調査（横断的、全フェーズ）
-    └─→ DII 機能マップ (dii-capability-map.md)
-    └─→ Splunk / Datadog / Grafana / Elastic ダッシュボード（機能マップ内のベンダー別ガイダンス）
+    └─→ サイバーレジリエンス機能マップ (cyber-resilience-capability-map.md)
+    └─→ Splunk / Datadog / Grafana / Elastic ダッシュボード（Respond セクション内のベンダー別ガイダンス）
 
 [3.6] 復旧検証 & データ発見（Recover / Identify 機能）
     └─→ 検証済みクリーン復旧ポイントガイド (verified-recovery-point-guide.md)
