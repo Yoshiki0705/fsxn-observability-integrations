@@ -54,6 +54,7 @@ FSx for ONTAP の監査ログをオブザーバビリティベンダーに転送
 | Stack | Template | Key Parameters | VPC Required |
 |-------|----------|---------------|--------------|
 | **性能＆容量ダッシュボード** | `shared/templates/fsxn-monitoring-dashboard.yaml` | FileSystemId, FileSystemName, CapacityThresholdPercent, NotificationEmail | No |
+| **Qtree クォータ監視** | `shared/templates/qtree-quota-monitor.yaml` | OntapMgmtIp, SvmName, VPC/Subnet/SG, QuotaThresholdPercent | Yes |
 | Syslog → CloudWatch | `shared/templates/syslog-vpce-cloudwatch.yaml` | VpcId, SubnetIds, VpcCidr | Yes |
 | FPolicy Server | `shared/templates/fpolicy-server-fargate.yaml` | VpcId, SubnetIds, FsxnSvmSecurityGroupId, ContainerImage | Yes |
 | CloudWatch Log Alarm | `shared/templates/cloudwatch-log-alarm.yaml` | LogGroupName, TargetPattern | No |

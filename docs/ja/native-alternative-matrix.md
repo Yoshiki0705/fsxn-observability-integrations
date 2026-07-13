@@ -23,11 +23,11 @@
 | **Qtree: クォータ管理** | ONTAP REST API `/storage/quota/rules` | CLI スクリプト / 手動 | ⚠️ API経由の管理、GUIなし |
 | **Qtree: クォータ監視** | Lambda → ONTAP REST API → CloudWatch Custom Metric | `qtree-quota-monitor.yaml` | ✅ |
 | **Qtree: クォータアラート** | CloudWatch Alarm on `QtreeQuotaUsedPercent` | `qtree-quota-monitor.yaml` | ✅ |
-| **ボリューム: 作成/削除/リサイズ** | FSx コンソール + ONTAP REST API | CloudFormation テンプレート + スクリプト | ✅ |
+| **ボリューム: 作成/削除/リサイズ** | FSx コンソール + ONTAP REST API | デモテンプレート + FSx コンソール（汎用ボリューム管理テンプレートはなし） | ⚠️ |
 | **Snapshot: 作成/スケジュール** | FSx Backup + ONTAP REST API | `ontap_response.py` + FSx ネイティブ | ✅ |
 | **Snapshot: リストア** | FSx コンソール + ONTAP REST API | `restore-verification.yaml`（リストア前検証） | ✅ |
-| **NFS エクスポート管理** | ONTAP REST API | `ontap_response.py`（export-policy rules） | ✅ |
-| **SMB 共有管理** | ONTAP REST API | `ontap_response.py`（name-mapping） | ✅ |
+| **NFS エクスポート管理** | ONTAP REST API | `ontap_response.py`（export-policy deny rule によるブロック） | ⚠️ ブロックのみ |
+| **SMB 共有管理** | ONTAP REST API | `ontap_response.py`（name-mapping deny によるブロック） | ⚠️ ブロックのみ |
 | **EMS イベントビューア** | CloudWatch Logs（syslog VPC EP） | `syslog-vpce-cloudwatch.yaml` | ✅ |
 | **ARP ステータス** | EMS → Observability パイプライン | 9 ベンダー統合 + EMS webhook | ✅ |
 | **SnapMirror 管理** | FSx コンソール + ONTAP REST API | ドキュメント（手動手順） | ⚠️ 自動化なし |
@@ -56,9 +56,11 @@
 
 ## DII Storage Workload Security — 機能カバレッジ
 
+> **DII** = Data Infrastructure Insights（旧 Cloud Insights）。Storage Workload Security はそのランサムウェア検知・対応モジュールです。
+
 | DII 機能 | AWS ネイティブ同等 | 本リポジトリ | 状態 |
 |---------|------------------|-----------|:----:|
-| **ML ベースライン異常検知** | ONTAP ARP/AI（内蔵）+ SIEM ML | EMS → Datadog/9 ベンダー | ✅ |
+| **ML ベースライン異常検知** | ONTAP ARP/AI（内蔵）+ SIEM ML | EMS → Datadog/9 ベンダー（パイプライン提供のみ。ML検知設定はSIEM側の責任） | ✅ パイプライン |
 | **ユーザー自動ブロック** | ONTAP REST API（name-mapping deny） | `ontap_response.py` + `automated-response.yaml` | ✅ E2E検証済み |
 | **IP 自動ブロック** | ONTAP REST API（export-policy）+ VPC NACL | `ontap_response.py` + `automated-response.yaml` | ✅ E2E検証済み |
 | **保護 Snapshot** | ONTAP REST API | `ontap_response.py` `create_snapshot` | ✅ E2E検証済み |
@@ -78,11 +80,25 @@
 
 | プロダクト | マッピング機能数 | ✅ 対応済み | ⚠️ 部分対応 | ❌ 対象外 |
 |----------|:-------------:|:---------:|:---------:|:--------:|
-| System Manager | 18 | 14 | 2 | 2 |
+| System Manager | 20 | 13 | 5 | 2 |
 | Workload Factory | 9 | 5 | 2 | 2 |
 | DII SWS | 13 | 13 | 0 | 0 |
 
-**重要な洞察**: セキュリティ/インシデント対応機能（DII 相当）は **100% カバー**。運用監視（System Manager 相当）は **78% カバー** — 残りのギャップは QoS 管理と SnapMirror 自動化であり、FSx コンソールまたは専用の IaC ツールの方が適しているインフラ管理タスクです。
+**重要な洞察**: セキュリティ/インシデント対応機能（DII 相当）は **100% カバー**。運用監視（System Manager 相当）は **65% 完全対応 + 25% 部分対応** — 部分対応はセキュリティブロック専用のエクスポート/共有管理実装とデモ用ボリュームテンプレートです。完全未対応（QoS、LIF/DNS）は FSx コンソールに適したインフラ管理タスクです。
+
+---
+
+## 選び方ガイド
+
+| 状況 | 推奨 |
+|------|------|
+| AWS Observability（Datadog、Grafana、Splunk等）に投資済み + ストレージ層 IR が欲しい | **本アプローチ** — 既存スタックをストレージ層の封じ込めに拡張 |
+| SIEM 設定なしでターンキーの ML 異常検知が欲しい | **DII Storage Workload Security** — 内蔵のユーザー別ベースライン、外部 SIEM 不要 |
+| GUI でのストレージ日常運用（ボリューム作成、共有管理）が必要 | **FSx コンソール + ONTAP System Manager** — インタラクティブ管理に特化 |
+| 大規模な自動インフラプロビジョニングが必要 | **CloudFormation/Terraform** — 監視ツールの選択に関わらず IaC が正しいパターン |
+| 上記全てが大規模フリートで必要 | ハイブリッド検討: 本アプローチ（IR）+ DII（検知）+ FSx コンソール（アドホック操作） |
+
+> **全てを1つのツールでカバーするものは存在しません。** 上記マトリクスは本リポジトリがカバーする範囲です。インタラクティブ操作には FSx コンソール、ベンダー管理の ML 検知には DII、検知が既に SIEM にあり追加ライセンスなしで自動封じ込め + フォレンジックエビデンスが欲しい場合は本リポジトリを使ってください。
 
 ---
 

@@ -23,11 +23,11 @@ This document maps every major feature of ONTAP System Manager, NetApp Workload 
 | **Qtree: Quota Management** | ONTAP REST API `/storage/quota/rules` | CLI scripts / manual | ⚠️ Management via API, no GUI |
 | **Qtree: Quota Monitoring** | Lambda → ONTAP REST API → CloudWatch Custom Metric | `qtree-quota-monitor.yaml` | ✅ |
 | **Qtree: Quota Alerts** | CloudWatch Alarm on `QtreeQuotaUsedPercent` | `qtree-quota-monitor.yaml` | ✅ |
-| **Volume: Create/Delete/Resize** | FSx Console + ONTAP REST API | CloudFormation templates + scripts | ✅ |
+| **Volume: Create/Delete/Resize** | FSx Console + ONTAP REST API | Demo templates + FSx Console (no general-purpose volume management template) | ⚠️ |
 | **Snapshot: Create/Schedule** | FSx Backup + ONTAP REST API | `ontap_response.py` + FSx native | ✅ |
 | **Snapshot: Restore** | FSx Console + ONTAP REST API | `restore-verification.yaml` (verify before restore) | ✅ |
-| **NFS Export Management** | ONTAP REST API | `ontap_response.py` (export-policy rules) | ✅ |
-| **SMB Share Management** | ONTAP REST API | `ontap_response.py` (name-mapping) | ✅ |
+| **NFS Export Management** | ONTAP REST API | `ontap_response.py` (export-policy deny rules for blocking) | ⚠️ Blocking only |
+| **SMB Share Management** | ONTAP REST API | `ontap_response.py` (name-mapping deny for blocking) | ⚠️ Blocking only |
 | **EMS Event Viewer** | CloudWatch Logs (syslog VPC EP) | `syslog-vpce-cloudwatch.yaml` | ✅ |
 | **ARP Status** | EMS → Observability pipeline | 9 vendor integrations + EMS webhook | ✅ |
 | **SnapMirror Management** | FSx Console + ONTAP REST API | Docs (manual procedure) | ⚠️ No automation |
@@ -56,9 +56,11 @@ This document maps every major feature of ONTAP System Manager, NetApp Workload 
 
 ## DII Storage Workload Security — Feature Coverage
 
+> **DII** = Data Infrastructure Insights (formerly Cloud Insights). Storage Workload Security is its ransomware detection and response module.
+
 | DII Feature | AWS-Native Equivalent | This Repo | Status |
 |------------|----------------------|-----------|:------:|
-| **ML-Based Anomaly Detection** | ONTAP ARP/AI (built-in) + SIEM ML | EMS → Datadog/9 vendors | ✅ |
+| **ML-Based Anomaly Detection** | ONTAP ARP/AI (built-in) + SIEM ML | EMS → Datadog/9 vendors (pipeline only; ML detection config is your SIEM's responsibility) | ✅ Pipeline |
 | **User Auto-Block** | ONTAP REST API (name-mapping deny) | `ontap_response.py` + `automated-response.yaml` | ✅ E2E verified |
 | **IP Auto-Block** | ONTAP REST API (export-policy) + VPC NACL | `ontap_response.py` + `automated-response.yaml` | ✅ E2E verified |
 | **Protective Snapshot** | ONTAP REST API | `ontap_response.py` `create_snapshot` | ✅ E2E verified |
@@ -78,11 +80,11 @@ This document maps every major feature of ONTAP System Manager, NetApp Workload 
 
 | Product | Features Mapped | ✅ Covered | ⚠️ Partial | ❌ Out of Scope |
 |---------|:--------------:|:----------:|:----------:|:--------------:|
-| System Manager | 18 | 14 | 2 | 2 |
+| System Manager | 20 | 13 | 5 | 2 |
 | Workload Factory | 9 | 5 | 2 | 2 |
 | DII SWS | 13 | 13 | 0 | 0 |
 
-**Key insight**: Security/incident-response features (DII equivalent) are **100% covered**. Operations monitoring (System Manager equivalent) is **78% covered** — remaining gaps are QoS management and SnapMirror automation, which are infrastructure-management tasks better suited to the FSx Console or a dedicated IaC tool.
+**Key insight**: Security/incident-response features (DII equivalent) are **100% covered**. Operations monitoring (System Manager equivalent) is **65% fully covered + 25% partial** — partial items are security-blocking-only implementations of export/share management, and demo-only volume templates. The fully uncovered items (QoS, LIF/DNS) are infrastructure-management tasks suited to the FSx Console.
 
 ---
 
@@ -95,6 +97,20 @@ This document maps every major feature of ONTAP System Manager, NetApp Workload 
 | Incident Response | `automated-response.yaml` | Tier 2 |
 | Recovery Verification | `restore-verification.yaml` | After Tier 2 |
 | Forensics | Datadog API (dashboard JSON) | After log pipeline |
+
+---
+
+## How to Choose
+
+| Your situation | Recommendation |
+|---------------|----------------|
+| Already invested in AWS observability (Datadog, Grafana, Splunk, etc.) + want storage-layer IR | **This approach** — extends your existing stack to storage-layer containment |
+| Need turnkey ML-based anomaly detection without SIEM configuration | **DII Storage Workload Security** — built-in per-user baselines, no external SIEM needed |
+| Need GUI-driven daily storage operations (create volumes, manage shares) | **FSx Console + ONTAP System Manager** — purpose-built for interactive administration |
+| Need automated infrastructure provisioning at scale | **CloudFormation/Terraform** — IaC is the right pattern regardless of monitoring choice |
+| Need all of the above across a large fleet | Consider a hybrid: this approach for IR + DII for detection + FSx Console for ad-hoc operations |
+
+> **There is no single tool that does everything.** The matrix above maps what this repository covers. Use FSx Console for interactive operations, DII if you want vendor-managed ML detection, and this repository when your detection is already in your SIEM and you want automated containment + forensic evidence without additional licensing.
 
 ---
 
