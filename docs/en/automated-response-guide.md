@@ -57,6 +57,48 @@ This guide describes how to implement automated storage-layer access blocking fo
 +-------------------------------------------------------------------+
 ```
 
+```mermaid
+graph TD
+    subgraph Detection["Detection Layer (any source)"]
+        CWA[CloudWatch Log Alarm]
+        DD[Datadog Monitor]
+        ES[Elastic SIEM]
+        CLI[Manual CLI]
+    end
+
+    subgraph Trigger["SNS Decoupling"]
+        SNS[SNS Trigger Topic]
+    end
+
+    subgraph Response["Response Layer (Lambda + ONTAP)"]
+        LMB[Lambda VPC]
+        LMB --> BLK_SMB[Block SMB User<br/>name-mapping deny]
+        LMB --> BLK_NFS[Block NFS IP<br/>export-policy + NACL]
+        LMB --> SNAP[Create Snapshot<br/>evidence preservation]
+        LMB --> DISC[Disconnect Sessions<br/>force re-auth]
+        LMB --> NOTIFY[SNS Notification<br/>security team]
+    end
+
+    subgraph Verification["Recovery Verification (Step Functions)"]
+        SF[Step Functions Workflow]
+        SF --> CLONE[FlexClone]
+        SF --> WAIT[WaitForFsxSync<br/>10 min]
+        SF --> DISC2[FSx Discovery<br/>120s poll]
+        SF --> AP[S3 Access Point<br/>Internet-origin]
+        SF --> SCAN[Scan for Indicators<br/>extension check]
+        SF --> VERDICT[Record Verdict<br/>DynamoDB]
+    end
+
+    CWA --> SNS
+    DD --> SNS
+    ES --> SNS
+    CLI --> SNS
+    SNS --> LMB
+    SNAP -.->|"verify before restore"| SF
+```
+
+*Three-layer architecture: Detection (any SIEM/monitor) → Response (Lambda, < 2 min E2E) → Verification (Step Functions, 25-50 min). SNS decouples detection from response — no vendor lock-in.*
+
 ---
 
 ## How Blocking Works
@@ -599,6 +641,21 @@ export-policy rule delete -vserver <svm> -policyname <policy> -ruleindex <index>
 ---
 
 ## Cost Estimate
+
+### Comparison: This Approach vs DII Storage Workload Security
+
+| Aspect | This approach (AWS-native) | DII Storage Workload Security |
+|--------|---------------------------|-------------------------------|
+| **Monthly baseline** | ~$0.51 (Lambda + SNS + Secrets Manager) | Capacity-based license (per-node or per-TB) |
+| **VPC Endpoints (if needed)** | +~$14/month (2 Interface EPs) | N/A (SaaS data plane) |
+| **Scales with** | Invocation count (incident frequency) | Storage capacity monitored |
+| **At 10 incidents/month** | ~$0.45 | License cost unchanged |
+| **At 10,000 incidents/month** | ~$36 | License cost unchanged |
+| **Detection cost** | Existing SIEM (already paid) | Included in license |
+| **Setup time** | 30 min (CloudFormation) | Days (agent + collector + AD config) |
+| **Data residency** | Your AWS VPC only | Vendor SaaS cloud |
+
+> **Cost note**: The comparison is between *containment-phase* costs only. DII's license also covers ML-based detection (which this approach delegates to your SIEM). If you don't already have a SIEM with anomaly detection, add that cost to this approach's side of the comparison.
 
 | Component | Monthly Cost (typical) | Notes |
 |-----------|----------------------|-------|

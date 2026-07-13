@@ -59,6 +59,48 @@
 +-------------------------------------------------------------------+
 ```
 
+```mermaid
+graph TD
+    subgraph Detection["検知層（任意のソース）"]
+        CWA[CloudWatch Log Alarm]
+        DD[Datadog Monitor]
+        ES[Elastic SIEM]
+        CLI[手動 CLI]
+    end
+
+    subgraph Trigger["SNS 疎結合"]
+        SNS[SNS トリガートピック]
+    end
+
+    subgraph Response["応答層（Lambda + ONTAP）"]
+        LMB[Lambda VPC内]
+        LMB --> BLK_SMB[SMB ユーザーブロック<br/>name-mapping deny]
+        LMB --> BLK_NFS[NFS IP ブロック<br/>export-policy + NACL]
+        LMB --> SNAP[Snapshot 作成<br/>証拠保全]
+        LMB --> DISC[セッション切断<br/>再認証強制]
+        LMB --> NOTIFY[SNS 通知<br/>セキュリティチーム]
+    end
+
+    subgraph Verification["復旧検証（Step Functions）"]
+        SF[Step Functions ワークフロー]
+        SF --> CLONE[FlexClone]
+        SF --> WAIT[WaitForFsxSync<br/>10 分]
+        SF --> DISC2[FSx Discovery<br/>120秒ポーリング]
+        SF --> AP[S3 Access Point<br/>Internet-origin]
+        SF --> SCAN[指標スキャン<br/>拡張子チェック]
+        SF --> VERDICT[判定記録<br/>DynamoDB]
+    end
+
+    CWA --> SNS
+    DD --> SNS
+    ES --> SNS
+    CLI --> SNS
+    SNS --> LMB
+    SNAP -.->|"リストア前に検証"| SF
+```
+
+*3層アーキテクチャ: 検知（任意のSIEM/Monitor）→ 応答（Lambda、E2E < 2分）→ 検証（Step Functions、25-50分）。SNS が検知と応答を疎結合 — ベンダーロックインなし。*
+
 ---
 
 ## ブロックの仕組み
@@ -619,6 +661,21 @@ export-policy rule delete -vserver <svm> -policyname <policy> -ruleindex <index>
 ---
 
 ## コスト見積もり
+
+### 比較: 本アプローチ vs DII Storage Workload Security
+
+| 観点 | 本アプローチ（AWS ネイティブ） | DII Storage Workload Security |
+|------|-------------------------------|-------------------------------|
+| **月額ベースライン** | ~$0.51（Lambda + SNS + Secrets Manager） | 容量ベースライセンス（ノード単位 or TB 単位） |
+| **VPC Endpoint（必要時）** | +~$14/月（Interface EP 2本） | N/A（SaaS データプレーン） |
+| **スケール基準** | 呼び出し回数（インシデント頻度） | 監視対象ストレージ容量 |
+| **月 10 インシデント時** | ~$0.45 | ライセンス費用変化なし |
+| **月 10,000 インシデント時** | ~$36 | ライセンス費用変化なし |
+| **検知コスト** | 既存 SIEM（既に支払い済み） | ライセンスに内包 |
+| **セットアップ時間** | 30 分（CloudFormation） | 数日（エージェント + コレクタ + AD 設定） |
+| **データ残留場所** | お客様の AWS VPC のみ | ベンダー SaaS クラウド |
+
+> **コスト比較に関する補足**: 比較対象は*封じ込めフェーズ*のコストのみです。DII のライセンスには ML ベースの検知（本アプローチでは既存 SIEM に委任）も含まれています。異常検知機能付きの SIEM をまだ持っていない場合は、そのコストも本アプローチ側の比較に加えてください。
 
 | コンポーネント | 月額（一般的） | 備考 |
 |-------------|-------------|------|
