@@ -529,7 +529,7 @@ aws dynamodb query \
 | `LambdaMemorySize` | 512 MB | 検証用 Lambda 全体のメモリサイズ | 256 MB でも大半の実行には十分。512 MB は大規模な `ListObjectsV2` ページネーションへの余裕 |
 | `CreateSecretsManagerEndpoint` | true | Secrets Manager 用 Interface VPC Endpoint を作成 | VPC に既に存在する場合は `false`（重複 = デプロイ失敗）。事前に `preflight-check.sh` を実行 |
 | `CreateStsEndpoint` | true | STS 用 Interface VPC Endpoint を作成 | 同上 — 既に存在する場合は `false` |
-| `CreateS3GatewayEndpoint` | true | S3 Gateway VPC Endpoint を作成 | ScanForIndicators が VPC 限定 AP に到達するために必要。ルートテーブルに既にある場合は `false` |
+| `CreateS3GatewayEndpoint` | true | S3 Gateway VPC Endpoint を作成 | ScanForIndicators が VPC外で実行されるようになったため（Internet-origin AP）、本ワークフローのスキャンステップには不要。VPC内の他の Lambda が S3 アクセスに必要な場合に有用。不要または既にある場合は `false` |
 
 ### タイミングバジェットの内訳
 

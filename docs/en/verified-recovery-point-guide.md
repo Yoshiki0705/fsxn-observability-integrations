@@ -19,7 +19,7 @@ This guide implements that missing verification step using AWS-native services o
 
 **Key capabilities:**
 - FlexClone-based verification with zero impact on production volumes (copy-on-write, read-only workload against the clone)
-- VPC-scoped S3 Access Point — the clone's contents are never internet-reachable
+- Internet-origin S3 Access Point with IAM + Block Public Access enforcement — no anonymous access possible
 - Fast extension-based pre-filter for ransomware indicators
 - Guaranteed cleanup via Step Functions `Catch` — no orphaned clones or access points, even on failure
 - DynamoDB ledger of every verification run, doubling as CSF 2.0 RC.RP evidence for audits
@@ -48,7 +48,7 @@ This guide implements that missing verification step using AWS-native services o
 |  WaitForFsxDiscovery (FSx describe-volumes polling)               |
 |       |                                                           |
 |       v                                                           |
-|  AttachAccessPoint (AWS FSx API, VPC-scoped)                      |
+|  AttachAccessPoint (AWS FSx API, Internet-origin)                     |
 |       |                                                           |
 |       v                                                           |
 |  ScanForIndicators (S3 ListObjectsV2 via access point)             |
@@ -72,7 +72,7 @@ The key design choice: **cleanup runs on every path**, success or failure. The S
 
 > **Why WaitForFsxDiscovery exists**: ONTAP REST API creates the FlexClone instantly, but FSx API "may take up to several minutes" to discover it (see [AWS docs](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-resources-ontap-apps.html)). This dedicated polling step absorbs that sync delay, keeping AttachAccessPoint focused solely on S3 Access Point lifecycle.
 
-> **Diagram description (text alternative)**: The Step Functions state machine runs six states in sequence — `CreateFlexClone` (ONTAP REST API) → `WaitForFsxDiscovery` (polls FSx `describe-volumes` until the clone appears) → `AttachAccessPoint` (AWS FSx API, VPC-scoped) → `ScanForIndicators` (S3 `ListObjectsV2` via the access point) → `RecordVerdict` (DynamoDB, optional SNS) → `Cleanup` (detaches the S3 Access Point and deletes the FlexClone; this state always runs). If any of the first four states fails, control transfers to `CleanupAfterError`, which invokes the same `Cleanup` Lambda, then `RecordErrorVerdict` writes the failure to the ledger before the execution ends in a `Fail` state.
+> **Diagram description (text alternative)**: The Step Functions state machine runs seven states in sequence — `CreateFlexClone` (ONTAP REST API, with AD DC pre-flight check) → `WaitForFsxSync` (static Wait, 10 min) → `WaitForFsxDiscovery` (polls FSx `describe-volumes` until the clone appears) → `AttachAccessPoint` (AWS FSx API, Internet-origin) → `ScanForIndicators` (S3 `ListObjectsV2` via the access point, runs outside VPC) → `RecordVerdict` (DynamoDB, optional SNS) → `Cleanup` (detaches the S3 Access Point and deletes the FlexClone; this state always runs). If any of the first five states fails, control transfers to `CleanupAfterError`, which invokes the same `Cleanup` Lambda, then `RecordErrorVerdict` writes the failure to the ledger before the execution ends in a `Fail` state.
 
 ---
 
@@ -128,7 +128,7 @@ Step Functions retry config (120s interval, 25 max attempts, after a 10-minute s
 
 ### Step 2: S3 Access Point Attachment
 
-The clone is exposed via a [VPC-scoped S3 Access Point](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-vpc.html) — not internet-origin — so requests must traverse an Interface VPC Endpoint in the bound VPC:
+The clone is exposed via an **Internet-origin S3 Access Point**. VPC-origin was initially planned for stronger network isolation, but E2E verification confirmed that VPC-origin APs + Lambda (even with S3 Gateway Endpoint) consistently return `AccessDenied`. Internet-origin with IAM + S3 Block Public Access (enforced by FSx, non-modifiable) is the verified working pattern.
 
 ```python
 fsx.create_and_attach_s3_access_point(
@@ -138,9 +138,18 @@ fsx.create_and_attach_s3_access_point(
         "VolumeId": fsvol_id,  # resolved via DescribeVolumes, NOT the ONTAP UUID
         "FileSystemIdentity": {"Type": "UNIX", "UnixUser": {"Name": "root"}},
     },
-    S3AccessPoint={"VpcConfiguration": {"VpcId": vpc_id}},
+    # No VpcConfiguration = Internet-origin AP
+    # No put_access_point_policy needed — same-account IAM identity policy is sufficient
 )
 ```
+
+> **Why Internet-origin, not VPC-origin?**
+>
+> VPC-origin APs (`S3AccessPoint={"VpcConfiguration": {"VpcId": vpc_id}}`) provide stronger network-layer isolation in theory. However, this project's E2E verification found that Lambda running inside the bound VPC with an S3 Gateway Endpoint consistently received `AccessDenied` from `ListObjectsV2` — even with all IAM policies, AP resource policies (including `Principal: *` full-open), and VPC Endpoint policies confirmed correct. The same workflow succeeded immediately when switched to Internet-origin AP + VPC-external Lambda. This matches the pattern verified in [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns): "VPC-external Lambda for Internet-origin S3AP access (no VpcConfig)".
+>
+> Security of Internet-origin APs: FSx for ONTAP enforces S3 Block Public Access on all attached APs (non-modifiable), so anonymous/public access is impossible regardless of network origin. Access requires valid IAM credentials with `s3:ListBucket`/`s3:GetObject` on the AP ARN.
+>
+> **Why no `put_access_point_policy`?** Same-account access to FSx ONTAP S3 APs works with IAM identity policy alone — the AP resource policy defaults to delegating to IAM. Calling `s3control.put_access_point_policy()` on FSx ONTAP APs was observed to cause persistent `AccessDenied` in testing, possibly conflicting with FSx's internal authorization layer.
 
 > **Resolving fsvol-id from the ONTAP UUID — measured delay and retry design**: AWS FSx discovers volumes created via ONTAP REST API asynchronously — there is no direct API to map an ONTAP volume UUID to the corresponding `fsvol-xxxx` ID. AWS's own documentation states this sync "may take up to several minutes" ([Managing FSx for ONTAP resources using NetApp applications](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-resources-ontap-apps.html)). This is a distinct concern from ONTAP's own [asynchronous REST API job model](https://docs.netapp.com/us-en/ontap-automation/rest/asynchronous_processing.html) (a `POST` like the one in Step 1 above returns HTTP 202 with a job UUID, and the caller polls `GET /cluster/jobs/{uuid}` until the job itself resolves to `success`/`failure`) — `CreateFlexClone` already polls that ONTAP job to completion before this step ever runs, so by the time `AttachAccessPoint` executes, the ONTAP-side operation has already succeeded. The delay discussed below is what happens *after* that: FSx's own inventory of ONTAP volumes hasn't caught up to a change ONTAP has already made. This project's own end-to-end verification measured this delay directly, with continuous polling and no observation gaps, across three separate runs against the same otherwise-idle file system: **~12 minutes**, then **~24 minutes**, then **~36 minutes** — an increasing pattern across runs, not fixed noise, though three data points are not enough to confirm this is strictly periodic rather than coincidental. The variance and its trend, not any single number, are the operationally important fact. Because of this, `AttachAccessPoint` makes exactly one check per invocation (querying `DescribeVolumes`, then `DescribeS3AccessPointAttachments`) and raises `FsxDiscoveryPending`/`S3AttachPending` when not ready — the **Step Functions state machine's own `Retry` block** (not a loop inside the Lambda) re-invokes it on a schedule (30s initial interval, 1.25x backoff, capped at 150s, 28 attempts — roughly 60 minutes of cumulative budget, sized with margin above the slowest of the three measured runs, but not guaranteed to be sufficient if your environment's delay runs longer still) until FSx reports the clone `AVAILABLE`. This design choice matters operationally: each retry is a separate few-hundred-millisecond Lambda invocation rather than one Lambda blocking for up to 15 minutes (Lambda's own maximum timeout, which the measured delays can approach or exceed), and the full retry schedule is visible in the Step Functions execution history rather than buried inside a sleep loop.
 
@@ -323,11 +332,11 @@ Which Lambdas run inside the VPC depends on what each one calls, not on a unifor
 |--------|-------|-------------------|-----|
 | `CreateFlexClone` | ONTAP REST API directly (volume create) | ✅ Yes | Needs the management-IP route via `SubnetIds`/`SecurityGroupId` |
 | `AttachAccessPoint` | FSx control-plane API only (`CreateAndAttachS3AccessPoint`, `DescribeVolumes`) — never touches ONTAP directly | ❌ No | The FSx API is a public AWS API reachable without a VPC; running it outside the VPC avoids needing an FSx Interface Endpoint just for this step |
-| `ScanForIndicators` | `ListObjectsV2` against the **VPC-scoped** S3 Access Point created in the previous step | ✅ Yes | This is the critical one: a VPC-scoped access point has no route from outside the VPC it's bound to (see Security Considerations below) — a Lambda outside the VPC cannot reach it, full stop |
+| `ScanForIndicators` | `ListObjectsV2` against the **Internet-origin** S3 Access Point created in the previous step | ❌ No | Internet-origin AP is accessible via the public S3 endpoint — VPC-external Lambda is the simplest and verified pattern (see [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns)) |
 | `RecordVerdict` | DynamoDB + SNS only | ❌ No | Neither API requires VPC access |
 | `Cleanup` | FSx control-plane API only (`DetachAndDeleteS3AccessPoint`, `DeleteVolume`) — never touches ONTAP directly | ❌ No | Both are public AWS APIs reachable without a VPC. Earlier versions of this stack deleted the FlexClone via the ONTAP REST API from inside the VPC — see the FlexClone-deletion note under Step 5 above for why that path was replaced with the FSx API, and why `Cleanup` no longer needs an FSx Interface Endpoint or VPC access at all |
 
-> **Critical: VPC Endpoints**. `CreateFlexClone` needs Secrets Manager + STS reachable from the VPC (for ONTAP credentials); `ScanForIndicators` needs the **S3 Gateway Endpoint** bound to your route tables (`RouteTableIds` parameter) — without it, the scan step cannot reach the VPC-scoped access point at all, and the workflow will fail at that state every time, not intermittently. Neither `AttachAccessPoint` nor `Cleanup` needs any VPC Endpoint — both call only the FSx control-plane API, which is a public AWS API. Each of the three remaining endpoints has its own `CreateXxxEndpoint` parameter (`CreateSecretsManagerEndpoint`/`CreateStsEndpoint`/`CreateS3GatewayEndpoint`, all default `true`) — set the ones your VPC already has to `false` rather than treating this as an all-or-nothing choice. See "Before You Deploy" immediately below for how to check what your VPC already has before choosing these three values.
+> **Critical: VPC Endpoints**. `CreateFlexClone` needs Secrets Manager + STS reachable from the VPC (for ONTAP credentials). `ScanForIndicators` runs **outside the VPC** (Internet-origin AP) and does NOT need any VPC Endpoint. Neither `AttachAccessPoint` nor `Cleanup` needs any VPC Endpoint — both call only the FSx control-plane API, which is a public AWS API. The remaining two endpoints have independent parameters (`CreateSecretsManagerEndpoint`/`CreateStsEndpoint`, both default `true`) — set the ones your VPC already has to `false`. `CreateS3GatewayEndpoint` is still available for other Lambda functions in the VPC that may access S3, but is not required by this workflow's scan step.
 
 ---
 
@@ -459,7 +468,7 @@ aws dynamodb query \
 | `LambdaMemorySize` | 512 MB | Memory for all verification Lambdas | 256 MB is sufficient for most runs; 512 provides headroom for large `ListObjectsV2` pagination |
 | `CreateSecretsManagerEndpoint` | true | Create Interface VPC Endpoint for Secrets Manager | Set `false` if your VPC already has one (duplicate = deploy failure). Run `preflight-check.sh` first |
 | `CreateStsEndpoint` | true | Create Interface VPC Endpoint for STS | Same as above — set `false` if already exists |
-| `CreateS3GatewayEndpoint` | true | Create S3 Gateway VPC Endpoint | Required for ScanForIndicators to reach the VPC-scoped AP. Set `false` if your route tables already have one |
+| `CreateS3GatewayEndpoint` | true | Create S3 Gateway VPC Endpoint | No longer required by ScanForIndicators (now runs outside VPC with Internet-origin AP). Still useful if other Lambda functions in this VPC need S3 access. Set `false` if not needed or already exists |
 
 ### Timing Budget Breakdown
 
@@ -511,7 +520,7 @@ The `Wait` state is a Step Functions native state — zero Lambda invocations, z
 - **No production data path**: The FlexClone shares blocks with its parent via copy-on-write, but the S3 Access Point only exposes the *clone*, not the parent volume. Deleting the clone at cleanup does not affect the parent volume or the original snapshot.
 
 > **Evidence-integrity note**: This property matters beyond production-impact avoidance if the snapshot being verified was itself created as protective evidence — for example, by the [Automated Response Guide](automated-response-guide.md)'s `create_snapshot` action during an active incident. Because this workflow only ever reads from and deletes the *clone* — `CreateFlexClone`, `AttachAccessPoint`, `ScanForIndicators`, and `Cleanup` never write back to the source snapshot — running verification against a protective snapshot does not alter or compromise that snapshot's own chain of custody. That's a separate question from whether the *verdict* this workflow records would itself hold up as evidence in an investigation; see the [Automated Response Security Addendum](automated-response-security-addendum.md#chain-of-custody-requirements-dfir)'s Chain of Custody Requirements table for the gap on that side (pre-action state and the triggering message are not currently hashed).
-- **VPC-scoped access point**: The access point is bound to the VPC at creation time and cannot be reached from outside it. This is a stronger guarantee than an internet-origin access point restricted only by policy — see [AWS's network-origin comparison](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/configuring-network-access-for-s3-access-points.html). This is also why `ScanForIndicators` (the Lambda that lists the access point's objects) *must* run inside the bound VPC with a route to S3 (the S3 Gateway Endpoint this stack creates) — there is no policy-only way to reach a VPC-scoped access point from outside its VPC, unlike an internet-origin one.
+- **Internet-origin access point with IAM enforcement**: The access point is created as Internet-origin (no VpcConfiguration), but FSx for ONTAP enforces S3 Block Public Access on all attached APs — anonymous/public access is impossible. Access requires valid IAM credentials. This is the verified working pattern; VPC-origin APs caused persistent AccessDenied in E2E testing (see Step 2 above for the full rationale).
 
 > **Data-residency note**: Every resource this workflow creates — the FlexClone (same Region as the parent FSx for ONTAP file system, by definition), the S3 Access Point, the DynamoDB ledger table, and the Lambda functions themselves — stays within the single AWS Region you deploy this stack into. There is no cross-Region data movement anywhere in this workflow, which is a relevant point to confirm affirmatively for a data-residency questionnaire rather than leaving it as an inference. If your organization operates this workflow across multiple Regions (one stack per Region, per the [Multi-Account Deployment](multi-account-deployment.md) pattern referenced in the Cyber Resilience Capability Map), each Region's ledger is independent — there is no built-in cross-Region replication or aggregation of verification history, so a residency-driven multi-Region deployment also means a per-Region evidence trail unless you build your own aggregation layer.
 - **Least privilege for `fsx:*S3AccessPoint*` actions**: These actions do not currently support resource-level permissions or condition keys as fine-grained as other FSx actions; the IAM policy in this stack scopes them to `Resource: '*'` with a documented rationale. Revisit this if AWS adds resource-level support.
