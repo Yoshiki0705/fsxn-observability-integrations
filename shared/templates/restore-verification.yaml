@@ -499,22 +499,19 @@ Resources:
               # looks like a policy issue but is actually AD connectivity.
               # Fail fast here with a clear message instead of waiting 30+ min
               # for clone creation + FSx discovery only to hit AccessDenied.
-              cifs_data = _request("GET", f"/protocols/cifs/services?svm.name={svm_name}&fields=ad_domain.fqdn,status")
+              cifs_data = _request("GET", f"/protocols/cifs/services?svm.name={svm_name}&fields=ad_domain.fqdn")
               cifs_records = cifs_data.get("records", [])
               if cifs_records:
-                  cifs_status = cifs_records[0].get("status", {})
-                  # ONTAP 9.11+ returns status.state for CIFS service health
-                  cifs_state = cifs_status.get("state", "") if isinstance(cifs_status, dict) else ""
                   ad_fqdn = cifs_records[0].get("ad_domain", {}).get("fqdn", "unknown")
-                  logger.info("SVM '%s' has CIFS enabled (AD: %s, state: %s)", svm_name, ad_fqdn, cifs_state)
+                  logger.info("SVM '%s' has CIFS enabled (AD: %s)", svm_name, ad_fqdn)
                   # Also check DNS connectivity to AD by verifying domain
                   # controller reachability via ONTAP's own diagnostic
                   try:
                       dc_check = _request("GET", f"/protocols/cifs/domains?svm.name={svm_name}&fields=discovered_servers")
                       dc_records = dc_check.get("records", [])
                       if dc_records:
-                          servers = dc_records[0].get("discovered_servers", [])
-                          if not servers:
+                          servers = dc_records[0].get("discovered_servers", None)
+                          if servers is not None and len(servers) == 0:
                               raise RuntimeError(
                                   f"AD CONNECTIVITY FAILURE: SVM '{svm_name}' is AD-joined "
                                   f"(domain: {ad_fqdn}) but cannot discover any domain controllers. "
@@ -522,13 +519,17 @@ Resources:
                                   f"Verify AD ({ad_fqdn}) is running and DNS IPs are reachable "
                                   f"from the SVM's network interfaces."
                               )
-                          logger.info("AD domain controllers reachable: %d servers discovered", len(servers))
+                          elif servers is not None:
+                              logger.info("AD domain controllers reachable: %d servers discovered", len(servers))
+                          else:
+                              # Field not returned by this ONTAP version — cannot verify
+                              logger.info("AD DC reachability check: discovered_servers field not available (proceeding)")
+                      else:
+                          logger.info("No CIFS domain records found — proceeding without DC verification")
                   except RuntimeError as e:
                       if "AD CONNECTIVITY" in str(e):
                           raise
                       # If the domains API is unavailable (older ONTAP), fall through
-                      # and let the workflow proceed — the error will surface later
-                      # at ScanForIndicators if AD is truly unreachable.
                       logger.warning("Could not verify AD DC reachability (API unavailable): %s", e)
 
               timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
