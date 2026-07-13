@@ -491,6 +491,46 @@ Resources:
               volume_name = event["volume_name"]
               snapshot_name = event["snapshot_name"]
 
+              # --- Pre-flight: AD DC reachability check ---
+              # If the SVM has CIFS enabled (AD-joined), S3 AP data operations
+              # require AD DC connectivity for unix->win reverse name-mapping.
+              # If AD is unreachable, S3 AP ListObjectsV2/GetObject will return
+              # AccessDenied at the file-system layer — a confusing error that
+              # looks like a policy issue but is actually AD connectivity.
+              # Fail fast here with a clear message instead of waiting 30+ min
+              # for clone creation + FSx discovery only to hit AccessDenied.
+              cifs_data = _request("GET", f"/protocols/cifs/services?svm.name={svm_name}&fields=ad_domain.fqdn,status")
+              cifs_records = cifs_data.get("records", [])
+              if cifs_records:
+                  cifs_status = cifs_records[0].get("status", {})
+                  # ONTAP 9.11+ returns status.state for CIFS service health
+                  cifs_state = cifs_status.get("state", "") if isinstance(cifs_status, dict) else ""
+                  ad_fqdn = cifs_records[0].get("ad_domain", {}).get("fqdn", "unknown")
+                  logger.info("SVM '%s' has CIFS enabled (AD: %s, state: %s)", svm_name, ad_fqdn, cifs_state)
+                  # Also check DNS connectivity to AD by verifying domain
+                  # controller reachability via ONTAP's own diagnostic
+                  try:
+                      dc_check = _request("GET", f"/protocols/cifs/domains?svm.name={svm_name}&fields=discovered_servers")
+                      dc_records = dc_check.get("records", [])
+                      if dc_records:
+                          servers = dc_records[0].get("discovered_servers", [])
+                          if not servers:
+                              raise RuntimeError(
+                                  f"AD CONNECTIVITY FAILURE: SVM '{svm_name}' is AD-joined "
+                                  f"(domain: {ad_fqdn}) but cannot discover any domain controllers. "
+                                  f"S3 Access Point data operations will fail with AccessDenied. "
+                                  f"Verify AD ({ad_fqdn}) is running and DNS IPs are reachable "
+                                  f"from the SVM's network interfaces."
+                              )
+                          logger.info("AD domain controllers reachable: %d servers discovered", len(servers))
+                  except RuntimeError as e:
+                      if "AD CONNECTIVITY" in str(e):
+                          raise
+                      # If the domains API is unavailable (older ONTAP), fall through
+                      # and let the workflow proceed — the error will surface later
+                      # at ScanForIndicators if AD is truly unreachable.
+                      logger.warning("Could not verify AD DC reachability (API unavailable): %s", e)
+
               timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
               clone_name = f"verify_{volume_name}_{timestamp}"[:203]
 
