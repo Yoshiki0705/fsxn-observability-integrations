@@ -67,14 +67,30 @@
 | **IP 自動ブロック** | ONTAP REST API（export-policy）+ VPC NACL | `ontap_response.py` + `automated-response.yaml` | ✅ E2E検証済み |
 | **保護 Snapshot** | ONTAP REST API | `ontap_response.py` `create_snapshot` | ✅ E2E検証済み |
 | **セッション切断** | ONTAP REST API（CIFS sessions） | `ontap_response.py` `disconnect_smb_sessions` | ✅ E2E検証済み |
-| **Forensics ダッシュボード** | Datadog カスタムダッシュボード | [`integrations/datadog/dashboards/`](../../integrations/datadog/dashboards/)（JSON + デプロイ手順） | ✅ 再現可能 |
-| **ユーザーアクティビティタイムライン** | Datadog Timeseries ウィジェット | Forensics ダッシュボード | ✅ |
-| **ファイルアクセス監査証跡** | 監査ログ → Datadog Log Explorer | パイプライン + Forensics ダッシュボード | ✅ |
-| **影響ボリューム可視化** | Datadog TopList ウィジェット | Forensics ダッシュボード | ✅ |
-| **アラート重要度分布** | Datadog ウィジェット | Forensics ダッシュボード | ✅ |
+| **Forensics ダッシュボード** | ベンダーダッシュボード（Datadog / Grafana / Splunk / Elastic / Sumo Logic） | ベンダー別ダッシュボード定義 — 下表参照 | ✅ 再現可能 |
+| **ユーザーアクティビティタイムライン** | Timeseries / Log パネル | Forensics ダッシュボード（全対応ベンダー） | ✅ |
+| **ファイルアクセス監査証跡** | Log stream / Discover / Log Explorer | Forensics ダッシュボード（全対応ベンダー） | ✅ |
+| **影響ボリューム可視化** | TopList / Bar chart | Forensics ダッシュボード（全対応ベンダー） | ✅ |
+| **アラート重要度分布** | 集約ウィジェット | Forensics ダッシュボード（全対応ベンダー） | ✅ |
 | **復旧ポイント検証** | Step Functions（FlexClone + S3 AP + Scan） | `restore-verification.yaml` | ✅ E2E検証済み |
 | **自動解除（TTL）** | EventBridge Scheduler | `automated-response-ttl.yaml` | ✅ |
 | **マルチ SVM 封じ込め** | Step Functions fan-out / multi-SVM CLI | `automated-response-multi-svm-cli.sh` | ✅ |
+
+---
+
+### Forensics ダッシュボード — ベンダー別リファレンス
+
+監査/EMS/FPolicy ログを受信する全てのベンダーで同等のフォレンジクスビューを構築可能です。以下は本リポジトリで提供済みのアーティファクトです:
+
+| ベンダー | 形式 | アーティファクト | デプロイ方法 |
+|---------|------|-------------|------------|
+| **Datadog** | Dashboard JSON | [`integrations/datadog/dashboards/forensics-dashboard.json`](../../integrations/datadog/dashboards/) | Datadog REST API (`POST /api/v1/dashboard`) |
+| **Grafana** | Dashboard JSON（Loki + LogQL） | [`integrations/grafana/dashboards/forensics-investigation.json`](../../integrations/grafana/dashboards/forensics-investigation.json) | Grafana API または UI インポート |
+| **Elastic** | Kibana Saved Searches（KQL） | [セットアップガイド — フォレンジック調査](../../integrations/elastic/docs/ja/setup-guide.md#フォレンジック調査-kibana-discoverlens) | Kibana UI（Discover + Lens） |
+| **Splunk** | SPL Saved Searches + Dashboard Studio | [サイバーレジリエンスマップ — Respond](../ja/cyber-resilience-capability-map.md)（SPL クエリ記載） | Splunk UI または REST API |
+| **Sumo Logic** | Log Search クエリ | Splunk と同じクエリパターン（Sumo Logic 構文に適応） | Sumo Logic Dashboard API |
+
+> **ベンダー中立の原則**: フォレンジクス機能は特定のベンダーに依存しません。監査ログが既に配信されているベンダーを選択してください。調査ワークフロー（ユーザータイムライン → 全アクティビティ → IP ドリルダウン → ファイルエンティティ履歴）は全ベンダーで同一 — 異なるのはクエリ言語のみです。
 
 ---
 
@@ -114,7 +130,7 @@
 | Qtree クォータ監視 | `qtree-quota-monitor.yaml` | VPC EP 存在後 |
 | インシデント対応 | `automated-response.yaml` | Tier 2 |
 | 復旧検証 | `restore-verification.yaml` | Tier 2 の後 |
-| フォレンジクス | Datadog API（ダッシュボード JSON） | ログパイプライン後 |
+| フォレンジクス | ベンダー別ダッシュボード JSON/クエリ（上表参照） | ログパイプライン後 |
 
 ### Qtree クォータアラーム — 問題の Qtree を特定する方法
 

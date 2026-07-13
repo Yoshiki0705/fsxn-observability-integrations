@@ -128,7 +128,7 @@ Forensic investigation (the RS.AN analysis sub-function) is built from the same 
 | SIEM | Implementation | Reference |
 |------|-----------------|-----------|
 | Splunk | Four `.spl` searches (user timeline, all-activity, IP-centric drill-down, file-entity history) composed into a Dashboard Studio dashboard with input tokens | [`integrations/splunk-serverless/searches/`](../../integrations/splunk-serverless/searches/) |
-| Datadog | A Forensic Investigation notebook with sequential query cells (User Overview → All Activity → IP drill-down → Entity/file drill-down) using Notebook variables | [Datadog README — Saved Views](../../integrations/datadog/README.md#saved-views) |
+| Datadog | Dashboard JSON (8 widgets: ARP timeline, response actions, affected volumes, severity, user activity, audit trail, client IPs, recovery verification) | [`integrations/datadog/dashboards/`](../../integrations/datadog/dashboards/) |
 | Grafana | A provided dashboard JSON using LogQL with `\| json` parsing (Loki's label-cardinality constraint means `user`/`client_ip`/`path` stay in the log body, not as labels) | [`integrations/grafana/dashboards/forensics-investigation.json`](../../integrations/grafana/dashboards/forensics-investigation.json) |
 | Elastic | Kibana Discover + Lens, since ECS field mapping (`user.name`, `source.ip`, `file.path`, `event.action`) is already defined in the [Normalized Event Schema](normalized-event-schema.md#vendor-mapping-matrix) | [Elastic Setup Guide](../../integrations/elastic/docs/en/setup-guide.md#forensic-investigation-kibana-discoverlens) |
 
@@ -143,7 +143,7 @@ Forensic investigation (the RS.AN analysis sub-function) is built from the same 
 | **DII SWS automated response** (vendor SaaS) | Automated user/IP block + protective snapshot + admin alert, driven by DII's own ML detection specifically (not triggerable from an arbitrary third-party detection source). | Preferred if you want response tightly coupled to DII's own detection model in a single vendor-managed workflow. This repo's approach trades that tight coupling for source-agnostic triggering (any SIEM, any detection rule, via SNS). |
 | **AWS Security Hub + Systems Manager Automation** (AWS-native) | Route a GuardDuty/Security Hub finding to an SSM Automation runbook that performs a containment action. | A viable pattern for AWS-centric detection sources that don't call the ONTAP REST API directly; would need a custom runbook step to invoke the same `name-mapping`/export-policy ONTAP actions this repo's Lambda already implements. |
 
-**Status**: ✅ Full for mitigation tooling (ONTAP-native, source-agnostic). ⚠️ Requires assembly for Forensics dashboards (the underlying normalized data exists; a dashboard/saved-search must be built per vendor using the references above — this is a packaging gap, not a technical ceiling. See [Remaining Gaps](#remaining-gaps-not-yet-addressed) items 2 and 3 for the unified-dashboard and cross-storage-system extensions to this same gap).
+**Status**: ✅ Full for mitigation tooling (ONTAP-native, source-agnostic). ✅ Forensics dashboards provided for Datadog (JSON), Grafana (JSON), Elastic (KQL saved searches), and Splunk (SPL queries) — see the [AWS-Native Alternative Matrix](native-alternative-matrix.md#forensics-dashboard--per-vendor-reference) for per-vendor artifacts and deploy methods.
 
 ---
 

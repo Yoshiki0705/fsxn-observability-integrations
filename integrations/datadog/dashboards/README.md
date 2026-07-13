@@ -55,3 +55,34 @@ curl -X POST "https://api.${DD_SITE}/api/v1/dashboard" \
 - **Template variables**: Filter by SVM (`$svm`) or user (`$user`)
 - **Log source**: Widgets use `source:fsxn` (audit), `source:fsxn-ems`, or `source:fsxn-fpolicy`. If you changed the `DD_SOURCE` environment variable in your Lambda, update the queries to match.
 - **Facets**: Ensure `@usr.name`, `@evt.name`, `@file.path`, `@network.client.ip`, `@svm`, `@volume`, `@severity`, `@action`, `@verdict` facets exist in your Datadog Logs configuration
+
+## Equivalent Dashboards on Other Vendors
+
+This Datadog dashboard is one implementation of the **vendor-neutral forensics investigation workflow**. The same views (user timeline, file access trail, IP drill-down, affected volumes, severity distribution) can be built on any vendor receiving FSx for ONTAP audit logs.
+
+| Vendor | Provided Artifact | Query Language | Notes |
+|--------|-------------------|:-------------:|-------|
+| **Grafana (Loki)** | [`integrations/grafana/dashboards/forensics-investigation.json`](../../../integrations/grafana/dashboards/forensics-investigation.json) | LogQL | Full dashboard JSON; import via Grafana API or UI |
+| **Elastic (Kibana)** | [Setup Guide — Forensic Investigation](../../../integrations/elastic/docs/en/setup-guide.md#forensic-investigation-kibana-discoverlens) | KQL | Saved Searches + Lens; ECS field mapping pre-defined |
+| **Splunk** | SPL queries in [Cyber Resilience Map](../../../docs/en/cyber-resilience-capability-map.md) | SPL | 4 saved searches composable into Dashboard Studio |
+| **Sumo Logic** | Same query patterns (adapted syntax) | Sumo Query | Log Search dashboards via Content API |
+
+### Investigation Workflow (Vendor-Independent)
+
+Regardless of which vendor you use, the forensics investigation follows the same 4-step flow:
+
+1. **User Overview** — Filter by suspected user, view activity volume over time
+2. **All Activity** — Full event stream for the user/time window (what files, what operations)
+3. **IP Drill-Down** — Identify access source IPs, detect unusual origins
+4. **File Entity History** — Trace all operations on a specific file path
+
+The difference is only the query language:
+
+| Step | Datadog | Grafana (LogQL) | Elastic (KQL) | Splunk (SPL) |
+|------|---------|-----------------|---------------|--------------|
+| User filter | `@usr.name:<user>` | `{source="fsxn"} \| json \| user=~"<user>"` | `user.name: "<user>"` | `index=fsxn_audit user="<user>"` |
+| Time sort | Default (newest first) | Default | `@timestamp` desc | `_time` desc |
+| IP filter | `@network.client.ip:<ip>` | `\| client_ip=~"<ip>"` | `source.ip: "<ip>"` | `client_ip="<ip>"` |
+| Path filter | `@file.path:<path>` | `\| path=~"<path>"` | `file.path: "<path>"` | `path="<path>"` |
+
+> **Choosing a vendor**: If you already have audit logs flowing to a specific vendor via this project's integration templates, build the forensics dashboard there. No need to add a second vendor just for forensics.

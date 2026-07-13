@@ -140,7 +140,7 @@ ONTAP ARP（Autonomous Ransomware Protection）が、ネイティブのファイ
 | SIEM | 実装内容 | 参照先 |
 |------|---------|--------|
 | Splunk | 4 本の `.spl` 検索（ユーザータイムライン、全活動、IP 中心のドリルダウン、ファイルエンティティ履歴）を、入力トークン付きの Dashboard Studio ダッシュボードに構成 | [`integrations/splunk-serverless/searches/`](../../integrations/splunk-serverless/searches/) |
-| Datadog | Notebook variables を使った連続クエリセル（User Overview → All Activity → IP ドリルダウン → エンティティ/ファイルドリルダウン）による Forensic Investigation ノートブック | [Datadog README — Saved Views](../../integrations/datadog/README.md#saved-views) |
+| Datadog | ダッシュボード JSON（8 ウィジェット: ARP タイムライン、応答アクション、影響ボリューム、重要度、ユーザーアクティビティ、監査証跡、クライアント IP、復旧検証） | [`integrations/datadog/dashboards/`](../../integrations/datadog/dashboards/) |
 | Grafana | `\| json` パース付き LogQL を使った提供済みダッシュボード JSON（Loki のラベルカーディナリティ制約により `user`/`client_ip`/`path` はラベルではなくログ本文に保持） | [`integrations/grafana/dashboards/forensics-investigation.json`](../../integrations/grafana/dashboards/forensics-investigation.json) |
 | Elastic | Kibana Discover + Lens。ECS フィールドマッピング（`user.name`、`source.ip`、`file.path`、`event.action`）は[正規化イベントスキーマ](normalized-event-schema.md#vendor-mapping-matrix)で既に定義済み | [Elastic セットアップガイド](../../integrations/elastic/docs/ja/setup-guide.md#フォレンジック調査-kibana-discoverlens) |
 
@@ -159,7 +159,7 @@ ONTAP ARP（Autonomous Ransomware Protection）が、ネイティブのファイ
 | **DII SWS の自動応答**（ベンダー SaaS） | DII 自身の ML 検知を起点とした、ユーザー/IP の自動ブロック + 保護 Snapshot + 管理者アラート（任意の第三者検知ソースからはトリガーできません）。 | 対応を DII 自身の検知モデルに密結合させ、単一のベンダー管理ワークフローの中で行いたい場合に適しています。本リポジトリのアプローチは、その密結合を、ソースに依存しないトリガー（任意の SIEM、任意の検知ルール、SNS 経由）と引き換えています。 |
 | **AWS Security Hub + Systems Manager Automation**（AWS ネイティブ） | GuardDuty/Security Hub の検出結果を SSM Automation の Runbook にルーティングし、封じ込めアクションを実行します。 | ONTAP REST API を直接呼び出さない AWS 中心の検知ソースに対して有効なパターンです。本リポジトリの Lambda が既に実装している同じ `name-mapping`/export-policy の ONTAP アクションを呼び出すカスタム Runbook ステップが必要になります。 |
 
-**ステータス**: ✅ 低減ツールとしては完全対応（ONTAP ネイティブ、ソースに依存しない）。⚠️ Forensics ダッシュボードは組み合わせが必要（基盤となる正規化データは存在し、上記の参照先を使ってベンダーごとにダッシュボード/保存検索を構築する必要があります — これはパッケージングのギャップであり、技術的な限界ではありません。統合ダッシュボードとストレージシステム横断の拡張については、[残存するギャップ](#残存するギャップ未対応部分)の項目2・3を参照）。
+**ステータス**: ✅ 低減ツールとしては完全対応（ONTAP ネイティブ、ソースに依存しない）。✅ Forensics ダッシュボードは Datadog（JSON）、Grafana（JSON）、Elastic（KQL Saved Searches）、Splunk（SPL クエリ）向けに提供済み — ベンダー別アーティファクトとデプロイ方法は [AWS ネイティブ代替マトリクス](native-alternative-matrix.md#forensics-ダッシュボード--ベンダー別リファレンス)を参照。
 
 ---
 

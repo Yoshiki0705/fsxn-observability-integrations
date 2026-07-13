@@ -1,4 +1,9 @@
-index=fsxn (sourcetype=fsxn:audit:evtx OR sourcetype=fsxn:audit:xml OR sourcetype=fsxn:fpolicy) path="$path_tok$"
-| eval action=coalesce(operation_type, operation)
-| table _time, path, user, client_ip, svm, volume, action, result
+` FSx for ONTAP Forensic Investigation — Step 4: File Entity History
+` All operations on a specific file path across all users and IPs.
+` Token: $path$ (file path, e.g., /share/finance/report.xlsx)
+
+index=fsxn_audit path="$path$"
 | sort - _time
+| table _time, user, operation, client_ip, result, svm, volume
+| rename _time AS "Timestamp", user AS "User", operation AS "Operation",
+         client_ip AS "Client IP", result AS "Result", svm AS "SVM", volume AS "Volume"

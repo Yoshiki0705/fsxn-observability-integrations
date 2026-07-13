@@ -67,14 +67,30 @@ This document maps every major feature of ONTAP System Manager, NetApp Workload 
 | **IP Auto-Block** | ONTAP REST API (export-policy) + VPC NACL | `ontap_response.py` + `automated-response.yaml` | ✅ E2E verified |
 | **Protective Snapshot** | ONTAP REST API | `ontap_response.py` `create_snapshot` | ✅ E2E verified |
 | **Session Disconnect** | ONTAP REST API (CIFS sessions) | `ontap_response.py` `disconnect_smb_sessions` | ✅ E2E verified |
-| **Forensics Dashboard** | Datadog custom dashboard | [`integrations/datadog/dashboards/`](../../integrations/datadog/dashboards/) (JSON + deploy instructions) | ✅ Reproducible |
-| **User Activity Timeline** | Datadog Timeseries widget | Forensics dashboard | ✅ |
-| **File Access Audit Trail** | Audit logs → Datadog Log Explorer | Pipeline + Forensics dashboard | ✅ |
-| **Affected Volume Visualization** | Datadog TopList widget | Forensics dashboard | ✅ |
-| **Alert Severity Distribution** | Datadog widgets | Forensics dashboard | ✅ |
+| **Forensics Dashboard** | Vendor dashboard (Datadog / Grafana / Splunk / Elastic / Sumo Logic) | Per-vendor dashboard definitions — see table below | ✅ Reproducible |
+| **User Activity Timeline** | Timeseries / Log panel | Forensics dashboard (all supported vendors) | ✅ |
+| **File Access Audit Trail** | Log stream / Discover / Log Explorer | Forensics dashboard (all supported vendors) | ✅ |
+| **Affected Volume Visualization** | TopList / Bar chart | Forensics dashboard (all supported vendors) | ✅ |
+| **Alert Severity Distribution** | Aggregation widget | Forensics dashboard (all supported vendors) | ✅ |
 | **Recovery Point Verification** | Step Functions (FlexClone + S3 AP + Scan) | `restore-verification.yaml` | ✅ E2E verified |
 | **Auto-Unblock (TTL)** | EventBridge Scheduler | `automated-response-ttl.yaml` | ✅ |
 | **Multi-SVM Containment** | Step Functions fan-out / multi-SVM CLI | `automated-response-multi-svm-cli.sh` | ✅ |
+
+---
+
+### Forensics Dashboard — Per-Vendor Reference
+
+All vendors that receive audit/EMS/FPolicy logs can build equivalent forensics views. The table below shows what's already provided in this repository:
+
+| Vendor | Format | Artifact | Deploy Method |
+|--------|--------|----------|---------------|
+| **Datadog** | Dashboard JSON | [`integrations/datadog/dashboards/forensics-dashboard.json`](../../integrations/datadog/dashboards/) | Datadog REST API (`POST /api/v1/dashboard`) |
+| **Grafana** | Dashboard JSON (Loki + LogQL) | [`integrations/grafana/dashboards/forensics-investigation.json`](../../integrations/grafana/dashboards/forensics-investigation.json) | Grafana API or UI import |
+| **Elastic** | Kibana Saved Searches (KQL) | [Setup Guide — Forensic Investigation](../../integrations/elastic/docs/en/setup-guide.md#forensic-investigation-kibana-discoverlens) | Kibana UI (Discover + Lens) |
+| **Splunk** | SPL Saved Searches + Dashboard Studio | [Cyber Resilience Map — Respond](../en/cyber-resilience-capability-map.md) (SPL queries documented) | Splunk UI or REST API |
+| **Sumo Logic** | Log Search queries | Same query patterns as Splunk (adapted to Sumo Logic syntax) | Sumo Logic Dashboard API |
+
+> **Vendor-neutral principle**: The forensics capability is not tied to any single vendor. Choose the vendor where your audit logs already land. The investigation workflow (user timeline → all activity → IP drill-down → file entity history) is identical across all vendors — only the query language differs.
 
 ---
 
@@ -98,7 +114,7 @@ This document maps every major feature of ONTAP System Manager, NetApp Workload 
 | Qtree Quota Monitoring | `qtree-quota-monitor.yaml` | After VPC EP exists |
 | Incident Response | `automated-response.yaml` | Tier 2 |
 | Recovery Verification | `restore-verification.yaml` | After Tier 2 |
-| Forensics | Datadog API (dashboard JSON) | After log pipeline |
+| Forensics | Per-vendor dashboard JSON/queries (see table above) | After log pipeline |
 
 ### Qtree Quota Alarm — Identifying the Offending Qtree
 

@@ -1,0 +1,7 @@
+` FSx for ONTAP Forensic Investigation — Step 1: User Timeline
+` Shows activity volume over time for a specific user.
+` Token: $user$ (Windows/AD username, e.g., CORP\jdoe)
+
+index=fsxn_audit user="$user$"
+| timechart span=5m count by operation
+| rename count AS "Operations"

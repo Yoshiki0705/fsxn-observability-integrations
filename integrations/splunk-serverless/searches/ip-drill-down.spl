@@ -1,0 +1,11 @@
+` FSx for ONTAP Forensic Investigation — Step 3: IP Drill-Down
+` Identify access source IPs for a user, detect unusual origins.
+` Token: $user$ (Windows/AD username), $client_ip$ (optional filter)
+
+index=fsxn_audit user="$user$" client_ip="$client_ip$"
+| stats count, dc(path) AS unique_files, values(operation) AS operations,
+        earliest(_time) AS first_seen, latest(_time) AS last_seen
+  BY client_ip
+| sort - count
+| rename client_ip AS "Client IP", count AS "Events", unique_files AS "Unique Files",
+         operations AS "Operations", first_seen AS "First Seen", last_seen AS "Last Seen"
