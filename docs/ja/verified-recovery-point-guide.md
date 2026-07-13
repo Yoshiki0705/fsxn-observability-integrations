@@ -51,6 +51,9 @@
 |  CreateFlexClone (ONTAP REST API)                                 |
 |       |                                                           |
 |       v                                                           |
+|  WaitForFsxDiscovery (FSx describe-volumes ポーリング)            |
+|       |                                                           |
+|       v                                                           |
 |  AttachAccessPoint (AWS FSx API, VPC 限定)                        |
 |       |                                                           |
 |       v                                                           |
@@ -67,11 +70,17 @@
 +-------------------------------------------------------------------+
 ```
 
+![Step Functions グラフビュー — 実行中](../screenshots/automated-response/stepfunctions-graph-running.png)
+
+*Step Functions コンソール: 検証実行のグラフビュー。CreateFlexClone は成功（緑）、WaitForFsxDiscovery/AttachAccessPoint がリトライ中（オレンジ ⚠️ — FSx API が ONTAP で作成されたクローンを発見するのを待機中）。下流のステートは点線（未到達）。*
+
 設計上の重要な選択: **クリーンアップは成功・失敗どちらの経路でも必ず実行されます**。Step Functions の `Catch` ブロックは、どのエラーも正常系と同じ Cleanup Lambda に直接ルーティングします。そのため、ワークフローの途中で失敗しても、FlexClone ボリュームや S3 Access Point がストレージを消費したり不要なアクセス面を残したりすることはありません。
+
+> **WaitForFsxDiscovery が存在する理由**: ONTAP REST API は FlexClone を即座に作成しますが、FSx API がそれを発見するまで「数分かかる場合がある」（[AWSドキュメント](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-resources-ontap-apps.html)参照）。この専用のポーリングステップがその同期遅延を吸収し、AttachAccessPoint は S3 Access Point のライフサイクルのみに集中できます。
 
 > **図の説明（テキストによる代替）**
 >
-> Step Functions ステートマシンは 5 つのステートを順に実行します — `CreateFlexClone`（ONTAP REST API）→ `AttachAccessPoint`（AWS FSx API、VPC 限定）→ `ScanForIndicators`（Access Point 経由の S3 `ListObjectsV2`）→ `RecordVerdict`（DynamoDB、任意で SNS）→ `Cleanup`（S3 Access Point のデタッチと FlexClone の削除。このステートは常に実行されます）。最初の 3 ステートのいずれかが失敗すると、制御は `CleanupAfterError` に移り、同じ `Cleanup` Lambda を呼び出した後、`RecordErrorVerdict` が失敗結果を台帳に記録し、実行は `Fail` ステートで終了します。上記の図は ASCII アートです。この段落がスクリーンリーダー利用者向けの完全なテキスト版に相当します。
+> Step Functions ステートマシンは 6 つのステートを順に実行します — `CreateFlexClone`（ONTAP REST API）→ `WaitForFsxDiscovery`（FSx `describe-volumes` をポーリングしクローンが見えるまで待機）→ `AttachAccessPoint`（AWS FSx API、VPC 限定）→ `ScanForIndicators`（Access Point 経由の S3 `ListObjectsV2`）→ `RecordVerdict`（DynamoDB、任意で SNS）→ `Cleanup`（S3 Access Point のデタッチと FlexClone の削除。このステートは常に実行されます）。最初の 4 ステートのいずれかが失敗すると、制御は `CleanupAfterError` に移り、同じ `Cleanup` Lambda を呼び出した後、`RecordErrorVerdict` が失敗結果を台帳に記録し、実行は `Fail` ステートで終了します。
 
 ---
 
@@ -100,7 +109,34 @@ POST /api/storage/volumes
 >
 > `clone_name` は `verify_{volume_name}_{timestamp}` から生成され、`timestamp` は 1 秒単位の精度です（`%Y%m%d_%H%M%S`）。同じ `volume_name` に対して同じ 1 秒以内に開始された 2 つの Step Functions 実行 — 例えばスケジュール実行と手動トリガーが同時に発火した場合 — は、同一名の ONTAP ボリュームを作成しようとし、2 回目の `POST /storage/volumes` 呼び出しは処理を継続できずに名前の衝突エラーで失敗します。本ワークフローには、これを防ぐための実行レベルのロック（DynamoDB の条件付き書き込みや Step Functions の名前重複排除など）はありません。実際にはこの衝突ウィンドウは狭く、トリガーパターンとしても頻度は高くありませんが、同じボリュームに対して複数の独立したトリガー（例: スケジュールと SOAR プレイブックの両方）から本ワークフローを呼び出す場合は、同一秒での衝突を避けるため、識別用のサフィックス（短いランダムトークンや呼び出し元の実行 ID など）を追加することを検討してください。
 
-### ステップ2: S3 Access Point の接続
+### ステップ2: FSx API によるクローン発見待ち（WaitForFsxDiscovery）
+
+ONTAP REST API でクローンが作成された後、FSx API がそのボリュームを発見するまでには「数分かかる場合がある」ことが [AWS ドキュメント](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-resources-ontap-apps.html)に明記されています。本プロジェクトの実測では 12〜36 分の範囲で変動しています。
+
+この専用ステップが `fsx describe-volumes` をポーリングし、クローンが `CREATED` または `AVAILABLE` ステータスで見えるまで待機します。
+
+![Step Functions AttachAccessPoint — FsxDiscoveryPending リトライ中](../screenshots/automated-response/stepfunctions-execution-running.png)
+
+*Step Functions コンソール: AttachAccessPoint のステート詳細。State input にはクローン名・UUID・親ボリューム・親 Snapshot が表示される。`FsxDiscoveryPending` エラーが発生し、Step Functions の Retry ブロックが再呼び出しを行っている。*
+
+```python
+# WaitForFsxDiscovery Lambda (概略)
+paginator = fsx.get_paginator("describe_volumes")
+for page in paginator.paginate(
+    Filters=[{"Name": "file-system-id", "Values": [file_system_id]}]
+):
+    for volume in page.get("Volumes", []):
+        if volume.get("Name") == clone_name and volume.get("Lifecycle") in (
+            "AVAILABLE", "CREATED",
+        ):
+            return {"fsvol_id": volume["VolumeId"], ...}
+
+raise FsxDiscoveryPending(f"Clone volume '{clone_name}' not yet visible via FSx API")
+```
+
+Step Functions のリトライ設定（初回間隔 30 秒、バックオフ率 1.25、最大 150 秒でキャップ、最大 28 回試行）が、FSx 同期の遅延を吸収します。各リトライは数百ミリ秒の短い Lambda 呼び出しで、Lambda 自身のタイムアウト（15 分制限）にブロックされません。
+
+### ステップ3: S3 Access Point の接続
 
 クローンは [VPC 限定の S3 Access Point](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-vpc.html) 経由で公開されます（インターネット起点ではありません）。そのため、リクエストは接続先 VPC 内の Interface VPC Endpoint を経由する必要があります:
 

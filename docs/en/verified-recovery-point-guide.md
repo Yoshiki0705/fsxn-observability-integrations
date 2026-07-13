@@ -45,6 +45,9 @@ This guide implements that missing verification step using AWS-native services o
 |  CreateFlexClone (ONTAP REST API)                                 |
 |       |                                                           |
 |       v                                                           |
+|  WaitForFsxDiscovery (FSx describe-volumes polling)               |
+|       |                                                           |
+|       v                                                           |
 |  AttachAccessPoint (AWS FSx API, VPC-scoped)                      |
 |       |                                                           |
 |       v                                                           |
@@ -61,9 +64,15 @@ This guide implements that missing verification step using AWS-native services o
 +-------------------------------------------------------------------+
 ```
 
+![Step Functions Graph View — execution in progress](../screenshots/automated-response/stepfunctions-graph-running.png)
+
+*Step Functions console: Graph view of a verification execution. CreateFlexClone succeeded (green), WaitForFsxDiscovery/AttachAccessPoint is retrying (orange ⚠️ — waiting for FSx API to discover the ONTAP-created clone). Downstream states are dashed (not yet reached).*
+
 The key design choice: **cleanup runs on every path**, success or failure. The Step Functions `Catch` block routes any error straight to the same cleanup Lambda used on the happy path, so a mid-workflow failure never leaves a FlexClone volume or S3 Access Point behind consuming storage or presenting an unnecessary access surface.
 
-> **Diagram description (text alternative)**: The Step Functions state machine runs five states in sequence — `CreateFlexClone` (ONTAP REST API) → `AttachAccessPoint` (AWS FSx API, VPC-scoped) → `ScanForIndicators` (S3 `ListObjectsV2` via the access point) → `RecordVerdict` (DynamoDB, optional SNS) → `Cleanup` (detaches the S3 Access Point and deletes the FlexClone; this state always runs). If any of the first three states fails, control transfers to `CleanupAfterError`, which invokes the same `Cleanup` Lambda, then `RecordErrorVerdict` writes the failure to the ledger before the execution ends in a `Fail` state. The diagram above is ASCII art; this paragraph is the complete textual equivalent for screen-reader users.
+> **Why WaitForFsxDiscovery exists**: ONTAP REST API creates the FlexClone instantly, but FSx API "may take up to several minutes" to discover it (see [AWS docs](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-resources-ontap-apps.html)). This dedicated polling step absorbs that sync delay, keeping AttachAccessPoint focused solely on S3 Access Point lifecycle.
+
+> **Diagram description (text alternative)**: The Step Functions state machine runs six states in sequence — `CreateFlexClone` (ONTAP REST API) → `WaitForFsxDiscovery` (polls FSx `describe-volumes` until the clone appears) → `AttachAccessPoint` (AWS FSx API, VPC-scoped) → `ScanForIndicators` (S3 `ListObjectsV2` via the access point) → `RecordVerdict` (DynamoDB, optional SNS) → `Cleanup` (detaches the S3 Access Point and deletes the FlexClone; this state always runs). If any of the first four states fails, control transfers to `CleanupAfterError`, which invokes the same `Cleanup` Lambda, then `RecordErrorVerdict` writes the failure to the ledger before the execution ends in a `Fail` state.
 
 ---
 
@@ -89,6 +98,33 @@ POST /api/storage/volumes
 This returns an async job; the Lambda polls `GET /api/cluster/jobs/{uuid}` until `state: success`, then resolves the clone's ONTAP volume UUID for later cleanup.
 
 > **Concurrency note**: `clone_name` is derived from `verify_{volume_name}_{timestamp}`, where `timestamp` has 1-second resolution (`%Y%m%d_%H%M%S`). Two Step Functions executions started against the *same* `volume_name` within the same second — e.g., a scheduled run and a manually-triggered one firing together — will attempt to create two ONTAP volumes with an identical name, and the second `POST /storage/volumes` call will fail with a naming conflict rather than proceeding. The workflow has no execution-level locking (no DynamoDB conditional write, no Step Functions `name` deduplication) to prevent this. In practice this is a narrow window and an infrequent trigger pattern, but if you invoke this workflow from multiple independent triggers (e.g., both a schedule and a SOAR playbook) against the same volume, consider adding a distinguishing suffix (a short random token or the invoking execution's own ID) to avoid a same-second collision.
+
+### Step 1b: Wait for FSx API Discovery (WaitForFsxDiscovery)
+
+After ONTAP creates the clone, FSx API needs time to discover it — AWS documents this as "may take up to several minutes" ([Managing resources using NetApp applications](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-resources-ontap-apps.html)). Measured delays in this project: 12–36 minutes across multiple runs.
+
+This dedicated step polls `fsx describe-volumes` until the clone appears with `CREATED` or `AVAILABLE` lifecycle status.
+
+![Step Functions AttachAccessPoint — FsxDiscoveryPending retry](../screenshots/automated-response/stepfunctions-execution-running.png)
+
+*Step Functions console: The state detail panel shows the state input (clone name, UUID, parent volume, parent snapshot) and the `FsxDiscoveryPending` error being retried by the Step Functions Retry block.*
+
+```python
+# WaitForFsxDiscovery Lambda (simplified)
+paginator = fsx.get_paginator("describe_volumes")
+for page in paginator.paginate(
+    Filters=[{"Name": "file-system-id", "Values": [file_system_id]}]
+):
+    for volume in page.get("Volumes", []):
+        if volume.get("Name") == clone_name and volume.get("Lifecycle") in (
+            "AVAILABLE", "CREATED",
+        ):
+            return {"fsvol_id": volume["VolumeId"], ...}
+
+raise FsxDiscoveryPending(f"Clone volume '{clone_name}' not yet visible via FSx API")
+```
+
+Step Functions retry config (30s initial, 1.25 backoff, 150s cap, 28 max attempts) absorbs the FSx sync delay. Each retry is a sub-second Lambda invocation — not blocked by Lambda's own 15-minute timeout limit.
 
 ### Step 2: S3 Access Point Attachment
 
