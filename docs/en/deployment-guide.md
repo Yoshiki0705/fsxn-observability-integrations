@@ -358,6 +358,25 @@ The S3 Access Point requires UNIX security style for the target volume. NTFS and
 
 The `automated-response` stack's SMB user blocking (name-mapping) operates at the ONTAP SVM level. To block SMB users by domain identity (e.g., `CORP\jdoe`), the SVM must be joined to Active Directory.
 
+#### S3 Access Points on AD-Joined SVMs
+
+If your SVM is AD-joined (CIFS enabled), **AD domain controller connectivity is required for all S3 AP data operations** — not just SMB. This applies to `restore-verification` and `content-classification` stacks that use S3 APs to access volume data.
+
+| Condition | S3 AP Data Operations |
+|-----------|:---:|
+| Non-AD SVM (CIFS disabled) | ✅ Always works |
+| AD-joined SVM + AD DCs reachable | ✅ Works |
+| AD-joined SVM + AD DCs unreachable | ❌ AccessDenied |
+
+**Pre-flight check**: Before deploying `restore-verification` on an AD-joined SVM, verify AD health:
+```bash
+# From an EC2 in the same VPC/subnet:
+nslookup <AD-domain-FQDN> <AD-DNS-IP>
+# If timeout → AD DCs are down → S3 AP data operations will fail
+```
+
+**Design recommendation**: For `restore-verification`, prefer using a non-AD SVM when possible. If you must use an AD-joined SVM, ensure AD infrastructure is monitored and highly available.
+
 #### AD Join: Verified Deployment Sequence
 
 1. **Create or identify your AD** (AWS Managed or self-managed)
@@ -535,6 +554,46 @@ No stack creates Route 53 records. VPC Endpoint private DNS is handled automatic
 
 **Fix**: Use a different SVM or delete the ONTAP S3 server (confirm no data loss first).
 
+### S3 AP AccessDenied on AD-Joined SVM (HeadBucket OK, Data Ops Fail)
+
+**Cause**: The SVM is joined to Active Directory (CIFS enabled), but the AD domain controllers are unreachable. On AD-joined SVMs, ONTAP performs a `unix→win` reverse lookup for every file system operation — even on UNIX-style volumes with a UNIX file system identity. When AD DCs are down, this lookup fails and all data operations return AccessDenied.
+
+**Diagnosis**: HeadBucket succeeds (only checks the S3 AP exists at the service layer) but ListObjectsV2, GetObject, and PutObject all return AccessDenied. The IAM policy and AP resource policy are correct. This is NOT an IAM issue.
+
+**Fix**:
+1. Verify AD DC connectivity from the SVM's subnet: `nslookup <domain> <ad-dns-ip>`
+2. If AD was deleted/recreated: update the SVM's DNS IPs or force-delete + re-create the CIFS service (see below)
+3. If AD is permanently gone and SMB is not needed: force-delete the CIFS service to remove the AD dependency
+
+**Force-delete CIFS and re-join to new AD** (via ONTAP REST API):
+```bash
+# 1. Disable secure DNS updates
+curl -sk -X PATCH -u fsxadmin:$PW -H 'Content-Type: application/json' \
+  -d '{"dynamic_dns":{"use_secure":false}}' \
+  "https://<mgmt-ip>/api/name-services/dns/<svm-uuid>"
+
+# 2. Force-delete CIFS service
+curl -sk -X DELETE -u fsxadmin:$PW -H 'Content-Type: application/json' \
+  -d '{"force":true,"ad_domain":{"fqdn":"<domain>","user":"Admin","password":"<pw>"}}' \
+  "https://<mgmt-ip>/api/protocols/cifs/services/<svm-uuid>"
+
+# 3. Clean stale records
+curl -sk -X POST -u fsxadmin:$PW -H 'Content-Type: application/json' \
+  -d '{"vserver":"<svm-name>"}' \
+  "https://<mgmt-ip>/api/private/cli/vserver/cifs/users-and-groups/remove-stale-records"
+
+# 4. Re-create CIFS with new AD (use a NEW NetBIOS name — old one is taken in AD)
+curl -sk -X POST -u fsxadmin:$PW -H 'Content-Type: application/json' \
+  -d '{"svm":{"uuid":"<svm-uuid>"},"name":"<NEW-NETBIOS>","ad_domain":{"fqdn":"<domain>","organizational_unit":"<ou>","user":"Admin","password":"<pw>"}}' \
+  "https://<mgmt-ip>/api/protocols/cifs/services"
+```
+
+**Key points**:
+- Each failed rejoin attempt leaves an orphaned computer account in AD — always use a new NetBIOS name
+- FSx API may report the SVM as `MISCONFIGURED` even after successful ONTAP-level CIFS re-creation
+- FSx automatically manages `s3_unix` name-mapping for S3 APs — no manual setup needed
+- Same-account S3 AP access does NOT require an AP resource policy (IAM identity policy alone is sufficient)
+
 ---
 
 ## Day 2: Verification and Ongoing Operations
@@ -595,6 +654,44 @@ aws cloudformation delete-stack --stack-name fsxn-automated-response
 ```
 
 **Operational note**: Delete stacks in reverse deployment order. The `automated-response` stack creates VPC Endpoints used by other stacks; deleting it first causes other stacks to lose Secrets Manager access during their own deletion (usually harmless but generates error logs).
+
+### E2E Verification Environment Cleanup
+
+When tearing down a full verification environment (FSx + AD + demo stacks), follow this order to avoid dependency errors:
+
+| Order | Resource | Command | Notes |
+|-------|----------|---------|-------|
+| 1 | `fsxn-rv-e2e` stack | `aws cloudformation delete-stack --stack-name fsxn-rv-e2e` | Step Functions + Lambda + DynamoDB + VPC Endpoints |
+| 2 | Helper EC2 instances | `aws ec2 terminate-instances --instance-ids <id>` | SSM helper, Windows demo EC2 |
+| 3 | FlexClone volumes | `aws fsx delete-volume --volume-id <fsvol-id> --ontap-configuration '{"SkipFinalBackup":true}'` | Always use `SkipFinalBackup` for throwaway clones |
+| 4 | Demo volumes | Same as above | Any `demo_*` or `verify_*` volumes |
+| 5 | AD environment stack | `aws cloudformation delete-stack --stack-name fsxn-demo-ad-env` | Managed AD deletion takes 15-30 min |
+| 6 | SVM (if dedicated) | `aws fsx delete-storage-virtual-machine --storage-virtual-machine-id <id>` | May fail if volumes or AD relations remain |
+| 7 | IAM roles/profiles | Detach policies → delete profile → delete role | See below |
+
+**IAM cleanup sequence** (order matters):
+```bash
+# 1. Remove role from instance profile
+aws iam remove-role-from-instance-profile \
+  --instance-profile-name <name> --role-name <name>
+# 2. Delete instance profile
+aws iam delete-instance-profile --instance-profile-name <name>
+# 3. Detach managed policies
+aws iam detach-role-policy --role-name <name> --policy-arn <arn>
+# 4. Delete inline policies
+aws iam delete-role-policy --role-name <name> --policy-name <name>
+# 5. Delete role
+aws iam delete-role --role-name <name>
+```
+
+**Known issues during cleanup:**
+
+| Issue | Cause | Resolution |
+|-------|-------|-----------|
+| SVM shows `MISCONFIGURED` after AD deletion | FSx API retains old AD config state | Delete SVM directly, or ignore if FS is being decommissioned |
+| Volume deletion fails: "has one or more clones" | ONTAP recovery queue holds stale clone references | Wait 12h, or purge via `DELETE /private/cli/volume/recovery-queue/purge` (ONTAP admin only) |
+| Volume deletion fails: "SnapMirror relationships" | FSx backup management | Always delete via FSx API (`delete-volume`), never ONTAP REST API |
+| Stack DELETE_FAILED | Resource dependency | Check `describe-stack-events` for the specific resource, resolve, retry |
 
 ---
 
