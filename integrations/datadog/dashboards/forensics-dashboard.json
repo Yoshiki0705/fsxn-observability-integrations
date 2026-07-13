@@ -18,7 +18,7 @@
                 "indexes": ["*"],
                 "compute": {"aggregation": "count"},
                 "group_by": [{"facet": "@evt.name", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}],
-                "search": {"query": "source:fsxn-audit @evt.name:ARP*"}
+                "search": {"query": "source:fsxn @evt.name:ARP*"}
               }
             ],
             "response_format": "timeseries",
@@ -42,7 +42,7 @@
                 "indexes": ["*"],
                 "compute": {"aggregation": "count"},
                 "group_by": [{"facet": "@action", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}],
-                "search": {"query": "source:fsxn-audit @action:(block_user OR block_ip OR snapshot OR disconnect)"}
+                "search": {"query": "source:fsxn @action:(block_user OR block_ip OR snapshot OR disconnect)"}
               }
             ],
             "response_format": "timeseries",
@@ -66,7 +66,7 @@
                 "indexes": ["*"],
                 "compute": {"aggregation": "count"},
                 "group_by": [{"facet": "@volume", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}],
-                "search": {"query": "source:fsxn-audit @evt.name:ARP*"}
+                "search": {"query": "source:fsxn @evt.name:ARP*"}
               }
             ],
             "response_format": "scalar"
@@ -89,7 +89,7 @@
                 "indexes": ["*"],
                 "compute": {"aggregation": "count"},
                 "group_by": [{"facet": "@severity", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}],
-                "search": {"query": "source:fsxn-audit @evt.name:(ARP* OR ransomware*)"}
+                "search": {"query": "source:fsxn @evt.name:(ARP* OR ransomware*)"}
               }
             ],
             "response_format": "scalar"
@@ -112,7 +112,7 @@
                 "indexes": ["*"],
                 "compute": {"aggregation": "count"},
                 "group_by": [{"facet": "@usr.name", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}],
-                "search": {"query": "source:fsxn-audit @evt.name:(Create OR Delete OR Rename OR Write)"}
+                "search": {"query": "source:fsxn @evt.name:(Create OR Delete OR Rename OR Write)"}
               }
             ],
             "response_format": "timeseries",
@@ -136,7 +136,7 @@
               {"field": "@network.client.ip", "width": "auto"},
               {"field": "@svm", "width": "auto"}
             ],
-            "query": {"data_source": "logs_stream", "indexes": ["*"], "query_string": "source:fsxn-audit"},
+            "query": {"data_source": "logs_stream", "indexes": ["*"], "query_string": "source:fsxn OR source:fsxn-ems OR source:fsxn-fpolicy"},
             "response_format": "event_list"
           }
         ]
@@ -157,7 +157,7 @@
                 "indexes": ["*"],
                 "compute": {"aggregation": "count"},
                 "group_by": [{"facet": "@network.client.ip", "limit": 20, "sort": {"aggregation": "count", "order": "desc"}}],
-                "search": {"query": "source:fsxn-audit"}
+                "search": {"query": "source:fsxn OR source:fsxn-ems OR source:fsxn-fpolicy"}
               }
             ],
             "response_format": "scalar"
@@ -180,7 +180,7 @@
                 "indexes": ["*"],
                 "compute": {"aggregation": "count"},
                 "group_by": [{"facet": "@verdict", "limit": 5, "sort": {"aggregation": "count", "order": "desc"}}],
-                "search": {"query": "source:fsxn-audit @action:recovery_verification"}
+                "search": {"query": "source:fsxn @action:recovery_verification"}
               }
             ],
             "response_format": "scalar"

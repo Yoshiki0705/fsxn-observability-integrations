@@ -4,8 +4,22 @@ DII Storage Workload Security equivalent dashboard for FSx for ONTAP audit foren
 
 ## Prerequisites
 
-- Datadog audit log pipeline deployed and shipping logs (`source:fsxn-audit`)
+- Datadog audit log pipeline deployed and shipping logs
 - Datadog API key and Application key
+
+## Log Source Tags (ddsource mapping)
+
+This dashboard queries logs using Datadog's `source:` filter. The source tags are set by each Lambda handler's `ddsource` field:
+
+| Pipeline | Lambda Handler | `ddsource` value | Dashboard query |
+|----------|---------------|:----------------:|-----------------|
+| Audit logs (S3 AP) | `handler.py` | `fsxn` | `source:fsxn` |
+| EMS webhook | `ems_handler.py` | `fsxn-ems` | `source:fsxn-ems` |
+| FPolicy (SQS) | `fpolicy_handler.py` | `fsxn-fpolicy` | `source:fsxn-fpolicy` |
+
+The audit log handler's source is configurable via the `DD_SOURCE` environment variable (default: `fsxn`). If you override it, update the dashboard queries accordingly.
+
+The "File Access Audit Trail" and "Client IP Origins" widgets query all three sources (`source:fsxn OR source:fsxn-ems OR source:fsxn-fpolicy`) to provide a unified view.
 
 ## Deploy via Datadog API
 
@@ -39,5 +53,5 @@ curl -X POST "https://api.${DD_SITE}/api/v1/dashboard" \
 ## Customization
 
 - **Template variables**: Filter by SVM (`$svm`) or user (`$user`)
-- **Log source**: Adjust `source:fsxn-audit` if your pipeline uses a different source tag
+- **Log source**: Widgets use `source:fsxn` (audit), `source:fsxn-ems`, or `source:fsxn-fpolicy`. If you changed the `DD_SOURCE` environment variable in your Lambda, update the queries to match.
 - **Facets**: Ensure `@usr.name`, `@evt.name`, `@file.path`, `@network.client.ip`, `@svm`, `@volume`, `@severity`, `@action`, `@verdict` facets exist in your Datadog Logs configuration
