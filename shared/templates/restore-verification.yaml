@@ -339,12 +339,6 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/*'
                   - !Sub 'arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/*/object/*'
-              - Sid: S3AccessPointPolicyManagement
-                Effect: Allow
-                Action:
-                  - s3:PutAccessPointPolicy
-                  - s3:GetAccessPointPolicy
-                Resource: !Sub 'arn:aws:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/*'
               - Sid: DynamoDbLedger
                 Effect: Allow
                 Action:
@@ -660,7 +654,6 @@ Resources:
           IMPORTANT: always sets FileSystemIdentity.Type=UNIX — only
           authorizes UNIX-security-style volumes.
           """
-          import json
           import logging
           import os
           import re
@@ -673,7 +666,6 @@ Resources:
           logger.setLevel(logging.INFO)
 
           fsx = boto3.client("fsx")
-          s3control = boto3.client("s3control")
 
 
           class S3AttachPending(Exception):
@@ -702,6 +694,11 @@ Resources:
               if not existing:
                   logger.info("Requesting S3 Access Point %s for volume %s", access_point_name, fsvol_id)
                   try:
+                      # Internet-origin AP: accessible from VPC-external Lambda
+                      # without needing a VPC endpoint. This matches the verified
+                      # pattern from FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns.
+                      # VPC-origin AP + Gateway EP causes AccessDenied in Lambda
+                      # (observed and confirmed in E2E testing — see AGENTS.md).
                       fsx.create_and_attach_s3_access_point(
                           Name=access_point_name,
                           Type="ONTAP",
@@ -709,7 +706,6 @@ Resources:
                               "VolumeId": fsvol_id,
                               "FileSystemIdentity": {"Type": "UNIX", "UnixUser": {"Name": unix_user}},
                           },
-                          S3AccessPoint={"VpcConfiguration": {"VpcId": vpc_id}},
                       )
                   except ClientError as e:
                       raise RuntimeError(f"Failed to create S3 Access Point: {e}") from e
@@ -722,33 +718,20 @@ Resources:
               if lifecycle == "AVAILABLE":
                   ap = existing[0].get("S3AccessPoint", {})
                   ap_arn = ap.get("ResourceARN", "")
-                  try:
-                      sts_identity = boto3.client("sts").get_caller_identity()
-                      principal_arn = sts_identity["Arn"]
-                      if ":assumed-role/" in principal_arn:
-                          account_id = sts_identity["Account"]
-                          role_name = principal_arn.split(":assumed-role/")[1].split("/")[0]
-                          principal_arn = f"arn:aws:iam::{account_id}:role/{role_name}"
-                      policy = {
-                          "Version": "2012-10-17",
-                          "Statement": [{
-                              "Effect": "Allow",
-                              "Principal": {"AWS": principal_arn},
-                              "Action": ["s3:ListBucket", "s3:GetObject"],
-                              "Resource": [ap_arn, f"{ap_arn}/object/*"],
-                          }],
-                      }
-                      s3control.put_access_point_policy(
-                          AccountId=sts_identity["Account"],
-                          Name=access_point_name,
-                          Policy=json.dumps(policy),
-                      )
-                  except ClientError as e:
-                      raise RuntimeError(f"Failed to set S3 Access Point policy: {e}") from e
+                  # FSx for ONTAP S3 APs do NOT require an explicit resource
+                  # policy for same-account access. IAM identity policy alone
+                  # is sufficient (verified in FSx-for-ONTAP-S3AccessPoints-
+                  # Serverless-Patterns repo). Calling put_access_point_policy
+                  # on FSx ONTAP APs caused persistent AccessDenied in E2E
+                  # testing — the policy either doesn't propagate or conflicts
+                  # with FSx's internal authorization layer.
+                  ap_alias = ap.get("Alias", "")
+                  logger.info("S3 Access Point AVAILABLE: ARN=%s, Alias=%s", ap_arn, ap_alias)
                   result = dict(event)
                   result.update({
                       "access_point_name": access_point_name,
                       "access_point_arn": ap_arn,
+                      "access_point_alias": ap_alias,
                       "fsvol_id": fsvol_id,
                   })
                   return result
@@ -769,13 +752,10 @@ Resources:
       MemorySize: !Ref LambdaMemorySize
       Timeout: !Ref StepTimeoutSeconds
       Role: !GetAtt VerificationLambdaRole.Arn
-      # VpcConfig required: the access point is VPC-scoped, so it has no
-      # route from outside that VPC. Reaching it needs both running inside
-      # the VPC AND the S3 Gateway Endpoint bound to RouteTableIds.
-      VpcConfig:
-        SubnetIds: !Ref SubnetIds
-        SecurityGroupIds:
-          - !Ref SecurityGroupId
+      # No VpcConfig: S3 AP is Internet-origin (not VPC-scoped), so Lambda
+      # accesses it via the public S3 endpoint. This is the verified pattern
+      # from FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns:
+      # "VPC-external Lambda for Internet-origin S3AP access (no VpcConfig)"
       Environment:
         Variables:
           SUSPICIOUS_RATIO_THRESHOLD: !Ref SuspiciousRatioThreshold
@@ -791,7 +771,7 @@ Resources:
           for an automated go/no-go gate before a human reviews borderline
           cases.
 
-          Input:  {"access_point_arn", ...(passthrough)}
+          Input:  {"access_point_arn", "access_point_alias", ...(passthrough)}
           Output: {"objects_scanned", "suspicious_objects", "suspicious_ratio",
                     "verdict", "reason", ...(passthrough)}
           """
@@ -814,7 +794,11 @@ Resources:
 
 
           def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
+              # Prefer alias for VPC-scoped AP (avoids AccessDenied from ARN-based
+              # routing when Gateway Endpoint is involved); fall back to ARN
+              access_point_alias = event.get("access_point_alias") or event.get("access_point_arn")
               access_point_arn = event["access_point_arn"]
+              logger.info("Scanning via: %s (ARN: %s)", access_point_alias, access_point_arn)
               ratio_threshold = float(os.environ.get("SUSPICIOUS_RATIO_THRESHOLD", "0.05"))
               min_count = int(os.environ.get("SUSPICIOUS_MIN_COUNT", "20"))
 
@@ -822,7 +806,7 @@ Resources:
               suspicious = []
 
               paginator = s3.get_paginator("list_objects_v2")
-              for page in paginator.paginate(Bucket=access_point_arn, MaxKeys=1000):
+              for page in paginator.paginate(Bucket=access_point_alias, MaxKeys=1000):
                   for obj in page.get("Contents", []):
                       total_objects += 1
                       key = obj["Key"]
@@ -1193,6 +1177,15 @@ Resources:
               "Type": "Task",
               "Resource": "${ScanFunction.Arn}",
               "ResultPath": "$",
+              "Retry": [
+                {
+                  "ErrorEquals": ["AccessDenied"],
+                  "IntervalSeconds": 15,
+                  "BackoffRate": 2.0,
+                  "MaxAttempts": 5,
+                  "Comment": "S3 AP resource policy eventual consistency — propagation takes a few seconds after put_access_point_policy"
+                }
+              ],
               "Catch": [
                 {
                   "ErrorEquals": ["States.ALL"],
