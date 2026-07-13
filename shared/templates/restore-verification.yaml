@@ -87,6 +87,22 @@ Parameters:
     MinValue: 30
     MaxValue: 900
 
+  FsxSyncWaitSeconds:
+    Type: Number
+    Description: >-
+      Static wait time (seconds) BEFORE polling starts for FSx API to
+      discover the ONTAP-created FlexClone. ONTAP creates the clone
+      instantly, but FSx API sync takes 12-36 minutes (measured). This
+      Wait state is free (no Lambda invocation) and avoids generating
+      noise in CloudWatch Logs from repeated failed polling attempts
+      during the period when discovery is guaranteed to fail. After this
+      wait, WaitForFsxDiscovery polls at intervals until discovery
+      succeeds. Total budget = FsxSyncWaitSeconds + polling retries.
+      Set to 0 to skip the static wait (all delay absorbed by polling).
+    Default: 600
+    MinValue: 0
+    MaxValue: 2400
+
   SuspiciousRatioThreshold:
     Type: Number
     Description: >-
@@ -1121,20 +1137,25 @@ Resources:
                   "Next": "RecordErrorVerdict"
                 }
               ],
+              "Next": "WaitForFsxSync"
+            },
+            "WaitForFsxSync": {
+              "Type": "Wait",
+              "Seconds": ${FsxSyncWaitSeconds},
+              "Comment": "Static wait before polling — FSx API sync takes 12-36 min (measured). This state is free (no Lambda invocation) and avoids CloudWatch Logs noise from guaranteed-to-fail polling attempts.",
               "Next": "WaitForFsxDiscovery"
             },
             "WaitForFsxDiscovery": {
               "Type": "Task",
               "Resource": "${WaitForFsxDiscoveryFunction.Arn}",
-              "Comment": "Polls FSx API until it discovers the ONTAP-created FlexClone (sync delay: typically 3-12 min, observed up to 36 min)",
+              "Comment": "Polls FSx API until it discovers the ONTAP-created FlexClone. Most of the sync delay is absorbed by the preceding WaitForFsxSync state.",
               "ResultPath": "$",
               "Retry": [
                 {
                   "ErrorEquals": ["FsxDiscoveryPending"],
-                  "IntervalSeconds": 30,
-                  "BackoffRate": 1.25,
-                  "MaxAttempts": 28,
-                  "MaxDelaySeconds": 150
+                  "IntervalSeconds": 60,
+                  "BackoffRate": 1.0,
+                  "MaxAttempts": 20
                 }
               ],
               "Catch": [
