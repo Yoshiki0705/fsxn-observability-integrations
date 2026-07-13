@@ -65,7 +65,7 @@ This document maps every major feature of ONTAP System Manager, NetApp Workload 
 | **IP Auto-Block** | ONTAP REST API (export-policy) + VPC NACL | `ontap_response.py` + `automated-response.yaml` | ✅ E2E verified |
 | **Protective Snapshot** | ONTAP REST API | `ontap_response.py` `create_snapshot` | ✅ E2E verified |
 | **Session Disconnect** | ONTAP REST API (CIFS sessions) | `ontap_response.py` `disconnect_smb_sessions` | ✅ E2E verified |
-| **Forensics Dashboard** | Datadog custom dashboard | `datadog-forensics-dashboard.png` | ✅ Created |
+| **Forensics Dashboard** | Datadog custom dashboard | [`integrations/datadog/dashboards/`](../../integrations/datadog/dashboards/) (JSON + deploy instructions) | ✅ Reproducible |
 | **User Activity Timeline** | Datadog Timeseries widget | Forensics dashboard | ✅ |
 | **File Access Audit Trail** | Audit logs → Datadog Log Explorer | Pipeline + Forensics dashboard | ✅ |
 | **Affected Volume Visualization** | Datadog TopList widget | Forensics dashboard | ✅ |
@@ -97,6 +97,39 @@ This document maps every major feature of ONTAP System Manager, NetApp Workload 
 | Incident Response | `automated-response.yaml` | Tier 2 |
 | Recovery Verification | `restore-verification.yaml` | After Tier 2 |
 | Forensics | Datadog API (dashboard JSON) | After log pipeline |
+
+### Qtree Quota Alarm — Identifying the Offending Qtree
+
+When the Qtree quota alarm fires, it indicates that **at least one** qtree on the SVM exceeded the threshold. The alarm uses `Statistic: Maximum` across all qtrees, so the alarm itself does not tell you which qtree. Run this command to identify it:
+
+```bash
+aws cloudwatch get-metric-data \
+  --metric-data-queries '[{
+    "Id": "q1",
+    "MetricStat": {
+      "Metric": {
+        "Namespace": "FSxONTAP/Qtree",
+        "MetricName": "QtreeQuotaUsedPercent",
+        "Dimensions": [{"Name": "SvmName", "Value": "<your-svm-name>"}]
+      },
+      "Period": 300,
+      "Stat": "Maximum"
+    }
+  }]' \
+  --start-time "$(date -u -v-1H +%Y-%m-%dT%H:%M:%S)" \
+  --end-time "$(date -u +%Y-%m-%dT%H:%M:%S)"
+```
+
+Or query per-qtree metrics directly:
+
+```bash
+aws cloudwatch list-metrics \
+  --namespace "FSxONTAP/Qtree" \
+  --metric-name "QtreeQuotaUsedPercent" \
+  --dimensions Name=SvmName,Value=<your-svm-name> \
+  --query 'Metrics[].Dimensions[?Name==`QtreeName`].Value' \
+  --output text
+```
 
 ---
 

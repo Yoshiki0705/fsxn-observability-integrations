@@ -60,6 +60,40 @@ FSx for ONTAP の監査ログをオブザーバビリティベンダーに転送
 | CloudWatch Log Alarm | `shared/templates/cloudwatch-log-alarm.yaml` | LogGroupName, TargetPattern | No |
 | Lakehouse Monitoring | `shared/templates/lakehouse-monitoring.yaml` | OntapMgmtEndpoint, S3AccessPointArn, VPC/Subnet/SG | Yes |
 
+#### クイックデプロイ: 性能ダッシュボード（VPC不要）
+
+```bash
+aws cloudformation deploy \
+  --template-file shared/templates/fsxn-monitoring-dashboard.yaml \
+  --stack-name fsxn-monitoring \
+  --parameter-overrides \
+    FileSystemId=fs-0123456789abcdef0 \
+    FileSystemName=FSxN-Prod \
+    CapacityThresholdPercent=80 \
+    NotificationEmail=storage-team@example.com
+```
+
+#### クイックデプロイ: Qtree クォータ監視（VPC必要）
+
+```bash
+aws cloudformation deploy \
+  --template-file shared/templates/qtree-quota-monitor.yaml \
+  --stack-name fsxn-qtree-monitor \
+  --parameter-overrides \
+    OntapMgmtIp=<management-ip> \
+    OntapCredentialsSecretArn=arn:aws:secretsmanager:<region>:<account>:secret:<name> \
+    SvmName=svm-prod-01 \
+    VpcId=vpc-0123456789abcdef0 \
+    SubnetIds=subnet-aaa,subnet-bbb \
+    SecurityGroupId=sg-0123456789abcdef0 \
+    QuotaThresholdPercent=85 \
+    NotificationEmail=storage-team@example.com \
+    CreateSecretsManagerEndpoint=false \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+> **VPC Endpoint に関する補足**: Tier 2 スタックを既にデプロイ済みの場合（Secrets Manager エンドポイントが作成済み）は `CreateSecretsManagerEndpoint=false` を設定してください。上記の VPC Endpoint Conflict Matrix を参照。
+
 ### Tier 5: 運用アドオン
 
 | Stack | Template | Purpose |

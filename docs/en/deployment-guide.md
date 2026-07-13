@@ -60,6 +60,40 @@ These stacks ship FSx for ONTAP audit logs to observability vendors. They are th
 | CloudWatch Log Alarm | `shared/templates/cloudwatch-log-alarm.yaml` | LogGroupName, TargetPattern | No |
 | Lakehouse Monitoring | `shared/templates/lakehouse-monitoring.yaml` | OntapMgmtEndpoint, S3AccessPointArn, VPC/Subnet/SG | Yes |
 
+#### Quick Deploy: Performance Dashboard (No VPC required)
+
+```bash
+aws cloudformation deploy \
+  --template-file shared/templates/fsxn-monitoring-dashboard.yaml \
+  --stack-name fsxn-monitoring \
+  --parameter-overrides \
+    FileSystemId=fs-0123456789abcdef0 \
+    FileSystemName=FSxN-Prod \
+    CapacityThresholdPercent=80 \
+    NotificationEmail=storage-team@example.com
+```
+
+#### Quick Deploy: Qtree Quota Monitor (VPC required)
+
+```bash
+aws cloudformation deploy \
+  --template-file shared/templates/qtree-quota-monitor.yaml \
+  --stack-name fsxn-qtree-monitor \
+  --parameter-overrides \
+    OntapMgmtIp=<management-ip> \
+    OntapCredentialsSecretArn=arn:aws:secretsmanager:<region>:<account>:secret:<name> \
+    SvmName=svm-prod-01 \
+    VpcId=vpc-0123456789abcdef0 \
+    SubnetIds=subnet-aaa,subnet-bbb \
+    SecurityGroupId=sg-0123456789abcdef0 \
+    QuotaThresholdPercent=85 \
+    NotificationEmail=storage-team@example.com \
+    CreateSecretsManagerEndpoint=false \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+> **VPC Endpoint note**: Set `CreateSecretsManagerEndpoint=false` if you already deployed Tier 2 stacks (which create the Secrets Manager endpoint). See the VPC Endpoint Conflict Matrix above.
+
 ### Tier 5: Operational Add-ons
 
 | Stack | Template | Purpose |

@@ -1,0 +1,198 @@
+{
+  "title": "FSx for ONTAP — Forensics Dashboard",
+  "description": "DII Storage Workload Security equivalent: user activity, file access audit trail, affected volumes, alert severity distribution. Deploy after audit log pipeline is shipping to Datadog.",
+  "layout_type": "ordered",
+  "widgets": [
+    {
+      "id": 1,
+      "definition": {
+        "title": "ARP Alert Timeline",
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [{"formula": "query1"}],
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["*"],
+                "compute": {"aggregation": "count"},
+                "group_by": [{"facet": "@evt.name", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}],
+                "search": {"query": "source:fsxn-audit @evt.name:ARP*"}
+              }
+            ],
+            "response_format": "timeseries",
+            "style": {"palette": "warm"}
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "definition": {
+        "title": "Incident Response Actions",
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [{"formula": "query1"}],
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["*"],
+                "compute": {"aggregation": "count"},
+                "group_by": [{"facet": "@action", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}],
+                "search": {"query": "source:fsxn-audit @action:(block_user OR block_ip OR snapshot OR disconnect)"}
+              }
+            ],
+            "response_format": "timeseries",
+            "style": {"palette": "cool"}
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "definition": {
+        "title": "Top Affected Volumes",
+        "type": "toplist",
+        "requests": [
+          {
+            "formulas": [{"formula": "query1"}],
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["*"],
+                "compute": {"aggregation": "count"},
+                "group_by": [{"facet": "@volume", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}],
+                "search": {"query": "source:fsxn-audit @evt.name:ARP*"}
+              }
+            ],
+            "response_format": "scalar"
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "definition": {
+        "title": "Alert Severity Distribution",
+        "type": "toplist",
+        "requests": [
+          {
+            "formulas": [{"formula": "query1"}],
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["*"],
+                "compute": {"aggregation": "count"},
+                "group_by": [{"facet": "@severity", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}],
+                "search": {"query": "source:fsxn-audit @evt.name:(ARP* OR ransomware*)"}
+              }
+            ],
+            "response_format": "scalar"
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "definition": {
+        "title": "User Activity — File Operations by User",
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [{"formula": "query1"}],
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["*"],
+                "compute": {"aggregation": "count"},
+                "group_by": [{"facet": "@usr.name", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}],
+                "search": {"query": "source:fsxn-audit @evt.name:(Create OR Delete OR Rename OR Write)"}
+              }
+            ],
+            "response_format": "timeseries",
+            "style": {"palette": "dog_classic"}
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "definition": {
+        "title": "File Access Audit Trail — Recent Events",
+        "type": "list_stream",
+        "requests": [
+          {
+            "columns": [
+              {"field": "timestamp", "width": "auto"},
+              {"field": "@usr.name", "width": "auto"},
+              {"field": "@evt.name", "width": "auto"},
+              {"field": "@file.path", "width": "auto"},
+              {"field": "@network.client.ip", "width": "auto"},
+              {"field": "@svm", "width": "auto"}
+            ],
+            "query": {"data_source": "logs_stream", "indexes": ["*"], "query_string": "source:fsxn-audit"},
+            "response_format": "event_list"
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "definition": {
+        "title": "Client IP — Access Origins",
+        "type": "toplist",
+        "requests": [
+          {
+            "formulas": [{"formula": "query1"}],
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["*"],
+                "compute": {"aggregation": "count"},
+                "group_by": [{"facet": "@network.client.ip", "limit": 20, "sort": {"aggregation": "count", "order": "desc"}}],
+                "search": {"query": "source:fsxn-audit"}
+              }
+            ],
+            "response_format": "scalar"
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "definition": {
+        "title": "Recovery Point Verification — Results",
+        "type": "toplist",
+        "requests": [
+          {
+            "formulas": [{"formula": "query1"}],
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["*"],
+                "compute": {"aggregation": "count"},
+                "group_by": [{"facet": "@verdict", "limit": 5, "sort": {"aggregation": "count", "order": "desc"}}],
+                "search": {"query": "source:fsxn-audit @action:recovery_verification"}
+              }
+            ],
+            "response_format": "scalar"
+          }
+        ]
+      }
+    }
+  ],
+  "notify_list": [],
+  "reflow_type": "fixed",
+  "template_variables": [
+    {"name": "svm", "prefix": "@svm", "default": "*"},
+    {"name": "user", "prefix": "@usr.name", "default": "*"}
+  ]
+}

@@ -65,7 +65,7 @@
 | **IP 自動ブロック** | ONTAP REST API（export-policy）+ VPC NACL | `ontap_response.py` + `automated-response.yaml` | ✅ E2E検証済み |
 | **保護 Snapshot** | ONTAP REST API | `ontap_response.py` `create_snapshot` | ✅ E2E検証済み |
 | **セッション切断** | ONTAP REST API（CIFS sessions） | `ontap_response.py` `disconnect_smb_sessions` | ✅ E2E検証済み |
-| **Forensics ダッシュボード** | Datadog カスタムダッシュボード | `datadog-forensics-dashboard.png` | ✅ 作成済み |
+| **Forensics ダッシュボード** | Datadog カスタムダッシュボード | [`integrations/datadog/dashboards/`](../../integrations/datadog/dashboards/)（JSON + デプロイ手順） | ✅ 再現可能 |
 | **ユーザーアクティビティタイムライン** | Datadog Timeseries ウィジェット | Forensics ダッシュボード | ✅ |
 | **ファイルアクセス監査証跡** | 監査ログ → Datadog Log Explorer | パイプライン + Forensics ダッシュボード | ✅ |
 | **影響ボリューム可視化** | Datadog TopList ウィジェット | Forensics ダッシュボード | ✅ |
@@ -111,6 +111,39 @@
 | インシデント対応 | `automated-response.yaml` | Tier 2 |
 | 復旧検証 | `restore-verification.yaml` | Tier 2 の後 |
 | フォレンジクス | Datadog API（ダッシュボード JSON） | ログパイプライン後 |
+
+### Qtree クォータアラーム — 問題の Qtree を特定する方法
+
+Qtree クォータアラームが発火した場合、SVM 上の**少なくとも1つの** qtree が閾値を超えたことを示します。アラームは全 qtree の `Maximum` を使用するため、アラーム自体はどの qtree かを教えてくれません。以下のコマンドで特定してください:
+
+```bash
+aws cloudwatch get-metric-data \
+  --metric-data-queries '[{
+    "Id": "q1",
+    "MetricStat": {
+      "Metric": {
+        "Namespace": "FSxONTAP/Qtree",
+        "MetricName": "QtreeQuotaUsedPercent",
+        "Dimensions": [{"Name": "SvmName", "Value": "<your-svm-name>"}]
+      },
+      "Period": 300,
+      "Stat": "Maximum"
+    }
+  }]' \
+  --start-time "$(date -u -v-1H +%Y-%m-%dT%H:%M:%S)" \
+  --end-time "$(date -u +%Y-%m-%dT%H:%M:%S)"
+```
+
+または、個別 qtree メトリクスを直接確認:
+
+```bash
+aws cloudwatch list-metrics \
+  --namespace "FSxONTAP/Qtree" \
+  --metric-name "QtreeQuotaUsedPercent" \
+  --dimensions Name=SvmName,Value=<your-svm-name> \
+  --query 'Metrics[].Dimensions[?Name==`QtreeName`].Value' \
+  --output text
+```
 
 ---
 
