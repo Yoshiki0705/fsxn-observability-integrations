@@ -70,7 +70,7 @@
 +-------------------------------------------------------------------+
 ```
 
-![Step Functions グラフビュー — 実行成功](../screenshots/automated-response/stepfunctions-execution-succeeded.png)
+![Step Functions グラフビュー — 実行成功](../screenshots/automated-response/stepfunctions-graph-view-succeeded.png)
 
 *Step Functions コンソール: 全ステート成功（緑）。検証済みクリーン復旧ポイントワークフローがエンドツーエンドで完了 — FlexClone 作成、FSx discovery、S3 Access Point アタッチ、ランサムウェア指標スキャン、判定記録、クリーンアップ全て正常終了。ONTAP 9.17.1P7D1（2026年7月）で E2E 検証済み。*
 

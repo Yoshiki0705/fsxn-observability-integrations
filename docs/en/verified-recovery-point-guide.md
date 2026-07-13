@@ -64,7 +64,7 @@ This guide implements that missing verification step using AWS-native services o
 +-------------------------------------------------------------------+
 ```
 
-![Step Functions Graph View — execution succeeded](../screenshots/automated-response/stepfunctions-execution-succeeded.png)
+![Step Functions Graph View — execution succeeded](../screenshots/automated-response/stepfunctions-graph-view-succeeded.png)
 
 *Step Functions console: All states succeeded (green). The verified-clean recovery point workflow completed end-to-end — FlexClone creation, FSx discovery, S3 Access Point attachment, ransomware indicator scan, verdict recording, and cleanup all passed. E2E verified on ONTAP 9.17.1P7D1 (July 2026).*
 
