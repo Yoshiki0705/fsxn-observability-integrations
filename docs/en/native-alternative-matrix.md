@@ -58,6 +58,8 @@ This document maps every major feature of ONTAP System Manager, NetApp Workload 
 
 > **DII** = Data Infrastructure Insights (formerly Cloud Insights). Storage Workload Security is its ransomware detection and response module.
 
+> **Response latency note**: DII blocks users in-band (sub-second, integrated into ONTAP data path). This repository's Lambda-based response takes 2–5 seconds for a single containment action (block + snapshot), or 25–50 minutes for full recovery-point verification (dominated by FSx-ONTAP sync delay). Choose DII when sub-second response is a hard requirement; choose this approach when your detection is already in your SIEM and you need customizable response logic.
+
 | DII Feature | AWS-Native Equivalent | This Repo | Status |
 |------------|----------------------|-----------|:------:|
 | **ML-Based Anomaly Detection** | ONTAP ARP/AI (built-in) + SIEM ML | EMS → Datadog/9 vendors (pipeline only; ML detection config is your SIEM's responsibility) | ✅ Pipeline |
@@ -80,7 +82,7 @@ This document maps every major feature of ONTAP System Manager, NetApp Workload 
 
 | Product | Features Mapped | ✅ Covered | ⚠️ Partial | ❌ Out of Scope |
 |---------|:--------------:|:----------:|:----------:|:--------------:|
-| System Manager | 20 | 13 | 5 | 2 |
+| System Manager | 21 | 13 | 6 | 2 |
 | Workload Factory | 9 | 5 | 2 | 2 |
 | DII SWS | 13 | 13 | 0 | 0 |
 
@@ -145,6 +147,8 @@ aws cloudwatch list-metrics \
 
 > **There is no single tool that does everything.** The matrix above maps what this repository covers. Use FSx Console for interactive operations, DII if you want vendor-managed ML detection, and this repository when your detection is already in your SIEM and you want automated containment + forensic evidence without additional licensing.
 
+> **Cost model difference**: DII uses per-TB licensing (contact NetApp for pricing). This repository's operational cost is primarily Lambda invocations + CloudWatch metrics + VPC Endpoints (~$15–30/month baseline for a typical single-SVM deployment). See the deployment guide for detailed cost breakdown.
+
 ---
 
 ## Related Documents
@@ -153,3 +157,4 @@ aws cloudwatch list-metrics \
 - [Cyber Resilience Capability Map](cyber-resilience-capability-map.md) — NIST CSF 2.0 mapping
 - [Automated Response Guide](automated-response-guide.md) — DII-equivalent containment actions
 - [Verified Recovery Point Guide](verified-recovery-point-guide.md) — Step Functions verification workflow
+- [Compliance Evidence Pack](compliance-evidence-pack.md) — ISMAP/FISC/SOC2 audit evidence template
