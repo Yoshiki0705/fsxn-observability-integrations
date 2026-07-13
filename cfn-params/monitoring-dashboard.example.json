@@ -1,0 +1,6 @@
+[
+  {"ParameterKey": "FileSystemId", "ParameterValue": "fs-0123456789abcdef0"},
+  {"ParameterKey": "FileSystemName", "ParameterValue": "FSxN-Prod"},
+  {"ParameterKey": "CapacityThresholdPercent", "ParameterValue": "80"},
+  {"ParameterKey": "NotificationEmail", "ParameterValue": "storage-team@example.com"}
+]

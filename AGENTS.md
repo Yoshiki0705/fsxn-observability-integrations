@@ -551,6 +551,7 @@ All scripts use environment variables with sensible defaults:
 - `shared/templates/automated-response.yaml` — Automated incident response (user/IP blocking, snapshot via ONTAP REST API)
 - `shared/templates/automated-response-ttl.yaml` — Time-limited blocks with EventBridge Scheduler auto-unblock
 - `shared/templates/cloudwatch-log-alarm.yaml` — CloudWatch Log Alarm (`AWS::CloudWatch::LogAlarm`, GA 2026-07); direct log-to-alarm, no metric filter. cfn-lint E3006 expected until spec update.
+- `shared/templates/fsxn-monitoring-dashboard.yaml` — CloudWatch Dashboard (IOPS/Throughput/Capacity) + capacity/throughput alarms. System Manager performance view replacement.
 
 ### Security & CI
 - `guard/rules/critical-security.guard` — Blocking cfn-guard rules (wildcard IAM, secrets in env, DLQ encryption)

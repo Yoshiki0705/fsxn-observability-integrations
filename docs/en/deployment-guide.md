@@ -53,6 +53,7 @@ These stacks ship FSx for ONTAP audit logs to observability vendors. They are th
 
 | Stack | Template | Key Parameters | VPC Required |
 |-------|----------|---------------|--------------|
+| **Performance & Capacity Dashboard** | `shared/templates/fsxn-monitoring-dashboard.yaml` | FileSystemId, FileSystemName, CapacityThresholdPercent, NotificationEmail | No |
 | Syslog → CloudWatch | `shared/templates/syslog-vpce-cloudwatch.yaml` | VpcId, SubnetIds, VpcCidr | Yes |
 | FPolicy Server | `shared/templates/fpolicy-server-fargate.yaml` | VpcId, SubnetIds, FsxnSvmSecurityGroupId, ContainerImage | Yes |
 | CloudWatch Log Alarm | `shared/templates/cloudwatch-log-alarm.yaml` | LogGroupName, TargetPattern | No |
