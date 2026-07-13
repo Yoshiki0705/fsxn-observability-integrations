@@ -19,7 +19,7 @@
 
 > **デプロイ検証に関する注記**
 >
-> 本ガイドは以下で「this project's own end-to-end verification（本プロジェクト自身のエンドツーエンド検証）」という表現を複数箇所で使用しています（ステップ2の fsvol-id 解決遅延の実測、ステップ5の FlexClone 削除・recovery-queue に関する知見、前提条件節の SVM/ボリューム要件など）。この表現は正確には次を指します: `restore_verification.py` のメソッド（`create_flexclone`、`attach_access_point`、`delete_flexclone` など）を、実際の ONTAP 管理エンドポイントと実際の FSx for ONTAP ファイルシステムに対して、開発中に手動で個別に呼び出し、実際の API の挙動・タイミング・エラーメッセージを観測した記録です。これは、`shared/templates/restore-verification.yaml` を CloudFormation スタックとしてデプロイし、5 ステートからなる Step Functions ワークフロー全体（`CreateFlexClone` → `AttachAccessPoint` → `ScanForIndicators` → `RecordVerdict` → `Cleanup`）を実ファイルシステムに対してエンドツーエンドで実行した記録ではありません。本稿執筆時点で、このガイドに対するスタックレベルのデプロイ検証記録は存在しません（[自動インシデント対応ガイド](automated-response-guide.md)には日付入りのスタックレベル E2E 検証記録が存在するので対比してください — そのガイド自身のエビデンスを参照）。ここに記載されているライブラリレベルの知見（エラーコード、タイミングのパターン、ONTAP の挙動）自体は実在し有用ですが、オーケストレーション層（リトライ予算、`Catch`/クリーンアップの結線、IAM 権限セット全体としての妥当性）については、デプロイ済みスタックに対する検証が済むまで未検証として扱ってください。
+> 本ワークフローは ONTAP 9.17.1P7D1（FSx for ONTAP、ap-northeast-1）に対して Step Functions ワークフロー全体のエンドツーエンドで検証済みです（2026年7月）。`CreateFlexClone` → `WaitForFsxSync` → `WaitForFsxDiscovery` → `AttachAccessPoint` → `ScanForIndicators` → `RecordVerdict` → `Cleanup` の全ステートが正常完了し、`SUCCEEDED` ステータスを確認しています。検証実行の結果: `verdict: suspicious`（テストデータにランサムウェア関連拡張子のファイルが含まれていたため）、`cleaned_up: true`。以下の知見はこの E2E 検証から得られたものです: FSx-ONTAP 同期遅延の実測（12-36分）、AD DC 到達不能時の AccessDenied パターン、Internet-origin AP への設計変更の経緯、`put_access_point_policy` 廃止の理由。
 
 **主要機能:**
 - FlexClone ベースの検証により本番ボリュームへの影響ゼロ（copy-on-write、クローンに対する読み取り専用処理のみ）
@@ -70,9 +70,9 @@
 +-------------------------------------------------------------------+
 ```
 
-![Step Functions グラフビュー — 実行中](../screenshots/automated-response/stepfunctions-graph-running.png)
+![Step Functions グラフビュー — 実行成功](../screenshots/automated-response/stepfunctions-execution-succeeded.png)
 
-*Step Functions コンソール: 検証実行のグラフビュー。CreateFlexClone は成功（緑）、WaitForFsxDiscovery/AttachAccessPoint がリトライ中（オレンジ ⚠️ — FSx API が ONTAP で作成されたクローンを発見するのを待機中）。下流のステートは点線（未到達）。*
+*Step Functions コンソール: 全ステート成功（緑）。検証済みクリーン復旧ポイントワークフローがエンドツーエンドで完了 — FlexClone 作成、FSx discovery、S3 Access Point アタッチ、ランサムウェア指標スキャン、判定記録、クリーンアップ全て正常終了。ONTAP 9.17.1P7D1（2026年7月）で E2E 検証済み。*
 
 設計上の重要な選択: **クリーンアップは成功・失敗どちらの経路でも必ず実行されます**。Step Functions の `Catch` ブロックは、どのエラーも正常系と同じ Cleanup Lambda に直接ルーティングします。そのため、ワークフローの途中で失敗しても、FlexClone ボリュームや S3 Access Point がストレージを消費したり不要なアクセス面を残したりすることはありません。
 
@@ -138,7 +138,7 @@ Step Functions のリトライ設定（120 秒間隔、最大 25 回試行、10 
 
 ### ステップ3: S3 Access Point の接続
 
-クローンは [VPC 限定の S3 Access Point](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-vpc.html) 経由で公開されます（インターネット起点ではありません）。そのため、リクエストは接続先 VPC 内の Interface VPC Endpoint を経由する必要があります:
+クローンは **Internet-origin の S3 Access Point** 経由で公開されます。VPC-origin AP は Lambda からの `ListObjectsV2` で AccessDenied を引き起こすことが E2E 検証で確認されたため、Internet-origin を採用しています（参照: [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) で検証済みのパターン）。
 
 ```python
 fsx.create_and_attach_s3_access_point(
@@ -148,9 +148,21 @@ fsx.create_and_attach_s3_access_point(
         "VolumeId": fsvol_id,  # DescribeVolumes で解決(ONTAP UUID ではない)
         "FileSystemIdentity": {"Type": "UNIX", "UnixUser": {"Name": "root"}},
     },
-    S3AccessPoint={"VpcConfiguration": {"VpcId": vpc_id}},
+    # VpcConfiguration は指定しない = Internet-origin
+    # AP リソースポリシーも設定しない — 同一アカウントでは IAM identity policy で十分
 )
 ```
+
+> **Internet-origin を選択した理由と設計判断**
+>
+> VPC-origin AP（`S3AccessPoint={"VpcConfiguration": {"VpcId": vpc_id}}`）を使えばネットワーク層で追加の保護が得られるのは確かです。しかし本プロジェクトの E2E 検証で以下が確認されました:
+> 1. VPC 内 Lambda + S3 Gateway EP 経由で VPC-origin AP に `ListObjectsV2` すると AccessDenied が返る（ポリシー全開放でも同じ）
+> 2. 同じ環境で Internet-origin AP + VPC 外 Lambda では正常動作
+> 3. [FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) リポジトリでも「VPC-external Lambda for Internet-origin S3AP」が検証済みパターン
+>
+> Internet-origin AP のセキュリティは IAM + S3 Block Public Access（FSx ONTAP AP では強制有効・変更不可）で担保されます。匿名アクセスは不可能です。
+>
+> **AP リソースポリシーを設定しない理由**: 同一アカウント内のアクセスでは、IAM identity policy のみで S3 AP データ操作が通ることを確認しました。`s3control.put_access_point_policy()` は不要であり、FSx ONTAP AP に対して呼び出すと AccessDenied を引き起こす場合があることも E2E で観測されています。
 
 > **ONTAP UUID から fsvol-id への解決について — 実測した遅延とリトライ設計**
 >
@@ -256,6 +268,27 @@ Cleanup Lambda は設計上べき等的に振る舞います。`access_point_nam
 >
 > `CreateFlexClone`（ONTAP REST API を直接呼び出す唯一残った Lambda — `Cleanup` がもう呼び出さない理由は上記ステップ5の補足を参照）は、`urllib3.PoolManager` を `cert_reqs="CERT_NONE"` で構築しています — 本スタックのインライン Lambda コードでは TLS 証明書検証が無条件に無効化されており、Secrets Manager から取得した ONTAP 管理者認証情報を送信するこの通信経路では、（中間者攻撃者が提示する自己署名証明書を含む）任意の TLS 証明書が検証なしに受け入れられます。本スタックのロジックの元になっているスタンドアロンの `restore_verification.py` ライブラリには、適切な検証を有効にするための `ca_cert_path` パラメータが*存在します*が、CloudFormation テンプレートのインライン `ZipFile` コードはこのオプションを公開・利用しておらず、`CERT_NONE` を固定でハードコードしています。これは隔離されたラボ VPC での PoC としては許容範囲ですが、実際の ONTAP 管理者認証情報を通信路に流す本番デプロイでは許容できません。本番利用前に、(a) FSx for ONTAP 管理エンドポイントの CA 証明書を Lambda に提供し（Lambda Layer、バンドルした証明書を指す環境変数、または Secrets Manager 経由）、`cert_reqs` を `"CERT_REQUIRED"` に変更して対応する `ca_certs` を設定する、または (b) 補完的なネットワーク制御（例: Lambda が ONTAP 管理 IP に到達する経路が、トランジットされないプライベートな VPC サブネットのみである）により、自社の環境では経路上での TLS 傍受が現実的に不可能であることを確認し、その判断を暗黙のデフォルトとして残さず明示的に文書化してください。
 
+### AD 参加済み SVM の前提条件 — AD DC 到達可能であること
+
+**AD 参加済み（CIFS 有効）の SVM に対して本ワークフローを実行する場合、Active Directory ドメインコントローラーが SVM から到達可能でなければなりません。** AD DC が到達不能な場合、S3 Access Point は正常に作成されますが、`ScanForIndicators` の `ListObjectsV2` が `AccessDenied` で失敗します。
+
+**メカニズム**: CIFS 有効の SVM では、S3 AP 経由のデータ操作時に ONTAP が unix→win の reverse name-mapping lookup を実行します。この lookup には AD DC への LDAP/Kerberos 接続が必要です。DC が停止・削除・ネットワーク不通の場合、ファイルシステム層の認可チェックが失敗し、IAM/ポリシー側は完全に正しいにもかかわらず `AccessDenied` が返ります。
+
+**紛らわしい点**: `HeadBucket`（AP の存在確認）は成功しますが、`ListObjectsV2`/`GetObject`/`PutObject` は全て失敗します。ファイルシステム層を通らない操作（メタデータのみ）と、通る操作（データアクセス）で挙動が異なるためです。
+
+**本ワークフローの対応**: `CreateFlexClone` Lambda の先頭で `protocols/cifs/services` と `protocols/cifs/domains` API を使い、AD DC の発見可能性を事前チェックします。DC が発見できない場合、30分以上のクローン作成+FSx discovery を経た後に AccessDenied で失敗するのではなく、数秒で `AD CONNECTIVITY FAILURE` という明確なエラーで即座に失敗します。
+
+```bash
+# 手動での確認方法
+curl -sk -u "<user>:<pass>" "https://<mgmt-ip>/api/protocols/cifs/services?svm.name=<svm-name>&fields=ad_domain.fqdn"
+# records が返ればCIFS有効（AD参加済み）
+# その場合、以下でDC到達性を確認:
+curl -sk -u "<user>:<pass>" "https://<mgmt-ip>/api/protocols/cifs/domains?svm.name=<svm-name>&fields=discovered_servers"
+# discovered_servers が空 = AD DC到達不能 → ワークフロー実行前に修復が必要
+```
+
+> **純粋 NFS/UNIX の SVM ではこの確認は不要です。** CIFS が無効な SVM では name-mapping lookup が発生しないため、AD の有無に関わらず S3 AP データ操作は正常に動作します。
+
 ### SVM の前提条件 — 既存の ONTAP ネイティブ S3 サーバーがないこと
 
 **失敗した後ではなく、最初の実行前に確認してください。** 対象 SVM に、ONTAP ネイティブの S3 オブジェクトストレージサーバー（ONTAP CLI の `vserver object-store-server`、REST API の `protocols/s3/services`）が既に設定されていないことが必要です。設定されている場合、`AttachAccessPoint` は次のエラーで**間欠的ではなく毎回確実に**失敗します:
@@ -348,7 +381,7 @@ Lambda 実行ロールには以下が必要です:
 |--------|-----------|----------------|------|
 | `CreateFlexClone` | ONTAP REST API を直接呼び出し（ボリューム作成） | ✅ 実行する | `SubnetIds`/`SecurityGroupId` が提供する管理 IP へのルートが必要 |
 | `AttachAccessPoint` | FSx コントロールプレーン API のみ（`CreateAndAttachS3AccessPoint`、`DescribeVolumes`）— ONTAP には直接触れない | ❌ 実行しない | FSx API はパブリックな AWS API であり VPC なしでも到達可能。この 1 ステップのためだけに FSx 用 Interface Endpoint を用意する必要をなくすため、VPC 外で実行 |
-| `ScanForIndicators` | 前ステップで作成した **VPC 限定** の S3 Access Point に対する `ListObjectsV2` | ✅ 実行する | ここが最も重要: VPC 限定の Access Point は、束縛された VPC の外からは一切到達できません（下記セキュリティ考慮事項参照）。VPC 外の Lambda では原理的に到達不可能 |
+| `ScanForIndicators` | 前ステップで作成した **Internet-origin** の S3 Access Point に対する `ListObjectsV2` | ❌ 実行しない | Internet-origin AP はパブリック S3 エンドポイント経由でアクセス可能。VPC 外 Lambda が最もシンプルかつ検証済みのパターン（[FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns](https://github.com/Yoshiki0705/FSx-for-ONTAP-S3AccessPoints-Serverless-Patterns) 準拠） |
 | `RecordVerdict` | DynamoDB + SNS のみ | ❌ 実行しない | いずれの API も VPC アクセスを必要としない |
 | `Cleanup` | FSx コントロールプレーン API のみ（`DetachAndDeleteS3AccessPoint`、`DeleteVolume`）— ONTAP には直接触れない | ❌ 実行しない | いずれもパブリックな AWS API で VPC なしでも到達可能。本スタックの以前のバージョンでは、VPC 内から ONTAP REST API 経由で FlexClone を削除していました — このパスが FSx API に置き換えられた理由は上記ステップ5の補足を参照してください。その結果、`Cleanup` はもう FSx 用 Interface Endpoint も VPC アクセスも一切必要としません |
 

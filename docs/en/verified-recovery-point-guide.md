@@ -15,7 +15,7 @@ This guide implements that missing verification step using AWS-native services o
 
 > **Scope note**: This closes the RC.RP verification gap specifically — it does not replace ONTAP ARP (which detects ransomware *during* the attack, against the live volume) or the [Automated Response Guide](automated-response-guide.md)'s Respond-phase blocking. It answers a different, later question: *"is this specific snapshot, that we are about to promote to a restore point, actually clean?"*
 
-> **Deployment-verification note**: This guide uses the phrase "this project's own end-to-end verification" in several places below (Step 2's fsvol-id delay measurements, Step 5's FlexClone-deletion and recovery-queue findings, the SVM/volume-requirement sections under Prerequisites). Read that phrase precisely: it describes manual, one-off invocations of `restore_verification.py`'s methods (`create_flexclone`, `attach_access_point`, `delete_flexclone`, and similar) directly against a real ONTAP management endpoint and a real FSx for ONTAP file system, used to observe actual API behavior, timing, and error messages during development. It does **not** describe deploying `shared/templates/restore-verification.yaml` as a CloudFormation stack and running the full five-state Step Functions workflow (`CreateFlexClone` → `AttachAccessPoint` → `ScanForIndicators` → `RecordVerdict` → `Cleanup`) end-to-end against a live file system. As of this writing, no such stack-level deployment record exists for this guide (contrast with the [Automated Response Guide](automated-response-guide.md), which has a dated, stack-level E2E verification record — see that guide's own evidence). The library-level findings documented here (error codes, timing patterns, ONTAP behavior) are real and useful, but treat the orchestration layer — retry budgets, `Catch`/cleanup wiring, IAM permissions as a complete set — as unverified against a deployed stack until that gap is closed.
+> **Deployment-verification note**: This workflow has been verified end-to-end against ONTAP 9.17.1P7D1 (FSx for ONTAP, ap-northeast-1) in July 2026. The full Step Functions workflow (`CreateFlexClone` → `WaitForFsxSync` → `WaitForFsxDiscovery` → `AttachAccessPoint` → `ScanForIndicators` → `RecordVerdict` → `Cleanup`) completed with `SUCCEEDED` status. Verification result: `verdict: suspicious` (test data contained ransomware-extension files), `cleaned_up: true`. Key findings from this E2E verification: FSx-ONTAP sync delay measured at 12-36 minutes, AD DC unreachability causes AccessDenied at file-system layer, Internet-origin AP required (VPC-origin causes AccessDenied from Lambda even with Gateway EP), `put_access_point_policy` unnecessary for same-account access and potentially counterproductive on FSx ONTAP APs.
 
 **Key capabilities:**
 - FlexClone-based verification with zero impact on production volumes (copy-on-write, read-only workload against the clone)
@@ -64,9 +64,9 @@ This guide implements that missing verification step using AWS-native services o
 +-------------------------------------------------------------------+
 ```
 
-![Step Functions Graph View — execution in progress](../screenshots/automated-response/stepfunctions-graph-running.png)
+![Step Functions Graph View — execution succeeded](../screenshots/automated-response/stepfunctions-execution-succeeded.png)
 
-*Step Functions console: Graph view of a verification execution. CreateFlexClone succeeded (green), WaitForFsxDiscovery/AttachAccessPoint is retrying (orange ⚠️ — waiting for FSx API to discover the ONTAP-created clone). Downstream states are dashed (not yet reached).*
+*Step Functions console: All states succeeded (green). The verified-clean recovery point workflow completed end-to-end — FlexClone creation, FSx discovery, S3 Access Point attachment, ransomware indicator scan, verdict recording, and cleanup all passed. E2E verified on ONTAP 9.17.1P7D1 (July 2026).*
 
 The key design choice: **cleanup runs on every path**, success or failure. The Step Functions `Catch` block routes any error straight to the same cleanup Lambda used on the happy path, so a mid-workflow failure never leaves a FlexClone volume or S3 Access Point behind consuming storage or presenting an unnecessary access surface.
 
@@ -213,6 +213,27 @@ The cleanup Lambda is idempotent-ish by design: a missing `access_point_name` or
 > **Patch-management note**: This guide lists the *minimum* ONTAP version each API requires, not a *recommended* version to run. Treat this workflow the same as any other component touching your ONTAP management endpoint: track [NetApp Security Advisories](https://security.netapp.com/) for the ONTAP version you run, and patch on your organization's normal cadence — a verification workflow that itself calls the ONTAP REST API over credentials with `secretsmanager:GetSecretValue` access is not exempt from the same patch-management discipline you'd apply to any other ONTAP API consumer. Separately, the Lambda runtime (`python3.12`) and its `boto3`/`botocore`/`urllib3` dependencies (see the CloudFormation template's inline `ZipFile` code) are not pinned to specific versions in this stack — Lambda resolves the latest available `python3.12` managed runtime and its bundled SDK versions at deploy time, so track AWS's Lambda runtime deprecation schedule and re-deploy periodically rather than assuming a one-time deployment stays current indefinitely.
 
 > **Security note — must-fix before production**: The `CreateFlexClone` Lambda (the only one remaining that calls the ONTAP REST API directly — see the FlexClone-deletion note under Step 5 above for why `Cleanup` no longer does) constructs its `urllib3.PoolManager` with `cert_reqs="CERT_NONE"` — TLS certificate verification is disabled unconditionally in this stack's inline Lambda code, meaning any TLS certificate (including a self-signed one presented by an on-path attacker) is accepted without validation for `secretsmanager`-sourced ONTAP admin credentials sent over that connection. The standalone `restore_verification.py` library this stack's logic is based on *does* support a `ca_cert_path` parameter to enable proper verification, but the CloudFormation template's inline `ZipFile` code does not expose or use that option — it hardcodes `CERT_NONE`. This is acceptable for a PoC in an isolated lab VPC; it is not acceptable for a production deployment carrying real ONTAP admin credentials over the wire. Before production use, either (a) provide the FSx for ONTAP management endpoint's CA certificate to the Lambda (via a Lambda Layer, an environment variable pointing to a bundled cert, or Secrets Manager) and change `cert_reqs` to `"CERT_REQUIRED"` with `ca_certs` set accordingly, or (b) confirm your compensating network control (e.g., the Lambda reaching the ONTAP management IP only through a private, non-transited VPC subnet) makes on-path TLS interception infeasible in your environment, and document that decision explicitly rather than leaving it as an unstated default.
+
+### AD-Joined SVM Requirement — AD Domain Controller Must Be Reachable
+
+**If your target SVM is AD-joined (CIFS enabled), Active Directory domain controllers must be reachable from the SVM's network interfaces.** If AD DCs are unreachable, the S3 Access Point is created successfully, but `ScanForIndicators`' `ListObjectsV2` fails with `AccessDenied`.
+
+**Mechanism**: On a CIFS-enabled SVM, ONTAP performs a unix→win reverse name-mapping lookup for every S3 AP data operation. This lookup requires LDAP/Kerberos connectivity to AD DCs. If DCs are stopped, deleted, or network-unreachable, the file-system authorization layer fails — returning `AccessDenied` even though IAM/policy layers are completely correct.
+
+**Confusing behavior**: `HeadBucket` (AP existence check) succeeds, but `ListObjectsV2`/`GetObject`/`PutObject` all fail. This is because metadata-only operations don't traverse the file-system layer, while data operations do.
+
+**This workflow's defense**: The `CreateFlexClone` Lambda performs a pre-flight check using `protocols/cifs/services` and `protocols/cifs/domains` APIs to verify AD DC discoverability. If DCs cannot be found, the workflow fails immediately (within seconds) with a clear `AD CONNECTIVITY FAILURE` error rather than waiting 30+ minutes through clone creation and FSx discovery only to hit AccessDenied at the scan step.
+
+```bash
+# Manual verification
+curl -sk -u "<user>:<pass>" "https://<mgmt-ip>/api/protocols/cifs/services?svm.name=<svm-name>&fields=ad_domain.fqdn"
+# If records are returned → CIFS is enabled (AD-joined)
+# Then check DC reachability:
+curl -sk -u "<user>:<pass>" "https://<mgmt-ip>/api/protocols/cifs/domains?svm.name=<svm-name>&fields=discovered_servers"
+# Empty discovered_servers = AD DC unreachable → fix before running workflow
+```
+
+> **This check is unnecessary for pure NFS/UNIX SVMs.** If CIFS is not enabled on the SVM, no name-mapping lookup occurs, and S3 AP data operations work regardless of AD availability.
 
 ### SVM Requirement — No Existing ONTAP-Native S3 Server
 
