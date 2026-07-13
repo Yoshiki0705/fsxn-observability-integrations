@@ -552,6 +552,7 @@ All scripts use environment variables with sensible defaults:
 - `shared/templates/automated-response-ttl.yaml` — Time-limited blocks with EventBridge Scheduler auto-unblock
 - `shared/templates/cloudwatch-log-alarm.yaml` — CloudWatch Log Alarm (`AWS::CloudWatch::LogAlarm`, GA 2026-07); direct log-to-alarm, no metric filter. cfn-lint E3006 expected until spec update.
 - `shared/templates/fsxn-monitoring-dashboard.yaml` — CloudWatch Dashboard (IOPS/Throughput/Capacity) + capacity/throughput alarms. System Manager performance view replacement.
+- `shared/templates/qtree-quota-monitor.yaml` — Qtree quota usage monitoring (Lambda → ONTAP REST API → CloudWatch Custom Metric + alarm). System Manager quota view replacement.
 
 ### Security & CI
 - `guard/rules/critical-security.guard` — Blocking cfn-guard rules (wildcard IAM, secrets in env, DLQ encryption)
@@ -576,6 +577,7 @@ All scripts use environment variables with sensible defaults:
 - `integrations/otel-collector/docs/en/pii-redaction-cookbook.md` — 7 OTel Collector redaction recipes
 - `docs/en/automated-response-guide.md` — Automated incident response (user/IP blocking via ONTAP REST API)
 - `docs/en/ems-detection-capabilities.md` — EMS event catalog (30+ events, delivery patterns, latency comparison)
+- `docs/en/native-alternative-matrix.md` — System Manager / Workload Factory / DII feature-to-AWS-native mapping (40 features, DII 100% covered)
 - `docs/en/deployment-guide.md` — Comprehensive deployment guide (stack catalog, parameter mapping, VPC EP conflict matrix, verified paths, cost, Day 2)
 - `cfn-params/README.md` — Parameter file usage instructions (create-stack vs deploy syntax)
 - `shared/scripts/preflight-check.sh` — Pre-deployment environment validation (5 profiles, VPC EP conflict detection, ONTAP S3 server check)
