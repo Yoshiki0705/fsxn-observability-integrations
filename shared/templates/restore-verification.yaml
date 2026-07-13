@@ -1153,9 +1153,9 @@ Resources:
               "Retry": [
                 {
                   "ErrorEquals": ["FsxDiscoveryPending"],
-                  "IntervalSeconds": 60,
+                  "IntervalSeconds": 120,
                   "BackoffRate": 1.0,
-                  "MaxAttempts": 20
+                  "MaxAttempts": 25
                 }
               ],
               "Catch": [
