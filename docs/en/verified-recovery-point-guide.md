@@ -124,7 +124,7 @@ for page in paginator.paginate(
 raise FsxDiscoveryPending(f"Clone volume '{clone_name}' not yet visible via FSx API")
 ```
 
-Step Functions retry config (30s initial, 1.25 backoff, 150s cap, 28 max attempts) absorbs the FSx sync delay. Each retry is a sub-second Lambda invocation — not blocked by Lambda's own 15-minute timeout limit.
+Step Functions retry config (120s interval, 25 max attempts, after a 10-minute static Wait) absorbs the FSx sync delay. Each retry is a sub-second Lambda invocation — not blocked by Lambda's own 15-minute timeout limit. Total budget: 10 min (Wait) + 50 min (polling) = 60 min.
 
 ### Step 2: S3 Access Point Attachment
 
@@ -427,13 +427,55 @@ aws dynamodb query \
 
 ## Configuration Reference
 
-| Parameter | Default | Purpose |
-|-----------|---------|---------|
-| `SuspiciousRatioThreshold` | 0.05 | Fraction of scanned objects with ransomware-associated extensions required to flag "suspicious" |
-| `SuspiciousMinCount` | 20 | Absolute floor on suspicious object count (avoids false positives on small volumes) |
-| `StepTimeoutSeconds` | 180 | Timeout for each Step Functions Lambda task |
-| `UnixUser` | root | UNIX identity used by the verification S3 Access Point for file system access checks |
-| `LambdaMemorySize` | 512 MB | Memory for all 5 verification Lambdas |
+| Parameter | Default | Purpose | Why this value |
+|-----------|---------|---------|----------------|
+| `FsxSyncWaitSeconds` | 600 | Static wait (seconds) before polling FSx API for clone discovery | FSx sync delay measured at 12–36 min. A 10-min static wait avoids ~5 guaranteed-to-fail Lambda invocations, saving cost and reducing CloudWatch Logs noise. Set to 0 to skip (all delay absorbed by polling). |
+| `StepTimeoutSeconds` | 180 | Timeout for each Lambda invocation (CreateFlexClone, Scan, RecordVerdict, Cleanup) | ONTAP job completion + UUID lookup fits well within 180s. Increase only if your volume has millions of objects (Scan's `ListObjectsV2` pagination) |
+| `AttachAccessPointTimeoutSeconds` | 60 | Timeout for a single AttachAccessPoint Lambda invocation | One attempt = 2-3 AWS API calls (DescribeVolumes + CreateAndAttachS3AccessPoint or DescribeS3AccessPointAttachments). 60s is generous for API calls alone — the multi-minute sync delay is handled by Step Functions Retry, not this timeout |
+| `SuspiciousRatioThreshold` | 0.05 | Fraction of scanned objects with ransomware extensions to flag "suspicious" | 5% means a volume needs significant rename activity, not just a few test files |
+| `SuspiciousMinCount` | 20 | Absolute floor on suspicious object count | Avoids false positives on small volumes (e.g., 3 legitimately-named `.encrypted` files out of 50) |
+| `UnixUser` | root | UNIX identity for the S3 Access Point file-system access check | `root` (UID 0) can read all UNIX-style files. Change if your volume denies root or uses a specific service account |
+| `LambdaMemorySize` | 512 MB | Memory for all verification Lambdas | 256 MB is sufficient for most runs; 512 provides headroom for large `ListObjectsV2` pagination |
+| `CreateSecretsManagerEndpoint` | true | Create Interface VPC Endpoint for Secrets Manager | Set `false` if your VPC already has one (duplicate = deploy failure). Run `preflight-check.sh` first |
+| `CreateStsEndpoint` | true | Create Interface VPC Endpoint for STS | Same as above — set `false` if already exists |
+| `CreateS3GatewayEndpoint` | true | Create S3 Gateway VPC Endpoint | Required for ScanForIndicators to reach the VPC-scoped AP. Set `false` if your route tables already have one |
+
+### Timing Budget Breakdown
+
+The workflow's total wait budget for FSx-ONTAP sync is:
+
+```
+Total budget = FsxSyncWaitSeconds + (IntervalSeconds × MaxAttempts)
+             = 600s (10 min)      + (120s × 25 = 3000s / 50 min)
+             = 3600s (60 min)
+```
+
+| Phase | Duration | Cost | What happens |
+|-------|----------|------|--------------|
+| `WaitForFsxSync` | 10 min (configurable) | $0 (native Wait state) | Silent wait — no Lambda, no logs |
+| `WaitForFsxDiscovery` polling | 120s interval × up to 25 attempts | ~$0.001 per attempt (Lambda sub-second) | Calls `fsx:DescribeVolumes`, raises `FsxDiscoveryPending` if not found |
+| `AttachAccessPoint` S3 AP lifecycle | 15s interval × up to 12 attempts | ~$0.001 per attempt | Creates AP, polls for AVAILABLE status |
+| `ScanForIndicators` AP policy propagation | 15s interval × up to 5 attempts | ~$0.001 per attempt | Retries on `AccessDenied` (S3 AP resource policy eventual consistency) |
+
+**Design rationale — why a static Wait before polling?**
+
+Without the static wait, the workflow would invoke Lambda every 120 seconds for the first 10+ minutes knowing each call will fail (FSx sync hasn't had enough time). Each failed invocation:
+- Costs money (Lambda billing, minimal but non-zero)
+- Generates a CloudWatch Logs entry (noise for operators monitoring the workflow)
+- Consumes Step Functions state transitions (priced per transition for STANDARD type)
+
+The `Wait` state is a Step Functions native state — zero Lambda invocations, zero CloudWatch Logs, zero cost. It simply pauses the execution for the configured duration, then hands off to the polling step which (after the wait) has a much higher probability of succeeding on the first or second attempt.
+
+**Tuning for your environment:**
+
+| Your observed FSx sync delay | Recommended `FsxSyncWaitSeconds` | Remaining poll budget |
+|-----------------------------|----------------------------------|----------------------|
+| < 10 min | 300 (5 min) | 50 min (plenty) |
+| 10–20 min | 600 (10 min, default) | 50 min |
+| 20–40 min | 900–1200 (15–20 min) | 50 min |
+| Unknown (first deployment) | 600 (default) | 50 min — monitor first run, tune after |
+
+> **How to measure your FSx sync delay**: Start a verification run and note the timestamp when `WaitForFsxDiscovery` first succeeds (visible in Step Functions execution history as the first `LambdaFunctionSucceeded` event for that state). Subtract the `CreateFlexClone` completion time and the `FsxSyncWaitSeconds` value. The remainder is how long polling actually took. Repeat 2-3 times to get a range, then set `FsxSyncWaitSeconds` to slightly below your minimum observed delay.
 
 > **Cost note**: The recurring cost drivers per verification run are Lambda invocation time (5 short-lived functions, typically seconds each), DynamoDB on-demand writes (2-3 `PutItem`/`UpdateItem` calls per run against a `PAY_PER_REQUEST` table), Step Functions state transitions (this stack does not set `StateMachineType`, so it deploys as the default `STANDARD` type — priced per state transition, not per-request/per-duration like `EXPRESS`; `STANDARD` is the correct choice here specifically because `AttachAccessPoint`'s `Retry` block can span up to ~60 minutes, well past `EXPRESS`'s hard 5-minute execution limit), and — if `CreateVpcEndpoints=true` — the hourly cost of the Interface VPC Endpoints (Secrets Manager, STS, FSx) plus their per-GB data-processing charge; the S3 Gateway Endpoint itself has no hourly charge. None of these are metered per-scan-object the way [Amazon Comprehend pricing](https://aws.amazon.com/comprehend/pricing/) is for the companion PII scanner — cost here scales with *run frequency*, not volume size, so scheduling this workflow hourly against every snapshot on a large fleet is a meaningfully different cost profile than running it once per incident. Reuse Interface VPC Endpoints across this stack and `automated-response.yaml` in the same VPC (`CreateVpcEndpoints=false`) rather than paying for duplicates.
 

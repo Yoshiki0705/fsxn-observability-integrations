@@ -147,10 +147,23 @@ automated-response.yaml (CreateVpcEndpoints=true)
 
 **Goal**: Verify snapshots are clean before restoring (ransomware indicator scan).
 
+**Expected execution time**: 25–50 minutes per verification run (dominated by FSx-ONTAP sync delay).
+
 ```
 automated-response.yaml (first, creates SecretsManager EP)
   → restore-verification.yaml (CreateSecretsManagerEndpoint=false)
 ```
+
+**Timing design** (why it takes this long):
+
+| Phase | Duration | Reason |
+|-------|----------|--------|
+| CreateFlexClone | ~5 seconds | ONTAP REST API, instant CoW clone |
+| WaitForFsxSync | 10 min (configurable) | Static wait — FSx API needs 12-36 min to discover ONTAP-created volumes ([AWS docs](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-resources-ontap-apps.html)). This avoids wasted Lambda invocations |
+| WaitForFsxDiscovery | 0-40 min (polling) | 120s interval polling until FSx finds the clone. After 10min static wait, typically succeeds within a few attempts |
+| AttachAccessPoint | 1-3 min | S3 AP creation + AVAILABLE transition |
+| ScanForIndicators | seconds-minutes | Depends on object count (ListObjectsV2 pagination) |
+| RecordVerdict + Cleanup | ~1 min | DynamoDB write + AP detach + volume delete |
 
 **Prerequisites specific to this path**:
 - Target volume must be **UNIX security style** (check: `volume show -fields security-style`)

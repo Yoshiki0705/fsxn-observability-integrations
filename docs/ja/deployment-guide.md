@@ -147,10 +147,23 @@ automated-response.yaml (CreateVpcEndpoints=true)
 
 **目的**: スナップショットの復元前にランサムウェア指標をスキャンして安全性を検証する。
 
+**想定実行時間**: 1 回の検証あたり 25〜50 分（FSx-ONTAP 同期遅延が大部分を占める）。
+
 ```
 automated-response.yaml (first, creates SecretsManager EP)
   → restore-verification.yaml (CreateSecretsManagerEndpoint=false)
 ```
+
+**タイミング設計**（なぜこの時間がかかるのか）:
+
+| フェーズ | 所要時間 | 理由 |
+|---------|---------|------|
+| CreateFlexClone | 約 5 秒 | ONTAP REST API、即時の CoW クローン作成 |
+| WaitForFsxSync | 10 分（設定可能） | 静的待機 — FSx API が ONTAP 作成ボリュームを発見するのに 12〜36 分必要（[AWS ドキュメント](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-resources-ontap-apps.html)）。無駄な Lambda 呼び出しを回避 |
+| WaitForFsxDiscovery | 0〜40 分（ポーリング） | 120 秒間隔でクローンの発見を待機。10 分の静的 Wait 後は数回の試行で成功する傾向 |
+| AttachAccessPoint | 1〜3 分 | S3 AP 作成 + AVAILABLE 遷移 |
+| ScanForIndicators | 数秒〜数分 | オブジェクト数に依存（ListObjectsV2 ページネーション） |
+| RecordVerdict + Cleanup | 約 1 分 | DynamoDB 書き込み + AP デタッチ + ボリューム削除 |
 
 **このパス固有の前提条件**:
 - 対象ボリュームが **UNIX セキュリティスタイル**であること（確認: `volume show -fields security-style`）

@@ -10,6 +10,7 @@
   {"ParameterKey": "LambdaMemorySize", "ParameterValue": "512"},
   {"ParameterKey": "StepTimeoutSeconds", "ParameterValue": "180"},
   {"ParameterKey": "AttachAccessPointTimeoutSeconds", "ParameterValue": "60"},
+  {"ParameterKey": "FsxSyncWaitSeconds", "ParameterValue": "600"},
   {"ParameterKey": "SuspiciousRatioThreshold", "ParameterValue": "0.05"},
   {"ParameterKey": "SuspiciousMinCount", "ParameterValue": "20"},
   {"ParameterKey": "NotificationTopicArn", "ParameterValue": ""},

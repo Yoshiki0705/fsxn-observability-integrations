@@ -134,7 +134,7 @@ for page in paginator.paginate(
 raise FsxDiscoveryPending(f"Clone volume '{clone_name}' not yet visible via FSx API")
 ```
 
-Step Functions のリトライ設定（初回間隔 30 秒、バックオフ率 1.25、最大 150 秒でキャップ、最大 28 回試行）が、FSx 同期の遅延を吸収します。各リトライは数百ミリ秒の短い Lambda 呼び出しで、Lambda 自身のタイムアウト（15 分制限）にブロックされません。
+Step Functions のリトライ設定（120 秒間隔、最大 25 回試行、10 分の静的 Wait の後）が、FSx 同期の遅延を吸収します。各リトライは数百ミリ秒の短い Lambda 呼び出しで、Lambda 自身のタイムアウト（15 分制限）にブロックされません。総バジェット: 10 分（Wait）+ 50 分（ポーリング）= 60 分。
 
 ### ステップ3: S3 Access Point の接続
 
@@ -485,13 +485,55 @@ aws dynamodb query \
 
 ## 設定リファレンス
 
-| パラメータ | デフォルト | 用途 |
-|-----------|-----------|------|
-| `SuspiciousRatioThreshold` | 0.05 | 「suspicious」判定に必要な、ランサムウェア関連拡張子を持つスキャン対象オブジェクトの比率 |
-| `SuspiciousMinCount` | 20 | 疑わしいオブジェクト数の絶対的な下限（小規模ボリュームでの誤検知を回避） |
-| `StepTimeoutSeconds` | 180 | Step Functions の各 Lambda タスクのタイムアウト |
-| `UnixUser` | root | 検証用 S3 Access Point がファイルシステムアクセスチェックに使用する UNIX ID |
-| `LambdaMemorySize` | 512 MB | 検証用 5 Lambda 全てのメモリサイズ |
+| パラメータ | デフォルト | 用途 | この値の根拠 |
+|-----------|-----------|------|-------------|
+| `FsxSyncWaitSeconds` | 600 | FSx API のクローン発見を待つ前の静的待機時間（秒） | FSx 同期遅延は実測で 12〜36 分。10 分の静的 Wait により、確実に失敗する Lambda 呼び出しを約 5 回分回避し、コストと CloudWatch Logs ノイズを削減。0 に設定すると静的 Wait をスキップ（全遅延をポーリングで吸収） |
+| `StepTimeoutSeconds` | 180 | 各 Lambda 呼び出しのタイムアウト（CreateFlexClone, Scan, RecordVerdict, Cleanup） | ONTAP ジョブ完了 + UUID 解決は 180 秒以内に十分収まる。数百万オブジェクトのボリュームをスキャンする場合のみ増加を検討 |
+| `AttachAccessPointTimeoutSeconds` | 60 | AttachAccessPoint Lambda 1 回の呼び出しのタイムアウト | 1 回の試行 = 2〜3 回の AWS API 呼び出し（DescribeVolumes + CreateAndAttachS3AccessPoint or DescribeS3AccessPointAttachments）。API 呼び出し自体には 60 秒で十分 — 同期遅延は Step Functions Retry が吸収するため、このタイムアウトには含まれない |
+| `SuspiciousRatioThreshold` | 0.05 | 「suspicious」判定に必要な、ランサムウェア関連拡張子を持つオブジェクトの比率 | 5% = ボリューム全体で有意なリネーム活動があったことを意味する（数件のテストファイルでは発火しない） |
+| `SuspiciousMinCount` | 20 | 疑わしいオブジェクト数の絶対的な下限 | 小規模ボリュームでの誤検知を回避（例: 50 ファイル中に正当な `.encrypted` が 3 件） |
+| `UnixUser` | root | 検証用 S3 Access Point のファイルシステムアクセスチェックに使用する UNIX ID | `root`（UID 0）は全 UNIX スタイルファイルを読み取り可能。ボリュームが root を拒否する場合や特定のサービスアカウントを使う場合は変更 |
+| `LambdaMemorySize` | 512 MB | 検証用 Lambda 全体のメモリサイズ | 256 MB でも大半の実行には十分。512 MB は大規模な `ListObjectsV2` ページネーションへの余裕 |
+| `CreateSecretsManagerEndpoint` | true | Secrets Manager 用 Interface VPC Endpoint を作成 | VPC に既に存在する場合は `false`（重複 = デプロイ失敗）。事前に `preflight-check.sh` を実行 |
+| `CreateStsEndpoint` | true | STS 用 Interface VPC Endpoint を作成 | 同上 — 既に存在する場合は `false` |
+| `CreateS3GatewayEndpoint` | true | S3 Gateway VPC Endpoint を作成 | ScanForIndicators が VPC 限定 AP に到達するために必要。ルートテーブルに既にある場合は `false` |
+
+### タイミングバジェットの内訳
+
+FSx-ONTAP 同期に対するワークフローの総待機バジェット:
+
+```
+総バジェット = FsxSyncWaitSeconds + (IntervalSeconds × MaxAttempts)
+             = 600s（10 分）     + (120s × 25 = 3000s / 50 分)
+             = 3600s（60 分）
+```
+
+| フェーズ | 所要時間 | コスト | 動作内容 |
+|---------|---------|--------|---------|
+| `WaitForFsxSync` | 10 分（設定可能） | $0（ネイティブ Wait ステート） | 静的待機 — Lambda 呼び出しなし、ログ出力なし |
+| `WaitForFsxDiscovery` ポーリング | 120 秒間隔 × 最大 25 回 | 試行あたり約 $0.001（Lambda サブ秒） | `fsx:DescribeVolumes` を呼び出し、未発見なら `FsxDiscoveryPending` を raise |
+| `AttachAccessPoint` S3 AP ライフサイクル | 15 秒間隔 × 最大 12 回 | 試行あたり約 $0.001 | AP を作成し AVAILABLE 状態をポーリング |
+| `ScanForIndicators` AP ポリシー伝播 | 15 秒間隔 × 最大 5 回 | 試行あたり約 $0.001 | `AccessDenied` でリトライ（S3 AP リソースポリシーの結果整合性） |
+
+**設計根拠 — なぜポーリング前に静的 Wait を入れるのか？**
+
+静的 Wait がないと、ワークフローは最初の 10 分以上にわたり、確実に失敗すると分かっている Lambda を 120 秒ごとに呼び出し続けます。各失敗呼び出しは:
+- コストが発生（Lambda 課金、微小だが非ゼロ）
+- CloudWatch Logs にエントリを生成（ワークフロー監視者へのノイズ）
+- Step Functions ステート遷移を消費（STANDARD タイプでは遷移ごとに課金）
+
+`Wait` ステートは Step Functions のネイティブステートです — Lambda 呼び出しゼロ、CloudWatch Logs ゼロ、コストゼロ。設定された時間だけ実行を一時停止し、その後ポーリングステップに引き渡します。Wait 後は（既に同期時間が経過しているため）1〜2 回目の試行で成功する確率が大幅に高くなります。
+
+**自社環境に合わせたチューニング:**
+
+| 観測された FSx 同期遅延 | 推奨 `FsxSyncWaitSeconds` | 残りのポーリングバジェット |
+|------------------------|--------------------------|------------------------|
+| < 10 分 | 300（5 分） | 50 分（十分） |
+| 10〜20 分 | 600（10 分、デフォルト） | 50 分 |
+| 20〜40 分 | 900〜1200（15〜20 分） | 50 分 |
+| 不明（初回デプロイ） | 600（デフォルト） | 50 分 — 初回実行を監視してから調整 |
+
+> **自社の FSx 同期遅延の計測方法**: 検証を実行し、`WaitForFsxDiscovery` が初めて成功したタイムスタンプ（Step Functions の実行履歴で、当該ステートの最初の `LambdaFunctionSucceeded` イベントとして確認可能）を記録します。`CreateFlexClone` の完了時刻と `FsxSyncWaitSeconds` の値を差し引きます。残りが実際にポーリングにかかった時間です。2〜3 回繰り返して範囲を把握し、観測された最小遅延のやや下に `FsxSyncWaitSeconds` を設定してください。
 
 > **コストに関する補足**
 >
