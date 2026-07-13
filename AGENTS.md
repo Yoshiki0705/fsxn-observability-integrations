@@ -226,7 +226,33 @@ s3_client.get_object(
 )
 ```
 
-**S3 AP Resource Policy**: In addition to IAM, the S3 Access Point itself must have a resource policy granting access to the Lambda execution role. Use `s3control put-access-point-policy`.
+**S3 AP Resource Policy (same-account)**: For same-account access, the IAM identity policy alone is sufficient — an AP resource policy is NOT required. FSx for ONTAP S3 APs work without `put_access_point_policy` when the caller is in the same AWS account as the AP. Add an explicit AP resource policy only for cross-account access or when using condition keys (e.g., `aws:PrincipalAccount`).
+
+### ⚠️ CRITICAL: AD-Joined SVM + S3 Access Point — AD DC Must Be Reachable
+
+**On an AD-joined SVM (CIFS enabled), ALL S3 AP data operations (ListObjectsV2, GetObject, PutObject) require AD DC connectivity.** If AD DCs are unreachable, data operations return `AccessDenied` even though IAM/policy layers are correct. `HeadBucket` (metadata-only) succeeds — this is a false positive that makes diagnosis confusing.
+
+**Root cause**: ONTAP performs unix→win reverse name-mapping lookup on every data operation through S3 AP. This requires LDAP/Kerberos connectivity to AD DCs.
+
+**Symptoms**:
+- `HeadBucket` → 200 OK ✅
+- `ListObjectsV2` → `AccessDenied` ❌
+- IAM policy, AP resource policy, Security Group, VPC Endpoint all correct
+- Error message says "Access Denied" with no additional detail
+
+**Pre-flight check (in CreateFlexClone Lambda or any S3 AP workflow)**:
+```python
+# Check if SVM has CIFS (AD-joined)
+cifs_data = _request("GET", f"/protocols/cifs/services?svm.name={svm_name}&fields=ad_domain.fqdn")
+if cifs_data.get("records"):
+    # CIFS enabled — verify DC reachability
+    dc_check = _request("GET", f"/protocols/cifs/domains?svm.name={svm_name}&fields=discovered_servers")
+    # If discovered_servers is explicitly empty → AD DC unreachable → fail fast
+```
+
+**Resolution**: Ensure AD DCs (listed in SVM DNS config) are running and network-reachable from the SVM's ENIs. If AD was deleted/recreated, update SVM DNS IPs to new DC addresses.
+
+**Impact on Step Functions workflows**: The `restore-verification.yaml` template includes this check in `CreateFlexClone` Lambda, failing immediately with `AD CONNECTIVITY FAILURE` instead of waiting 30+ min for FSx discovery + AP creation only to hit AccessDenied at scan time.
 
 ### FSx ONTAP S3 AP — Unsupported S3 Features
 
@@ -245,6 +271,41 @@ The following S3 features are NOT supported on FSx ONTAP S3 Access Points:
 **Key implication for this project**: We use a **standard S3 bucket** as the audit log destination (which supports EventBridge notifications), NOT the FSx ONTAP S3 Access Point directly. The S3 AP is used for Lambda to read the logs from the bucket.
 
 Reference: [AWS Docs — S3 AP API Support](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/access-points-for-fsxn-object-api-support.html) | [AWS Blog — S3 Access Points for FSx](https://aws.amazon.com/blogs/storage/bridge-legacy-and-modern-applications-with-amazon-s3-access-points-for-amazon-fsx/)
+
+### ⚠️ S3 Access Points on AD-Joined SVMs — AD DC Reachability Required
+
+**On AD-joined SVMs (CIFS enabled), ALL S3 AP data operations require active connectivity to the AD domain controllers.** If AD DCs are unreachable, ListObjectsV2 / GetObject / PutObject return `AccessDenied`, even though HeadBucket succeeds.
+
+This is because ONTAP's multiprotocol identity pipeline performs a `unix→win` reverse lookup for every file system operation on CIFS-enabled SVMs, regardless of the volume's security style or the AP's file system identity type.
+
+**Dual-layer authorization flow (AD-joined SVM)**:
+```
+S3 API Request → IAM evaluation (Pass) → s3_unix name-mapping → UNIX UID resolution
+  → unix→win reverse lookup (requires AD DC) → File system authorization
+```
+
+| Symptom | Root Cause |
+|---------|-----------|
+| HeadBucket: ✅ / ListObjectsV2: ❌ AccessDenied | AD DCs unreachable (does NOT mean IAM or AP policy issue) |
+| AP Lifecycle: AVAILABLE but data ops fail | AP creation only validates identity existence, not runtime AD connectivity |
+| Works on non-AD SVM, fails on AD-joined SVM (same FS) | CIFS service triggers multiprotocol identity resolution |
+
+**Pre-flight check** (add to Lambda/Step Functions before S3 AP data operations):
+```python
+# Verify AD DC reachability from ONTAP SVM
+response = ontap_client.get("/api/protocols/cifs/services", params={"svm.name": svm_name, "fields": "enabled,ad_domain"})
+if response["records"] and response["records"][0]["enabled"]:
+    # SVM has CIFS enabled — AD DCs must be reachable for S3 AP data ops
+    logger.info("SVM is AD-joined. Verifying AD connectivity is handled by ONTAP.")
+```
+
+**FSx auto-manages `s3_unix` name-mapping**: When an S3 AP is created, FSx automatically creates a `direction: s3_unix` name-mapping entry (e.g., `amazon-fsx-XXXXXX → root`). No manual name-mapping configuration is needed for S3 AP operation.
+
+**Recovery when AD was deleted/recreated**:
+1. Force-delete CIFS service: `DELETE /api/protocols/cifs/services/{svm-uuid}` with body `{"force": true, "ad_domain": {...}}`
+2. Remove stale records: `POST /api/private/cli/vserver/cifs/users-and-groups/remove-stale-records` with body `{"vserver": "<svm-name>"}`
+3. Re-create CIFS service: `POST /api/protocols/cifs/services` with new AD details
+4. Use a NEW NetBIOS name (previous names leave computer accounts in AD that cannot be reused)
 
 ### Audit log formats
 
