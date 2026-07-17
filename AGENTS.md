@@ -56,6 +56,15 @@ bash shared/scripts/preflight-check.sh --list-profiles
 # Deploy a vendor integration
 bash integrations/<vendor>/scripts/deploy.sh
 
+# Full observability setup (deploy + alerts + forensics dashboard + verify)
+bash integrations/<vendor>/scripts/setup-full-observability.sh
+
+# Post-deployment E2E verification only
+bash integrations/<vendor>/scripts/verify.sh
+
+# Create security alerts only
+bash integrations/<vendor>/scripts/create-alerts.sh
+
 # Run full test suite
 bash shared/scripts/test.sh
 ```

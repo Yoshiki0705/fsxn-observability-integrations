@@ -27,10 +27,16 @@ EC2-free observability integrations for Amazon FSx for NetApp ONTAP via FSx for 
 ## Recommended First 30 Minutes
 
 1. Read "Choose Your Path" above to identify your target integration
-2. Run unit tests with sample payloads: `python -m pytest integrations/datadog/tests/ -v`
+2. Run unit tests with sample payloads: `python -m pytest integrations/<vendor>/tests/ -v`
 3. Review the [PoC Success Criteria](docs/en/poc-success-criteria.md) for your target integration
 4. Deploy audit-only path in a sandbox account (see Quick Start below)
 5. Confirm: one log record arrives, checkpoint advances, DLQ remains empty
+
+> **One-command setup**: Each vendor has a `setup-full-observability.sh` that orchestrates deploy → alerts → forensics dashboard → verification in a single run:
+> ```bash
+> bash integrations/<vendor>/scripts/setup-full-observability.sh
+> ```
+> See the vendor's `scripts/` directory for prerequisites (environment variables).
 
 ## Architecture Pattern
 
@@ -144,7 +150,11 @@ aws cloudformation deploy \
 bash shared/scripts/ontap-audit-setup.sh \
   --endpoint <management-ip> --svm <svm-name> --dry-run
 
-# 5. Deploy vendor integration (example: Datadog)
+# 5. Deploy vendor integration (choose your vendor)
+#    Option A: One-command full setup (deploy + alerts + dashboard + verify)
+bash integrations/<vendor>/scripts/setup-full-observability.sh
+
+#    Option B: Manual deploy (example: Datadog)
 aws cloudformation deploy \
   --template-file integrations/datadog/template.yaml \
   --stack-name fsxn-datadog-integration \
