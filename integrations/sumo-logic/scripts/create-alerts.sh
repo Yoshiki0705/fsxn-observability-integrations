@@ -6,6 +6,10 @@
 #   2. Mass File Deletion (>100 deletes in 5min from single user)
 #   3. Failed Access Spike (>50 failures in 5min)
 #
+# Threshold customization:
+#   Edit the "_count > N" values in monitor queries below.
+#   Detection rationale: docs/en/detection-use-cases.md
+#
 # Prerequisites:
 #   - Sumo Logic Access ID + Key with Manage Monitors permission
 #   - Logs flowing with _sourceCategory=fsxn*

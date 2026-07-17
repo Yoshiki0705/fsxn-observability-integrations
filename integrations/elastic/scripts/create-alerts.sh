@@ -6,6 +6,14 @@
 #   2. Mass File Deletion (>100 deletes in 5min from single user)
 #   3. Failed Access Spike (>50 failures in 5min)
 #
+# Threshold customization:
+#   Edit threshold values in the create_rule payloads below.
+#   - Mass deletion: "value": 100 → adjust to your environment
+#   - Failed access: "value": 50 → adjust to your environment
+#
+# Detection rationale:
+#   See docs/en/detection-use-cases.md for why these 3 rules were chosen.
+#
 # Prerequisites:
 #   - Kibana API access with Security write permissions
 #   - Index: fsxn-audit-* with ECS-mapped fields

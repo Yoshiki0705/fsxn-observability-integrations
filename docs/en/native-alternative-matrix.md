@@ -94,6 +94,8 @@ All vendors that receive audit/EMS/FPolicy logs can build equivalent forensics v
 
 > **Vendor-neutral principle**: The forensics capability is not tied to any single vendor. Choose the vendor where your audit logs already land. The investigation workflow (user timeline → all activity → IP drill-down → file entity history) is identical across all vendors — only the query language differs.
 
+> **Honeycomb note**: Honeycomb is optimized for distributed tracing and high-cardinality event exploration. While it receives FSx for ONTAP audit logs via the pipeline, it does not provide traditional dashboard/saved-search artifacts for forensic investigation workflows. Use Honeycomb for tracing correlation; use one of the 7 vendors above for forensics dashboards.
+
 ---
 
 ## Summary: Coverage Status

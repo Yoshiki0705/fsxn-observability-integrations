@@ -6,6 +6,10 @@
 #   2. Mass File Deletion (>100 deletes in 5min)
 #   3. Failed Access Spike (>50 failures in 5min)
 #
+# Threshold customization:
+#   Edit the "value" fields in threshold objects below.
+#   Detection rationale: docs/en/detection-use-cases.md
+#
 # Prerequisites:
 #   - Honeycomb API Key (Configuration key, not Ingest key)
 #   - Dataset: fsxn-audit

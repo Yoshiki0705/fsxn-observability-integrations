@@ -6,6 +6,10 @@
 #   2. Mass File Deletion (>100 deletes in 5min)
 #   3. Failed Access Spike (>50 failures in 5min)
 #
+# Threshold customization:
+#   Edit the "threshold" values in metric event payloads below.
+#   Detection rationale: docs/en/detection-use-cases.md
+#
 # Prerequisites:
 #   - Dynatrace API Token with scope: metrics.ingest, settings.write
 #   - Logs flowing with log.source = "fsxn"

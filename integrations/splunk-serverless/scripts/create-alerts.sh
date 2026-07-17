@@ -6,6 +6,16 @@
 #   2. Mass File Deletion (>100 deletes in 5min from single user)
 #   3. Failed Access Spike (>50 failures in 5min)
 #
+# Threshold customization:
+#   Edit the threshold values below to match your environment baseline:
+#   - THRESHOLD_MASS_DELETE: default 100 (files/5min/user)
+#   - THRESHOLD_FAILED_ACCESS: default 50 (events/5min)
+#   Run with lower thresholds in dev, higher in high-activity production.
+#
+# Detection rationale:
+#   See docs/en/detection-use-cases.md for why these 3 rules were chosen
+#   and how they map to NIST SP 800-61 indicator categories.
+#
 # Prerequisites:
 #   - Splunk admin credentials or token with saved search write access
 #   - Index: fsxn_audit populated with FSx for ONTAP audit logs
