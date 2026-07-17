@@ -18,7 +18,10 @@ rule no_wildcard_actions when %roles !empty {
 
 # Lambda environment variables must not contain secrets directly
 rule no_secrets_in_env when %lambdas !empty {
-  %lambdas.Properties.Environment.Variables {
+  %lambdas[
+    Properties.Environment exists
+    Properties.Environment.Variables exists
+  ].Properties.Environment.Variables {
     this[ keys == /.*[Kk][Ee][Yy]$/ ] not exists
     OR
     this[ keys == /.*[Kk][Ee][Yy]$/ ] == /^(arn:aws:secretsmanager:|arn:aws:ssm:|\{\{resolve:).*/
