@@ -1,0 +1,104 @@
+{
+  "dashboardMetadata": {
+    "name": "FSx for ONTAP — Forensic Investigation",
+    "shared": true,
+    "owner": "",
+    "tags": ["fsxn", "security", "forensics"],
+    "preset": false
+  },
+  "tiles": [
+    {
+      "name": "User Activity Timeline",
+      "tileType": "DATA_EXPLORER",
+      "configured": true,
+      "bounds": { "top": 0, "left": 0, "width": 608, "height": 304 },
+      "customName": "User Activity Timeline",
+      "queries": [
+        {
+          "id": "A",
+          "metric": "",
+          "spaceAggregation": "AUTO",
+          "timeAggregation": "DEFAULT",
+          "splitBy": ["operation"],
+          "enabled": true,
+          "dql": "fetch logs\n| filter matchesValue(log.source, \"fsxn\")\n| filter isNotNull(user)\n| makeTimeseries count(), by:{operation}, interval:5m"
+        }
+      ],
+      "visualConfig": {
+        "type": "GRAPH_CHART",
+        "global": { "hideLegend": false },
+        "rules": []
+      }
+    },
+    {
+      "name": "All Activity (Event Stream)",
+      "tileType": "DATA_EXPLORER",
+      "configured": true,
+      "bounds": { "top": 304, "left": 0, "width": 1216, "height": 380 },
+      "customName": "All Activity",
+      "queries": [
+        {
+          "id": "A",
+          "dql": "fetch logs\n| filter matchesValue(log.source, \"fsxn\")\n| fields timestamp, user, operation, path, client_ip, result, svm, volume\n| sort timestamp desc\n| limit 200"
+        }
+      ],
+      "visualConfig": { "type": "TABLE", "rules": [] }
+    },
+    {
+      "name": "Client IP — Access Origins",
+      "tileType": "DATA_EXPLORER",
+      "configured": true,
+      "bounds": { "top": 0, "left": 608, "width": 608, "height": 304 },
+      "customName": "Client IP Origins",
+      "queries": [
+        {
+          "id": "A",
+          "dql": "fetch logs\n| filter matchesValue(log.source, \"fsxn\")\n| filter isNotNull(client_ip)\n| summarize event_count = count(), unique_files = countDistinct(path), by:{client_ip}\n| sort event_count desc\n| limit 20"
+        }
+      ],
+      "visualConfig": { "type": "TABLE", "rules": [] }
+    },
+    {
+      "name": "File Entity History",
+      "tileType": "DATA_EXPLORER",
+      "configured": true,
+      "bounds": { "top": 684, "left": 0, "width": 608, "height": 304 },
+      "customName": "File Entity History",
+      "queries": [
+        {
+          "id": "A",
+          "dql": "fetch logs\n| filter matchesValue(log.source, \"fsxn\")\n| filter matchesValue(path, \"{{path}}\")\n| fields timestamp, user, operation, client_ip, result, svm\n| sort timestamp desc\n| limit 200"
+        }
+      ],
+      "visualConfig": { "type": "TABLE", "rules": [] }
+    },
+    {
+      "name": "Top Affected Volumes",
+      "tileType": "DATA_EXPLORER",
+      "configured": true,
+      "bounds": { "top": 684, "left": 608, "width": 608, "height": 304 },
+      "customName": "Top Affected Volumes",
+      "queries": [
+        {
+          "id": "A",
+          "dql": "fetch logs\n| filter matchesValue(log.source, \"fsxn\")\n| filter isNotNull(volume)\n| summarize count = count(), by:{volume}\n| sort count desc\n| limit 10"
+        }
+      ],
+      "visualConfig": { "type": "TOP_LIST", "rules": [] }
+    },
+    {
+      "name": "ARP Alert Timeline",
+      "tileType": "DATA_EXPLORER",
+      "configured": true,
+      "bounds": { "top": 988, "left": 0, "width": 1216, "height": 304 },
+      "customName": "ARP Alerts",
+      "queries": [
+        {
+          "id": "A",
+          "dql": "fetch logs\n| filter matchesValue(log.source, \"fsxn\")\n| filter matchesPhrase(content, \"arw\") or matchesPhrase(content, \"ARP\")\n| makeTimeseries count(), interval:5m"
+        }
+      ],
+      "visualConfig": { "type": "GRAPH_CHART", "rules": [] }
+    }
+  ]
+}

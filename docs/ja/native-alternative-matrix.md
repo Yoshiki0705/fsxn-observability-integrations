@@ -85,10 +85,12 @@
 | ベンダー | 形式 | アーティファクト | デプロイ方法 |
 |---------|------|-------------|------------|
 | **Datadog** | Dashboard JSON | [`integrations/datadog/dashboards/forensics-dashboard.json`](../../integrations/datadog/dashboards/) | Datadog REST API (`POST /api/v1/dashboard`) |
-| **Grafana** | Dashboard JSON（Loki + LogQL） | [`integrations/grafana/dashboards/forensics-investigation.json`](../../integrations/grafana/dashboards/forensics-investigation.json) | Grafana API または UI インポート |
-| **Elastic** | Kibana Saved Searches（KQL） | [セットアップガイド — フォレンジック調査](../../integrations/elastic/docs/ja/setup-guide.md#フォレンジック調査-kibana-discoverlens) | Kibana UI（Discover + Lens） |
-| **Splunk** | SPL Saved Searches + Dashboard Studio | [サイバーレジリエンスマップ — Respond](../ja/cyber-resilience-capability-map.md)（SPL クエリ記載） | Splunk UI または REST API |
-| **Sumo Logic** | Log Search クエリ | Splunk と同じクエリパターン（Sumo Logic 構文に適応） | Sumo Logic Dashboard API |
+| **Grafana** | Dashboard JSON（Loki + LogQL） | [`integrations/grafana/dashboards/forensics-investigation.json`](../../integrations/grafana/dashboards/forensics-investigation.json) | [`deploy-forensics-dashboard.sh`](../../integrations/grafana/scripts/deploy-forensics-dashboard.sh) または UI インポート |
+| **Elastic** | Kibana NDJSON（Saved Searches + Dashboard） | [`integrations/elastic/dashboards/forensics-investigation.ndjson`](../../integrations/elastic/dashboards/) | Kibana Saved Objects API または UI インポート |
+| **Splunk** | SPL Saved Searches + Dashboard Studio | [`integrations/splunk-serverless/searches/`](../../integrations/splunk-serverless/searches/) | Splunk UI または REST API |
+| **Sumo Logic** | Dashboard JSON（DashboardV2） | [`integrations/sumo-logic/dashboards/forensics-investigation.json`](../../integrations/sumo-logic/dashboards/) | Sumo Logic Content API (`POST /v2/dashboards`) |
+| **New Relic** | Dashboard JSON（NRQL） | [`integrations/new-relic/dashboards/forensics-investigation.json`](../../integrations/new-relic/dashboards/) | NerdGraph API (`dashboardCreate` mutation) |
+| **Dynatrace** | Dashboard JSON（DQL） | [`integrations/dynatrace/dashboards/forensics-investigation.json`](../../integrations/dynatrace/dashboards/) | Dynatrace Dashboards API (`POST /api/config/v1/dashboards`) |
 
 > **ベンダー中立の原則**: フォレンジクス機能は特定のベンダーに依存しません。監査ログが既に配信されているベンダーを選択してください。調査ワークフロー（ユーザータイムライン → 全アクティビティ → IP ドリルダウン → ファイルエンティティ履歴）は全ベンダーで同一 — 異なるのはクエリ言語のみです。
 

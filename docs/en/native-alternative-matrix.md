@@ -85,10 +85,12 @@ All vendors that receive audit/EMS/FPolicy logs can build equivalent forensics v
 | Vendor | Format | Artifact | Deploy Method |
 |--------|--------|----------|---------------|
 | **Datadog** | Dashboard JSON | [`integrations/datadog/dashboards/forensics-dashboard.json`](../../integrations/datadog/dashboards/) | Datadog REST API (`POST /api/v1/dashboard`) |
-| **Grafana** | Dashboard JSON (Loki + LogQL) | [`integrations/grafana/dashboards/forensics-investigation.json`](../../integrations/grafana/dashboards/forensics-investigation.json) | Grafana API or UI import |
-| **Elastic** | Kibana Saved Searches (KQL) | [Setup Guide — Forensic Investigation](../../integrations/elastic/docs/en/setup-guide.md#forensic-investigation-kibana-discoverlens) | Kibana UI (Discover + Lens) |
-| **Splunk** | SPL Saved Searches + Dashboard Studio | [Cyber Resilience Map — Respond](../en/cyber-resilience-capability-map.md) (SPL queries documented) | Splunk UI or REST API |
-| **Sumo Logic** | Log Search queries | Same query patterns as Splunk (adapted to Sumo Logic syntax) | Sumo Logic Dashboard API |
+| **Grafana** | Dashboard JSON (Loki + LogQL) | [`integrations/grafana/dashboards/forensics-investigation.json`](../../integrations/grafana/dashboards/forensics-investigation.json) | [`deploy-forensics-dashboard.sh`](../../integrations/grafana/scripts/deploy-forensics-dashboard.sh) or UI import |
+| **Elastic** | Kibana NDJSON (Saved Searches + Dashboard) | [`integrations/elastic/dashboards/forensics-investigation.ndjson`](../../integrations/elastic/dashboards/) | Kibana Saved Objects API or UI import |
+| **Splunk** | SPL Saved Searches + Dashboard Studio | [`integrations/splunk-serverless/searches/`](../../integrations/splunk-serverless/searches/) | Splunk UI or REST API |
+| **Sumo Logic** | Dashboard JSON (DashboardV2) | [`integrations/sumo-logic/dashboards/forensics-investigation.json`](../../integrations/sumo-logic/dashboards/) | Sumo Logic Content API (`POST /v2/dashboards`) |
+| **New Relic** | Dashboard JSON (NRQL) | [`integrations/new-relic/dashboards/forensics-investigation.json`](../../integrations/new-relic/dashboards/) | NerdGraph API (`dashboardCreate` mutation) |
+| **Dynatrace** | Dashboard JSON (DQL) | [`integrations/dynatrace/dashboards/forensics-investigation.json`](../../integrations/dynatrace/dashboards/) | Dynatrace Dashboards API (`POST /api/config/v1/dashboards`) |
 
 > **Vendor-neutral principle**: The forensics capability is not tied to any single vendor. Choose the vendor where your audit logs already land. The investigation workflow (user timeline → all activity → IP drill-down → file entity history) is identical across all vendors — only the query language differs.
 

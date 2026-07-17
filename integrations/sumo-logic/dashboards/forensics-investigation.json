@@ -1,0 +1,116 @@
+{
+  "type": "DashboardV2SyncDefinition",
+  "name": "FSx for ONTAP — Forensic Investigation",
+  "description": "DII Storage Workload Security equivalent: user activity timeline, file access audit trail, affected volumes, client IP analysis. Deploy after audit log pipeline is shipping to Sumo Logic.",
+  "title": "FSx for ONTAP — Forensic Investigation",
+  "rootPanel": null,
+  "theme": "Dark",
+  "topologyLabelMap": {},
+  "refreshInterval": 0,
+  "timeRange": {
+    "type": "BeginBoundedTimeRange",
+    "from": { "type": "RelativeTimeRangeBoundary", "relativeTime": "-24h" },
+    "to": null
+  },
+  "layout": {
+    "layoutType": "Grid",
+    "layoutStructures": [
+      { "key": "panel-user-timeline", "structure": "{\"height\":6,\"width\":12,\"x\":0,\"y\":0}" },
+      { "key": "panel-all-activity", "structure": "{\"height\":8,\"width\":24,\"x\":0,\"y\":6}" },
+      { "key": "panel-ip-drill-down", "structure": "{\"height\":6,\"width\":12,\"x\":12,\"y\":0}" },
+      { "key": "panel-file-entity", "structure": "{\"height\":6,\"width\":12,\"x\":0,\"y\":14}" },
+      { "key": "panel-affected-volumes", "structure": "{\"height\":6,\"width\":12,\"x\":12,\"y\":14}" },
+      { "key": "panel-arp-timeline", "structure": "{\"height\":6,\"width\":24,\"x\":0,\"y\":20}" }
+    ]
+  },
+  "panels": [
+    {
+      "id": "panel-user-timeline",
+      "key": "panel-user-timeline",
+      "title": "User Activity Timeline",
+      "visualSettings": "{\"general\":{\"type\":\"line\"},\"series\":{}}",
+      "queries": [
+        {
+          "queryString": "_sourceCategory=fsxn* \n| json field=_raw \"user\", \"operation\", \"svm\" \n| where !isBlank(user) \n| where user = \"{{user}}\" \n| timeslice 5m \n| count by _timeslice, operation \n| sort _timeslice asc",
+          "queryType": "Logs",
+          "queryKey": "A"
+        }
+      ],
+      "description": "Step 1: Activity volume for a specific user over time"
+    },
+    {
+      "id": "panel-all-activity",
+      "key": "panel-all-activity",
+      "title": "All Activity (Event Stream)",
+      "visualSettings": "{\"general\":{\"type\":\"table\"},\"series\":{}}",
+      "queries": [
+        {
+          "queryString": "_sourceCategory=fsxn* \n| json field=_raw \"user\", \"operation\", \"path\", \"client_ip\", \"result\", \"svm\", \"volume\" \n| where user = \"{{user}}\" OR \"{{user}}\" = \"*\" \n| fields _messagetime, user, operation, path, client_ip, result, svm, volume \n| sort _messagetime desc \n| limit 500",
+          "queryType": "Logs",
+          "queryKey": "A"
+        }
+      ],
+      "description": "Step 2: Full event stream for user/time window"
+    },
+    {
+      "id": "panel-ip-drill-down",
+      "key": "panel-ip-drill-down",
+      "title": "Client IP — Access Origins",
+      "visualSettings": "{\"general\":{\"type\":\"table\"},\"series\":{}}",
+      "queries": [
+        {
+          "queryString": "_sourceCategory=fsxn* \n| json field=_raw \"user\", \"client_ip\", \"operation\", \"path\" \n| where user = \"{{user}}\" OR \"{{user}}\" = \"*\" \n| count, count_distinct(path) as unique_files by client_ip \n| sort _count desc",
+          "queryType": "Logs",
+          "queryKey": "A"
+        }
+      ],
+      "description": "Step 3: Identify access source IPs, detect unusual origins"
+    },
+    {
+      "id": "panel-file-entity",
+      "key": "panel-file-entity",
+      "title": "File Entity History",
+      "visualSettings": "{\"general\":{\"type\":\"table\"},\"series\":{}}",
+      "queries": [
+        {
+          "queryString": "_sourceCategory=fsxn* \n| json field=_raw \"user\", \"operation\", \"path\", \"client_ip\", \"result\", \"svm\" \n| where path = \"{{path}}\" \n| fields _messagetime, user, operation, client_ip, result, svm \n| sort _messagetime desc \n| limit 200",
+          "queryType": "Logs",
+          "queryKey": "A"
+        }
+      ],
+      "description": "Step 4: All operations on a specific file path"
+    },
+    {
+      "id": "panel-affected-volumes",
+      "key": "panel-affected-volumes",
+      "title": "Top Affected Volumes",
+      "visualSettings": "{\"general\":{\"type\":\"bar\"},\"series\":{}}",
+      "queries": [
+        {
+          "queryString": "_sourceCategory=fsxn* \n| json field=_raw \"volume\", \"operation\" \n| where !isBlank(volume) \n| count by volume \n| sort _count desc \n| limit 10",
+          "queryType": "Logs",
+          "queryKey": "A"
+        }
+      ],
+      "description": "Top 10 volumes by event count"
+    },
+    {
+      "id": "panel-arp-timeline",
+      "key": "panel-arp-timeline",
+      "title": "ARP Alert Timeline",
+      "visualSettings": "{\"general\":{\"type\":\"line\"},\"series\":{}}",
+      "queries": [
+        {
+          "queryString": "_sourceCategory=fsxn* \n| json field=_raw \"event_type\", \"message_name\", \"svm\" \n| where message_name matches \"*arw*\" OR message_name matches \"*ARP*\" OR event_type matches \"*ARP*\" \n| timeslice 5m \n| count by _timeslice \n| sort _timeslice asc",
+          "queryType": "Logs",
+          "queryKey": "A"
+        }
+      ],
+      "description": "ARP/ransomware detection events over time"
+    }
+  ],
+  "variables": [
+    { "id": "var-user", "name": "user", "displayName": "User", "defaultValue": "*", "sourceDefinition": { "variableSourceType": "LogQueryVariableSourceDefinition", "query": "_sourceCategory=fsxn* | json field=_raw \"user\" | count by user | fields user", "field": "user" }, "allowMultiSelect": false, "includeAllOption": true, "hideFromUI": false },
+    { "id": "var-path", "name": "path", "displayName": "File Path", "defaultValue": "*", "sourceDefinition": { "variableSourceType": "LogQueryVariableSourceDefinition", "query": "_sourceCategory=fsxn* | json field=_raw \"path\" | count by path | fields path | limit 100", "field": "path" }, "allowMultiSelect": false, "includeAllOption": true, "hideFromUI": false }
+  ]
+}
