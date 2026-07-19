@@ -108,6 +108,8 @@ All vendors that receive audit/EMS/FPolicy logs can build equivalent forensics v
 
 **Key insight**: Security/incident-response features (DII equivalent) are **100% covered**. Operations monitoring (System Manager equivalent) is **65% fully covered + 25% partial** — partial items are security-blocking-only implementations of export/share management, and demo-only volume templates. The fully uncovered items (QoS, LIF/DNS) are infrastructure-management tasks suited to the FSx Console.
 
+> **Reading this table correctly**: "100% covered" describes feature-level parity for the specific containment/detection-response actions this repository implements — it is not a claim that this approach is a superior or complete substitute for DII. DII's ML detection, agent-based collection, and vendor-managed operations are capabilities this repository doesn't build from scratch; the coverage number reflects that this repository's narrower, AWS-native mechanism reaches the same *containment actions* via a different path. See [How to Choose](#how-to-choose) below for which context favors which approach.
+
 ---
 
 ## Deployment Quick Reference
@@ -167,7 +169,7 @@ aws cloudwatch list-metrics \
 
 > **There is no single tool that does everything.** The matrix above maps what this repository covers. Use FSx Console for interactive operations, DII if you want vendor-managed ML detection, and this repository when your detection is already in your SIEM and you want automated containment + forensic evidence without additional licensing.
 
-> **Cost model difference**: DII uses per-TB licensing (contact NetApp for pricing). This repository's operational cost is primarily Lambda invocations + CloudWatch metrics + VPC Endpoints (~$15–30/month baseline for a typical single-SVM deployment). See the deployment guide for detailed cost breakdown.
+> **Cost model difference**: DII uses per-TB licensing (contact NetApp for pricing). This repository's operational cost is primarily Lambda invocations + CloudWatch metrics + VPC Endpoints (~$15–30/month baseline for a typical single-SVM deployment). This is not an apples-to-apples TCO comparison — the AWS-side figure is infrastructure cost only and excludes the ongoing work of tuning detection rules, investigating false positives, and running quarterly drills, all of which apply to this approach and to DII alike. DII's licensing figure would similarly need to be weighed against its own setup and operational overhead. See the deployment guide for a fuller cost breakdown.
 
 ---
 
