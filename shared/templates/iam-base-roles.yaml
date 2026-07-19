@@ -1,5 +1,16 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Base IAM Roles for FSx for ONTAP Observability Lambda Functions
+Description: >
+  Base IAM Roles for FSx for ONTAP Observability Lambda Functions.
+
+  Reference-pattern status: this template is not deployed standalone and is
+  not referenced (via Fn::ImportValue, nested stack, or otherwise) by any
+  other template in this repository as of this writing. It documents the
+  IAM least-privilege pattern this repo's other stacks each implement
+  independently in their own inline Policies (see integrations/*/template.yaml
+  and shared/templates/restore-verification.yaml for the actual per-stack
+  policies that are deployed). Treat this file as a copy-paste reference
+  when writing a new stack's IAM role, not as infrastructure to deploy or
+  E2E-verify on its own.
 
 Parameters:
   S3AccessPointArn:

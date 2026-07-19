@@ -278,12 +278,15 @@ Resources:
       UserData: !If
         - CreateNewAd
         - !Base64
-            Fn::Sub: |
-              <powershell>
-              # Set DNS to AD DNS IPs (required for domain join in private subnets)
-              $adapter = Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | Select-Object -First 1
-              Set-DnsClientServerAddress -InterfaceIndex $adapter.InterfaceIndex -ServerAddresses ${ManagedAD.DnsIpAddresses}
-              </powershell>
+            Fn::Sub:
+              - |
+                <powershell>
+                # Set DNS to AD DNS IPs (required for domain join in private subnets)
+                $adapter = Get-NetAdapter | Where-Object {$$_.Status -eq 'Up'} | Select-Object -First 1
+                Set-DnsClientServerAddress -InterfaceIndex $adapter.InterfaceIndex -ServerAddresses ${AdDns1},${AdDns2}
+                </powershell>
+              - AdDns1: !Select [0, !GetAtt ManagedAD.DnsIpAddresses]
+                AdDns2: !Select [1, !GetAtt ManagedAD.DnsIpAddresses]
         - !Ref AWS::NoValue
       Tags:
         - Key: Name
