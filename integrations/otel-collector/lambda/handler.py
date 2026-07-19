@@ -4,8 +4,17 @@ Reads audit logs from S3 Access Point, parses JSON format,
 maps fields to OTLP Log Data Model attributes, and sends
 to a configured OTel Collector endpoint via OTLP/HTTP.
 
-The Lambda is backend-agnostic — adding/removing destinations
-requires only OTel Collector config changes, zero Lambda code changes.
+The Lambda is backend-agnostic. When sending through an OTel Collector
+(recommended), adding/removing destinations requires only Collector config
+changes, zero Lambda code changes. When sending directly to a vendor's OTLP
+endpoint (no Collector), the Lambda supports pluggable auth via AUTH_MODE
+("bearer", "basic", or "header" for a custom header name/value) and optional
+EXTRA_HEADERS_JSON for static non-secret headers a vendor's endpoint requires
+(e.g. Mackerel's required "Accept: */*"). It also supports OTLP_CONTENT_TYPE
+("json", the default, or "protobuf") for vendors whose OTLP/HTTP endpoint
+only accepts Protobuf-encoded request bodies and rejects OTLP/JSON outright
+(confirmed for Mackerel's log-feature endpoint). No vendor-specific branching
+exists in this file — only generic, vendor-agnostic primitives.
 """
 
 from __future__ import annotations
@@ -22,6 +31,8 @@ from typing import Any, Optional
 import boto3
 import urllib3
 
+from otlp_protobuf import encode_logs_data
+
 # ─── Configuration from environment ────────────────────────────────────────
 
 OTLP_ENDPOINT = os.environ.get("OTLP_ENDPOINT", "http://localhost:4318")
@@ -29,7 +40,23 @@ API_KEY_SECRET_ARN = os.environ.get("API_KEY_SECRET_ARN", "")
 S3_ACCESS_POINT_ARN = os.environ.get("S3_ACCESS_POINT_ARN", "")
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 SERVICE_NAME = os.environ.get("SERVICE_NAME", "fsxn-audit")
-AUTH_MODE = os.environ.get("AUTH_MODE", "bearer")  # "bearer" or "basic"
+AUTH_MODE = os.environ.get("AUTH_MODE", "bearer")  # "bearer", "basic", or "header"
+# Used only when AUTH_MODE="header": the header name to send the secret value
+# under, verbatim (no "Bearer "/"Basic " prefix, no encoding). Needed for
+# vendors with a custom auth header, e.g. Mackerel's "Mackerel-Api-Key", when
+# sending directly to the vendor's OTLP endpoint (skipping a local Collector).
+AUTH_HEADER_NAME = os.environ.get("AUTH_HEADER_NAME", "Authorization")
+# Optional static (non-secret) extra headers as a JSON object string, e.g.
+# '{"Accept": "*/*"}' — needed for Mackerel's OTLP endpoint, which requires
+# this header regardless of auth mode. Leave unset for vendors that don't need it.
+EXTRA_HEADERS_JSON = os.environ.get("EXTRA_HEADERS_JSON", "")
+# "json" (default) or "protobuf". Some vendors' OTLP/HTTP endpoints only
+# accept Protobuf and reject OTLP/JSON with an HTTP 400 (confirmed for
+# Mackerel's log-feature endpoint: {"code":400,"message":"json is not
+# supported yet"}). Set to "protobuf" for those vendors when sending
+# directly to the vendor's endpoint (i.e. not through an OTel Collector,
+# which already sends Protobuf by default).
+OTLP_CONTENT_TYPE = os.environ.get("OTLP_CONTENT_TYPE", "json")
 
 # ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -337,6 +364,7 @@ def _send_otlp_payload(
     payload: dict[str, Any],
     endpoint: str,
     auth_headers: Optional[dict[str, str]] = None,
+    content_type: str = "json",
 ) -> bool:
     """Send OTLP payload via HTTP POST with retry logic.
 
@@ -344,26 +372,37 @@ def _send_otlp_payload(
     Retries on HTTP 429 and 5xx. Does not retry on 4xx (except 429).
 
     Args:
-        payload: OTLP JSON payload dict.
+        payload: OTLP-JSON-style payload dict (resourceLogs -> scopeLogs ->
+            logRecords), regardless of the wire format actually sent.
         endpoint: Full URL (e.g., "http://collector:4318/v1/logs").
         auth_headers: Optional additional headers for authentication.
+        content_type: "json" (default) sends OTLP/JSON with
+            Content-Type: application/json. "protobuf" encodes the same
+            payload as OTLP/Protobuf (via otlp_protobuf.encode_logs_data)
+            and sends it with Content-Type: application/x-protobuf, for
+            vendors whose OTLP/HTTP endpoint rejects JSON bodies.
 
     Returns:
         True if successfully sent, False otherwise.
     """
     url = f"{endpoint}/v1/logs"
-    headers = {"Content-Type": "application/json"}
+
+    if content_type == "protobuf":
+        headers = {"Content-Type": "application/x-protobuf"}
+        body = encode_logs_data(payload)
+    else:
+        headers = {"Content-Type": "application/json"}
+        body = json.dumps(payload).encode("utf-8")
+
     if auth_headers:
         headers.update(auth_headers)
-
-    json_body = json.dumps(payload).encode("utf-8")
 
     for attempt in range(MAX_RETRIES):
         try:
             response = http.request(
                 "POST",
                 url,
-                body=json_body,
+                body=body,
                 headers=headers,
                 timeout=30.0,
             )
@@ -443,10 +482,24 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     # For Grafana Cloud OTLP: token should be "instanceId:apiToken"
                     encoded = base64.b64encode(token.encode("utf-8")).decode("utf-8")
                     auth_headers = {"Authorization": f"Basic {encoded}"}
+                elif AUTH_MODE == "header":
+                    # Generic custom-header auth (e.g. Mackerel: header
+                    # "Mackerel-Api-Key", token is the raw write-scoped API key).
+                    auth_headers = {AUTH_HEADER_NAME: token}
                 else:
                     auth_headers = {"Authorization": f"Bearer {token}"}
         except Exception as e:
             logger.warning("Could not retrieve auth token: %s", str(e))
+
+    if EXTRA_HEADERS_JSON:
+        try:
+            extra_headers = json.loads(EXTRA_HEADERS_JSON)
+            auth_headers = {**(auth_headers or {}), **extra_headers}
+        except json.JSONDecodeError:
+            logger.warning(
+                "EXTRA_HEADERS_JSON is not valid JSON, ignoring: %s",
+                EXTRA_HEADERS_JSON[:100],
+            )
 
     records = _extract_s3_records(event)
 
@@ -475,7 +528,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             payload = build_otlp_payload(logs, SERVICE_NAME, key)
 
             # Send to OTLP endpoint
-            success = _send_otlp_payload(payload, OTLP_ENDPOINT, auth_headers)
+            success = _send_otlp_payload(payload, OTLP_ENDPOINT, auth_headers, OTLP_CONTENT_TYPE)
 
             if success:
                 total_shipped += len(logs)

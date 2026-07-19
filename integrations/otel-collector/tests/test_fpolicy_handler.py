@@ -237,6 +237,159 @@ class TestSendOtlpPayload:
         assert mock_http.request.call_count == 3
 
 
+class TestAuthModeHeader:
+    """Tests for AUTH_MODE="header" and EXTRA_HEADERS_JSON (generic
+    custom-header auth support, needed for vendors like Mackerel with a
+    non-Bearer/Basic auth header, e.g. "Mackerel-Api-Key")."""
+
+    @patch("fpolicy_handler.http")
+    @patch("fpolicy_handler.secrets_client")
+    def test_header_auth_mode_uses_custom_header_name(self, mock_secrets, mock_http, monkeypatch):
+        fpolicy_handler._api_key_cache = None
+        monkeypatch.setattr(
+            fpolicy_handler, "API_KEY_SECRET_ARN",
+            "arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:test",
+        )
+        monkeypatch.setattr(fpolicy_handler, "AUTH_MODE", "header")
+        monkeypatch.setattr(fpolicy_handler, "AUTH_HEADER_NAME", "Mackerel-Api-Key")
+
+        mock_secrets.get_secret_value.return_value = {
+            "SecretString": json.dumps({"api_key": "write-scoped-key"})
+        }
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        fpolicy_handler.lambda_handler(SAMPLE_FILE_CREATE_EVENT, None)
+
+        _, kwargs = mock_http.request.call_args
+        sent_headers = kwargs["headers"]
+        assert sent_headers["Mackerel-Api-Key"] == "write-scoped-key"
+        assert "Authorization" not in sent_headers
+
+    @patch("fpolicy_handler.http")
+    @patch("fpolicy_handler.secrets_client")
+    def test_extra_headers_json_merged(self, mock_secrets, mock_http, monkeypatch):
+        fpolicy_handler._api_key_cache = None
+        monkeypatch.setattr(
+            fpolicy_handler, "API_KEY_SECRET_ARN",
+            "arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:test",
+        )
+        monkeypatch.setattr(fpolicy_handler, "AUTH_MODE", "header")
+        monkeypatch.setattr(fpolicy_handler, "AUTH_HEADER_NAME", "Mackerel-Api-Key")
+        monkeypatch.setattr(fpolicy_handler, "EXTRA_HEADERS_JSON", '{"Accept": "*/*"}')
+
+        mock_secrets.get_secret_value.return_value = {
+            "SecretString": json.dumps({"api_key": "write-scoped-key"})
+        }
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        fpolicy_handler.lambda_handler(SAMPLE_FILE_CREATE_EVENT, None)
+
+        _, kwargs = mock_http.request.call_args
+        sent_headers = kwargs["headers"]
+        assert sent_headers["Mackerel-Api-Key"] == "write-scoped-key"
+        assert sent_headers["Accept"] == "*/*"
+
+    @patch("fpolicy_handler.http")
+    def test_extra_headers_json_works_without_api_key_secret(self, mock_http, monkeypatch):
+        monkeypatch.setattr(fpolicy_handler, "EXTRA_HEADERS_JSON", '{"Accept": "*/*"}')
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        fpolicy_handler.lambda_handler(SAMPLE_FILE_CREATE_EVENT, None)
+
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["headers"]["Accept"] == "*/*"
+
+    @patch("fpolicy_handler.http")
+    def test_malformed_extra_headers_json_ignored_not_fatal(self, mock_http, monkeypatch):
+        monkeypatch.setattr(fpolicy_handler, "EXTRA_HEADERS_JSON", "{not valid json")
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        result = fpolicy_handler.lambda_handler(SAMPLE_FILE_CREATE_EVENT, None)
+
+        assert result["statusCode"] == 200
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["headers"] == {"Content-Type": "application/json"}
+
+
+class TestOtlpContentTypeProtobuf:
+    """Tests for OTLP_CONTENT_TYPE="protobuf" (needed for vendors like
+    Mackerel whose OTLP/HTTP log endpoint rejects OTLP/JSON bodies)."""
+
+    @patch("fpolicy_handler.http")
+    def test_protobuf_content_type_sets_correct_header_and_body_encoding(
+        self, mock_http, monkeypatch,
+    ):
+        monkeypatch.setattr(fpolicy_handler, "OTLP_CONTENT_TYPE", "protobuf")
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        result = fpolicy_handler.lambda_handler(SAMPLE_FILE_CREATE_EVENT, None)
+
+        assert result["statusCode"] == 200
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["headers"]["Content-Type"] == "application/x-protobuf"
+        body = kwargs["body"]
+        assert isinstance(body, bytes)
+        with pytest.raises((json.JSONDecodeError, UnicodeDecodeError)):
+            json.loads(body)
+
+    @patch("fpolicy_handler.http")
+    def test_default_content_type_is_json_unaffected(self, mock_http):
+        """Regression guard: default OTLP_CONTENT_TYPE must behave exactly
+        as before (OTLP/JSON body)."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        fpolicy_handler.lambda_handler(SAMPLE_FILE_CREATE_EVENT, None)
+
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["headers"]["Content-Type"] == "application/json"
+        json.loads(kwargs["body"])
+
+    @patch("fpolicy_handler.http")
+    @patch("fpolicy_handler.secrets_client")
+    def test_protobuf_content_type_combined_with_header_auth(
+        self, mock_secrets, mock_http, monkeypatch,
+    ):
+        """The combination actually needed for Mackerel's direct-send path:
+        AUTH_MODE=header + OTLP_CONTENT_TYPE=protobuf together."""
+        fpolicy_handler._api_key_cache = None
+        monkeypatch.setattr(
+            fpolicy_handler, "API_KEY_SECRET_ARN",
+            "arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:test",
+        )
+        monkeypatch.setattr(fpolicy_handler, "AUTH_MODE", "header")
+        monkeypatch.setattr(fpolicy_handler, "AUTH_HEADER_NAME", "Mackerel-Api-Key")
+        monkeypatch.setattr(fpolicy_handler, "EXTRA_HEADERS_JSON", '{"Accept": "*/*"}')
+        monkeypatch.setattr(fpolicy_handler, "OTLP_CONTENT_TYPE", "protobuf")
+
+        mock_secrets.get_secret_value.return_value = {
+            "SecretString": json.dumps({"api_key": "write-scoped-key"})
+        }
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        result = fpolicy_handler.lambda_handler(SAMPLE_FILE_CREATE_EVENT, None)
+
+        assert result["statusCode"] == 200
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["headers"]["Mackerel-Api-Key"] == "write-scoped-key"
+        assert kwargs["headers"]["Accept"] == "*/*"
+        assert kwargs["headers"]["Content-Type"] == "application/x-protobuf"
+        assert isinstance(kwargs["body"], bytes)
+
+
 class TestLambdaHandler:
     """Tests for the FPolicy Lambda handler entry point."""
 

@@ -299,6 +299,314 @@ class TestSendOtlpPayload:
         assert mock_http.request.call_count == 3
 
 
+class TestAuthModeHeader:
+    """Tests for AUTH_MODE="header" and EXTRA_HEADERS_JSON (generic custom-header
+    auth support, needed for vendors like Mackerel with a non-Bearer/Basic
+    auth header, e.g. "Mackerel-Api-Key")."""
+
+    @patch("handler.http")
+    @patch("handler.s3_client")
+    @patch("handler.secrets_client")
+    def test_header_auth_mode_uses_custom_header_name(
+        self, mock_secrets, mock_s3, mock_http, monkeypatch,
+        sample_s3_event, sample_json_audit_logs,
+    ):
+        handler._api_key_cache = None
+        # API_KEY_SECRET_ARN is a module-level constant read once at import
+        # time from the env var; conftest's monkeypatch.setenv doesn't affect
+        # an already-imported module, so it must be patched directly here.
+        monkeypatch.setattr(
+            handler, "API_KEY_SECRET_ARN",
+            "arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:test",
+        )
+        monkeypatch.setattr(handler, "AUTH_MODE", "header")
+        monkeypatch.setattr(handler, "AUTH_HEADER_NAME", "Mackerel-Api-Key")
+
+        mock_secrets.get_secret_value.return_value = {
+            "SecretString": json.dumps({"api_key": "write-scoped-key"})
+        }
+        mock_body = MagicMock()
+        mock_body.read.return_value = sample_json_audit_logs.encode("utf-8")
+        mock_s3.get_object.return_value = {"Body": mock_body}
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        handler.lambda_handler(sample_s3_event, None)
+
+        _, kwargs = mock_http.request.call_args
+        sent_headers = kwargs["headers"]
+        assert sent_headers["Mackerel-Api-Key"] == "write-scoped-key"
+        # Must NOT wrap the token in "Bearer "/"Basic " like the other modes
+        assert "Authorization" not in sent_headers
+
+    @patch("handler.http")
+    @patch("handler.s3_client")
+    @patch("handler.secrets_client")
+    def test_extra_headers_json_merged_with_auth_headers(
+        self, mock_secrets, mock_s3, mock_http, monkeypatch,
+        sample_s3_event, sample_json_audit_logs,
+    ):
+        handler._api_key_cache = None
+        monkeypatch.setattr(
+            handler, "API_KEY_SECRET_ARN",
+            "arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:test",
+        )
+        monkeypatch.setattr(handler, "AUTH_MODE", "header")
+        monkeypatch.setattr(handler, "AUTH_HEADER_NAME", "Mackerel-Api-Key")
+        monkeypatch.setattr(handler, "EXTRA_HEADERS_JSON", '{"Accept": "*/*"}')
+
+        mock_secrets.get_secret_value.return_value = {
+            "SecretString": json.dumps({"api_key": "write-scoped-key"})
+        }
+        mock_body = MagicMock()
+        mock_body.read.return_value = sample_json_audit_logs.encode("utf-8")
+        mock_s3.get_object.return_value = {"Body": mock_body}
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        handler.lambda_handler(sample_s3_event, None)
+
+        _, kwargs = mock_http.request.call_args
+        sent_headers = kwargs["headers"]
+        assert sent_headers["Mackerel-Api-Key"] == "write-scoped-key"
+        assert sent_headers["Accept"] == "*/*"
+
+    @patch("handler.http")
+    @patch("handler.s3_client")
+    @patch("handler.secrets_client")
+    def test_extra_headers_json_works_without_api_key_secret(
+        self, mock_secrets, mock_s3, mock_http, monkeypatch,
+        sample_s3_event, sample_json_audit_logs,
+    ):
+        """EXTRA_HEADERS_JSON must apply even when API_KEY_SECRET_ARN is unset
+        (e.g. a Collector endpoint that needs Accept: */* but no per-request
+        secret)."""
+        handler._api_key_cache = None
+        monkeypatch.setattr(handler, "API_KEY_SECRET_ARN", "")
+        monkeypatch.setattr(handler, "EXTRA_HEADERS_JSON", '{"Accept": "*/*"}')
+
+        mock_body = MagicMock()
+        mock_body.read.return_value = sample_json_audit_logs.encode("utf-8")
+        mock_s3.get_object.return_value = {"Body": mock_body}
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        handler.lambda_handler(sample_s3_event, None)
+
+        mock_secrets.get_secret_value.assert_not_called()
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["headers"]["Accept"] == "*/*"
+
+    @patch("handler.http")
+    @patch("handler.s3_client")
+    @patch("handler.secrets_client")
+    def test_malformed_extra_headers_json_ignored_not_fatal(
+        self, mock_secrets, mock_s3, mock_http, monkeypatch,
+        sample_s3_event, sample_json_audit_logs,
+    ):
+        """Malformed EXTRA_HEADERS_JSON must not crash the handler — it should
+        log a warning and proceed without the extra headers."""
+        handler._api_key_cache = None
+        monkeypatch.setattr(handler, "API_KEY_SECRET_ARN", "")
+        monkeypatch.setattr(handler, "EXTRA_HEADERS_JSON", "{not valid json")
+
+        mock_body = MagicMock()
+        mock_body.read.return_value = sample_json_audit_logs.encode("utf-8")
+        mock_s3.get_object.return_value = {"Body": mock_body}
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        result = handler.lambda_handler(sample_s3_event, None)
+
+        assert result["statusCode"] == 200
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["headers"] == {"Content-Type": "application/json"}
+
+    @patch("handler.http")
+    @patch("handler.s3_client")
+    @patch("handler.secrets_client")
+    def test_bearer_mode_unaffected_by_new_options(
+        self, mock_secrets, mock_s3, mock_http, monkeypatch,
+        sample_s3_event, sample_json_audit_logs,
+    ):
+        """Regression guard: default bearer mode must behave exactly as before
+        when AUTH_HEADER_NAME/EXTRA_HEADERS_JSON are left at their defaults."""
+        handler._api_key_cache = None
+        monkeypatch.setattr(
+            handler, "API_KEY_SECRET_ARN",
+            "arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:test",
+        )
+        monkeypatch.setattr(handler, "AUTH_MODE", "bearer")
+
+        mock_secrets.get_secret_value.return_value = {
+            "SecretString": json.dumps({"api_key": "test-token"})
+        }
+        mock_body = MagicMock()
+        mock_body.read.return_value = sample_json_audit_logs.encode("utf-8")
+        mock_s3.get_object.return_value = {"Body": mock_body}
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        handler.lambda_handler(sample_s3_event, None)
+
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["headers"]["Authorization"] == "Bearer test-token"
+
+
+class TestOtlpContentTypeProtobuf:
+    """Tests for OTLP_CONTENT_TYPE="protobuf" (needed for vendors like
+    Mackerel whose OTLP/HTTP log endpoint rejects OTLP/JSON bodies with
+    HTTP 400 and only accepts Protobuf-encoded requests)."""
+
+    @patch("handler.http")
+    @patch("handler.s3_client")
+    @patch("handler.secrets_client")
+    def test_protobuf_content_type_sets_correct_header_and_body_encoding(
+        self, mock_secrets, mock_s3, mock_http, monkeypatch,
+        sample_s3_event, sample_json_audit_logs,
+    ):
+        handler._api_key_cache = None
+        monkeypatch.setattr(handler, "API_KEY_SECRET_ARN", "")
+        monkeypatch.setattr(handler, "OTLP_CONTENT_TYPE", "protobuf")
+
+        mock_body = MagicMock()
+        mock_body.read.return_value = sample_json_audit_logs.encode("utf-8")
+        mock_s3.get_object.return_value = {"Body": mock_body}
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        result = handler.lambda_handler(sample_s3_event, None)
+
+        assert result["statusCode"] == 200
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["headers"]["Content-Type"] == "application/x-protobuf"
+        # Body must be raw bytes, not a json.dumps() string, and must not be
+        # valid JSON (it's a binary Protobuf wire-format message).
+        body = kwargs["body"]
+        assert isinstance(body, bytes)
+        # A Protobuf-encoded body must not be parseable as JSON (either it
+        # raises JSONDecodeError, or the raw bytes aren't even valid UTF-8
+        # and raise UnicodeDecodeError first — both prove it isn't OTLP/JSON).
+        with pytest.raises((json.JSONDecodeError, UnicodeDecodeError)):
+            json.loads(body)
+
+    @patch("handler.http")
+    @patch("handler.s3_client")
+    @patch("handler.secrets_client")
+    def test_default_content_type_is_json_unaffected(
+        self, mock_secrets, mock_s3, mock_http, monkeypatch,
+        sample_s3_event, sample_json_audit_logs,
+    ):
+        """Regression guard: leaving OTLP_CONTENT_TYPE at its default must
+        behave exactly as before (OTLP/JSON body, Content-Type: application/json)."""
+        handler._api_key_cache = None
+        monkeypatch.setattr(handler, "API_KEY_SECRET_ARN", "")
+
+        mock_body = MagicMock()
+        mock_body.read.return_value = sample_json_audit_logs.encode("utf-8")
+        mock_s3.get_object.return_value = {"Body": mock_body}
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        handler.lambda_handler(sample_s3_event, None)
+
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["headers"]["Content-Type"] == "application/json"
+        # Body must still be valid JSON, unchanged from before this option existed.
+        json.loads(kwargs["body"])
+
+    @patch("handler.http")
+    @patch("handler.s3_client")
+    @patch("handler.secrets_client")
+    def test_protobuf_content_type_combined_with_header_auth(
+        self, mock_secrets, mock_s3, mock_http, monkeypatch,
+        sample_s3_event, sample_json_audit_logs,
+    ):
+        """The combination actually needed for Mackerel's direct-send path:
+        AUTH_MODE=header + OTLP_CONTENT_TYPE=protobuf together."""
+        handler._api_key_cache = None
+        monkeypatch.setattr(
+            handler, "API_KEY_SECRET_ARN",
+            "arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:test",
+        )
+        monkeypatch.setattr(handler, "AUTH_MODE", "header")
+        monkeypatch.setattr(handler, "AUTH_HEADER_NAME", "Mackerel-Api-Key")
+        monkeypatch.setattr(handler, "EXTRA_HEADERS_JSON", '{"Accept": "*/*"}')
+        monkeypatch.setattr(handler, "OTLP_CONTENT_TYPE", "protobuf")
+
+        mock_secrets.get_secret_value.return_value = {
+            "SecretString": json.dumps({"api_key": "write-scoped-key"})
+        }
+        mock_body = MagicMock()
+        mock_body.read.return_value = sample_json_audit_logs.encode("utf-8")
+        mock_s3.get_object.return_value = {"Body": mock_body}
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        result = handler.lambda_handler(sample_s3_event, None)
+
+        assert result["statusCode"] == 200
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["headers"]["Mackerel-Api-Key"] == "write-scoped-key"
+        assert kwargs["headers"]["Accept"] == "*/*"
+        assert kwargs["headers"]["Content-Type"] == "application/x-protobuf"
+        assert isinstance(kwargs["body"], bytes)
+
+
+class TestSendOtlpPayloadContentTypeUnit:
+    """Direct unit tests of _send_otlp_payload()'s content_type parameter,
+    independent of the full lambda_handler flow."""
+
+    @patch("handler.http")
+    def test_protobuf_encodes_via_otlp_protobuf_module(self, mock_http):
+        import otlp_protobuf
+
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        payload = {
+            "resourceLogs": [
+                {
+                    "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "x"}}]},
+                    "scopeLogs": [
+                        {"scope": {"name": "s"}, "logRecords": [
+                            {"timeUnixNano": "1", "severityNumber": 9, "severityText": "INFO",
+                             "body": {"stringValue": "hi"}, "attributes": []}
+                        ]}
+                    ],
+                }
+            ]
+        }
+        result = handler._send_otlp_payload(payload, "https://example.com", content_type="protobuf")
+
+        assert result is True
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["body"] == otlp_protobuf.encode_logs_data(payload)
+        assert kwargs["headers"]["Content-Type"] == "application/x-protobuf"
+
+    @patch("handler.http")
+    def test_json_is_default_when_content_type_omitted(self, mock_http):
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_http.request.return_value = mock_response
+
+        payload = {"resourceLogs": []}
+        handler._send_otlp_payload(payload, "https://example.com")
+
+        _, kwargs = mock_http.request.call_args
+        assert kwargs["headers"]["Content-Type"] == "application/json"
+        assert kwargs["body"] == json.dumps(payload).encode("utf-8")
+
+
 class TestParseJsonLogs:
     """Tests for _parse_json_logs function."""
 

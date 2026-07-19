@@ -49,6 +49,12 @@ samconfig.toml
 cdk.out/
 
 # Environment
+# NOTE: .env.*.example files (e.g. integrations/otel-collector/.env.mackerel.example)
+# ARE meant to be committed as templates for readers to `cp` and fill in — this
+# blanket .env.* rule catches them too. They are force-tracked individually
+# via `git add -f <file>` when added (see AGENTS.md → "Adding a New Vendor
+# Integration"). If `git status` shows a new .env.*.example as untracked
+# after adding one, that's expected — force-add it, don't loosen this rule.
 .env
 .env.*
 .env.local

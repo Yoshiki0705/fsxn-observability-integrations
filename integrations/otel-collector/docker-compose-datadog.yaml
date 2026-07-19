@@ -1,3 +1,11 @@
+# TROUBLESHOOTING — DNS resolution errors ("server misbehaving"): if the
+# Collector's exporter logs show a DNS failure resolving your OTLP endpoint's
+# hostname (even though the host machine resolves it fine with `nslookup`),
+# this is a known Docker Desktop issue with its embedded DNS resolver
+# (127.0.0.11), not a problem with your endpoint or credentials. Fix by
+# uncommenting the `dns:` block below. See integrations/otel-collector/README.md
+# → Troubleshooting → "Docker Desktop DNS Resolution" for details.
+
 services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.152.0
@@ -9,6 +17,9 @@ services:
     environment:
       - DD_API_KEY=${DD_API_KEY}
       - DD_SITE=${DD_SITE:-datadoghq.com}
+    # dns:                  # Uncomment if you hit "server misbehaving" DNS errors (see note above)
+    #   - 8.8.8.8
+    #   - 1.1.1.1
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:13133/"]
       interval: 5s
