@@ -16,7 +16,7 @@ This document maps every major feature of ONTAP System Manager, NetApp Workload 
 |----------------------|----------------------|-----------|:------:|
 | **Performance: IOPS** | CloudWatch `DataReadOperations` + `DataWriteOperations` | `fsxn-monitoring-dashboard.yaml` | ✅ |
 | **Performance: Throughput** | CloudWatch `DataReadBytes` + `DataWriteBytes` | `fsxn-monitoring-dashboard.yaml` | ✅ |
-| **Performance: Latency** | CloudWatch `DataReadLatency` + `DataWriteLatency` (detailed metrics) | `fsxn-monitoring-dashboard.yaml` | ⚠️ Requires detailed metrics enablement |
+| **Performance: Latency** | CloudWatch `DataReadOperationTime`/`DataWriteOperationTime` (derived latency = `OperationTime * 1000 / Operations`) | Not yet in `fsxn-monitoring-dashboard.yaml` | ⚠️ Metrics available, widget not implemented |
 | **Performance: Network Utilization** | CloudWatch `NetworkThroughputUtilization` | `fsxn-monitoring-dashboard.yaml` | ✅ |
 | **Capacity: Storage Used** | CloudWatch `StorageUsed` + `StorageCapacityUtilization` | `fsxn-monitoring-dashboard.yaml` | ✅ |
 | **Capacity: Alerts** | CloudWatch Alarm on `StorageCapacityUtilization` | `fsxn-monitoring-dashboard.yaml` (threshold alarm) | ✅ |
@@ -58,7 +58,7 @@ This document maps every major feature of ONTAP System Manager, NetApp Workload 
 
 > **DII** = Data Infrastructure Insights (formerly Cloud Insights). Storage Workload Security is its ransomware detection and response module.
 
-> **Response latency note**: DII blocks users in-band (sub-second, integrated into ONTAP data path). This repository's Lambda-based response takes 2–5 seconds for a single containment action (block + snapshot), or 25–50 minutes for full recovery-point verification (dominated by FSx-ONTAP sync delay). Choose DII when sub-second response is a hard requirement; choose this approach when your detection is already in your SIEM and you need customizable response logic.
+> **Response latency note**: DII blocks users in-band (sub-second, integrated into ONTAP data path). This repository's Lambda-based response takes 2–5 seconds for a single containment action (block + snapshot), or 25–50 minutes for full recovery-point verification (dominated by FSx for ONTAP sync delay). Choose DII when sub-second response is a hard requirement; choose this approach when your detection is already in your SIEM and you need customizable response logic.
 
 | DII Feature | AWS-Native Equivalent | This Repo | Status |
 |------------|----------------------|-----------|:------:|
@@ -96,6 +96,8 @@ All vendors that receive audit/EMS/FPolicy logs can build equivalent forensics v
 
 > **Honeycomb note**: Honeycomb is optimized for distributed tracing and high-cardinality event exploration. While it receives FSx for ONTAP audit logs via the pipeline, it does not provide traditional dashboard/saved-search artifacts for forensic investigation workflows. Use Honeycomb for tracing correlation; use one of the 7 vendors above for forensics dashboards.
 
+> **CrowdStrike Falcon LogScale note**: CrowdStrike Falcon LogScale receives FSx for ONTAP audit logs via HEC (see [vendor-comparison.md](vendor-comparison.md)), but this repository does not yet include a forensics dashboard artifact for it — the 7 vendors in the table above are what's currently provided, not the full list of vendors this repository supports overall.
+
 ---
 
 ## Summary: Coverage Status
@@ -106,7 +108,7 @@ All vendors that receive audit/EMS/FPolicy logs can build equivalent forensics v
 | Workload Factory | 9 | 5 | 2 | 2 |
 | DII SWS | 13 | 13 | 0 | 0 |
 
-**Key insight**: Security/incident-response features (DII equivalent) are **100% covered**. Operations monitoring (System Manager equivalent) is **65% fully covered + 25% partial** — partial items are security-blocking-only implementations of export/share management, and demo-only volume templates. The fully uncovered items (QoS, LIF/DNS) are infrastructure-management tasks suited to the FSx Console.
+**Key insight**: Security/incident-response features (DII equivalent) are **100% covered**. Operations monitoring (System Manager equivalent) is **62% fully covered + 29% partial** (13/21 and 6/21 of the mapped features, respectively) — partial items are security-blocking-only implementations of export/share management, and demo-only volume templates. The remaining **10%** (QoS, LIF/DNS) are infrastructure-management tasks suited to the FSx Console.
 
 > **Reading this table correctly**: "100% covered" describes feature-level parity for the specific containment/detection-response actions this repository implements — it is not a claim that this approach is a superior or complete substitute for DII. DII's ML detection, agent-based collection, and vendor-managed operations are capabilities this repository doesn't build from scratch; the coverage number reflects that this repository's narrower, AWS-native mechanism reaches the same *containment actions* via a different path. See [How to Choose](#how-to-choose) below for which context favors which approach.
 
@@ -169,7 +171,7 @@ aws cloudwatch list-metrics \
 
 > **There is no single tool that does everything.** The matrix above maps what this repository covers. Use FSx Console for interactive operations, DII if you want vendor-managed ML detection, and this repository when your detection is already in your SIEM and you want automated containment + forensic evidence without additional licensing.
 
-> **Cost model difference**: DII uses per-TB licensing (contact NetApp for pricing). This repository's operational cost is primarily Lambda invocations + CloudWatch metrics + VPC Endpoints (~$15–30/month baseline for a typical single-SVM deployment). This is not an apples-to-apples TCO comparison — the AWS-side figure is infrastructure cost only and excludes the ongoing work of tuning detection rules, investigating false positives, and running quarterly drills, all of which apply to this approach and to DII alike. DII's licensing figure would similarly need to be weighed against its own setup and operational overhead. See the deployment guide for a fuller cost breakdown.
+> **Cost model difference**: DII uses per-TB licensing (contact NetApp for pricing). This repository's operational cost is primarily Lambda invocations + CloudWatch metrics + VPC Endpoints (~$15–30/month baseline for a typical single-SVM deployment, illustrative only — not yet broken down component-by-component in this repo's docs). This is not an apples-to-apples TCO comparison — the AWS-side figure is infrastructure cost only and excludes the ongoing work of tuning detection rules, investigating false positives, and running quarterly drills, all of which apply to this approach and to DII alike. DII's licensing figure would similarly need to be weighed against its own setup and operational overhead. See [Cost Model](cost-model.md) for the log-shipping-pipeline cost breakdown this repository does document (a related but distinct cost surface from the incident-response stacks discussed here).
 
 ---
 
