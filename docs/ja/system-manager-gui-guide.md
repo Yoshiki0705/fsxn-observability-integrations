@@ -498,6 +498,89 @@ Explorer ビューは CSV ダウンロードをサポート:
 
 ---
 
+## 5.2 代替実現方法の比較と導線
+
+System Manager（NetApp Console 経由）で行える各操作について、AWS ネイティブサービスやサードパーティツールで代替する方法を整理します。NetApp Console のセットアップが不要な方法、または GUI に依存しない自動化を検討する際の選択肢です。
+
+### 監査ログの設定と配信
+
+| 実現方法 | ツール/サービス | メリット | 導線（リンク） |
+|---------|--------------|---------|-------------|
+| System Manager GUI | NetApp Console 経由 | 直感的、運用者に馴染みやすい | 本ガイド Section 2 |
+| ONTAP CLI (SSH) | `vserver audit create` | NetApp Console 不要、再現可能 | [前提条件ガイド — 監査ログ有効化](prerequisites.md#step-2-fsx-for-ontap-監査ログの有効化) |
+| ONTAP REST API | `POST /api/protocols/audit` | IaC 統合可能、完全自動化 | [ONTAP REST API リファレンス](ontap-rest-api-reference.md) |
+| セットアップスクリプト | `ontap-audit-setup.sh` | ドライラン対応、パラメータ化 | [スクリプト](../../shared/scripts/ontap-audit-setup.sh) |
+
+**配信先の選択肢**
+
+| 配信方法 | アーキテクチャ | コスト目安 | 導線 |
+|---------|-------------|-----------|------|
+| S3 AP + EventBridge + Lambda | AWS ネイティブ（本リポジトリ） | $2-8/月 | [前提条件ガイド](prerequisites.md) |
+| AWS DataSync | 定期同期（5分間隔） | $5-15/月 | [AWS DataSync ドキュメント](https://docs.aws.amazon.com/datasync/) |
+| Kinesis Data Firehose | 高スループット配信 | ログ量依存 | [ベンダー比較](vendor-comparison.md#architecture-pattern-comparison) |
+
+### クォータ（容量制限）の設定
+
+| 実現方法 | ツール/サービス | メリット | 導線 |
+|---------|--------------|---------|------|
+| System Manager GUI | NetApp Console 経由 | 直感的な Qtree/クォータ管理 | 本ガイド Section 3 |
+| ONTAP CLI | `quota policy rule create` | スクリプト化可能 | [NetApp Docs — Qtree クォータ](https://docs.netapp.com/us-en/ontap/volumes/manage-volumes-task.html) |
+| ONTAP REST API | `POST /storage/quota/rules` | IaC 統合、CI/CD パイプライン対応 | [ONTAP REST API リファレンス](ontap-rest-api-reference.md), [quota セットアップスクリプト](../../shared/scripts/ontap-quota-setup.sh) |
+
+### 容量監視と通知
+
+| 実現方法 | 監視粒度 | リアルタイム性 | 導線 |
+|---------|---------|-------------|------|
+| **CloudWatch Alarms** | ボリュームレベル | 5分間隔 | 本ガイド Section 4.3 |
+| **EMS Webhook → Lambda → SNS** | Qtree レベル（クォータ超過） | リアルタイム | 本ガイド Section 4.2, [EMS 検知機能](ems-detection-capabilities.md) |
+| **CloudWatch Events (EventBridge)** | 一部 EMS イベント | 数分 | 本ガイド Section 4.4 |
+| **NetApp Harvest + Grafana** | 全メトリクス（300+） | 60秒 | [メトリクス収集比較](#10-メトリクス収集ツールの比較) |
+| **OTel Collector** | カスタム設定 | 設定次第 | [OTel Collector 統合](../../integrations/otel-collector/) |
+| **Datadog / Splunk / Elastic** | 監査ログ＋メトリクス | ベンダー依存 | [ベンダー比較 — ダッシュボード統合](vendor-comparison.md#ダッシュボード統合--各ベンダーでのイベント表示) |
+
+### ファイルアクセス分析（FSA Explorer の代替）
+
+| 実現方法 | 分析対象 | 長期分析 | 導線 |
+|---------|---------|---------|------|
+| **FSA Explorer (System Manager)** | point-in-time のファイル一覧・サイズ・アクセス日 | ❌ | 本ガイド Section 5.1 |
+| **監査ログ + Amazon Athena** | 全アクセス履歴（who/what/when） | ✅ | [管理・監視 Decision Tree](decision-tree-management-monitoring.md) |
+| **S3 Inventory (S3 AP 経由)** | オブジェクト一覧・サイズ | ✅ (日次) | [AWS S3 Inventory](https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-inventory.html) |
+| **FPolicy + SIEM** | リアルタイムファイル操作追跡 | ✅ | [FPolicy アーキテクチャパターン](fpolicy-production-architecture-patterns.md) |
+| **Amazon Comprehend (PII スキャン)** | ファイル内容の分類 | ✅ | [コンテンツ分類スキャナー](content-classification-scanner.md) |
+
+### パフォーマンス監視
+
+| 実現方法 | メトリクス範囲 | カスタムダッシュボード | 導線 |
+|---------|-------------|---------|------|
+| **System Manager** | ボリューム IOPS/スループット/レイテンシ | ❌（画面のみ） | NetApp Console 経由 |
+| **CloudWatch メトリクス** | FSx レベル（ボリューム、FS 全体） | ✅ | [AWS Docs — CloudWatch メトリクス](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring-cloudwatch.html) |
+| **NetApp Harvest → Prometheus → Grafana** | ONTAP 全メトリクス（300+） | ✅ | [Harvest GitHub](https://github.com/NetApp/harvest) |
+| **OTel Collector → 任意バックエンド** | カスタム設定 | ✅ | [OTel Collector 統合](../../integrations/otel-collector/) |
+
+### ランサムウェア対策（ARP + 自動応答）
+
+| 実現方法 | 検知 | 自動封じ込め | 導線 |
+|---------|------|-----------|------|
+| **ARP/AI + 本リポジトリの自動応答** | ONTAP ARP/AI（即時、学習期間不要） | ✅ Lambda → ONTAP REST API | [自動応答ガイド](automated-response-guide.md) |
+| **DII Storage Workload Security** | 内蔵 ML（ユーザー別ベースライン） | ✅ 内蔵 | [自動応答ガイド — 比較表](automated-response-guide.md#比較-本アプローチ-vs-専用ストレージセキュリティ製品) |
+| **CloudWatch Log Alarm → SNS → Lambda** | ログパターン検知 | ✅ 本リポジトリ | [CloudWatch Log Alarm ガイド](cloudwatch-log-alarm.md) |
+| **Datadog/Splunk ML + SNS** | SIEM 側 ML 検知 | ✅ 本リポジトリ | [ベンダー比較 — 自動封じ込め連携](vendor-comparison.md#自動封じ込め連携パターン全ベンダー共通) |
+
+### 選定フローチャート
+
+```mermaid
+flowchart TD
+    A[何を実現したいか？] --> B{GUI で操作したい？}
+    B -- はい --> C[NetApp Console セットアップ<br/>本ガイド Section 1]
+    B -- いいえ --> D{自動化したい？}
+    D -- はい --> E{AWS 完結？}
+    E -- はい --> F[CloudWatch + Lambda<br/>本リポジトリのテンプレート]
+    E -- いいえ --> G[OTel Collector or<br/>Harvest + Grafana]
+    D -- いいえ --> H[ONTAP CLI/REST API<br/>直接操作]
+```
+
+---
+
 ## 6. 検証チェックリスト
 
 ### Phase 1: System Manager アクセス確認

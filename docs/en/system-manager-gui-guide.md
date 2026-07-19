@@ -486,6 +486,89 @@ The Explorer view supports CSV download:
 
 ---
 
+## 5.2 Alternative Implementation Options and Navigation
+
+For each operation available in System Manager (via NetApp Console), this section maps alternative approaches using AWS-native services, third-party tools, or direct API access. Use this when NetApp Console setup is not desired, or when automation without GUI dependency is the goal.
+
+### Audit Log Configuration and Delivery
+
+| Approach | Tool/Service | Benefit | Link |
+|----------|-------------|---------|------|
+| System Manager GUI | Via NetApp Console | Intuitive, familiar to ops teams | This guide Section 2 |
+| ONTAP CLI (SSH) | `vserver audit create` | No NetApp Console needed, reproducible | [Prerequisites — Enable Audit Logging](prerequisites.md#step-2-enable-fsx-ontap-audit-logging) |
+| ONTAP REST API | `POST /api/protocols/audit` | IaC-friendly, fully automatable | [ONTAP REST API Reference](ontap-rest-api-reference.md) |
+| Setup script | `ontap-audit-setup.sh` | Dry-run support, parameterized | [Script](../../shared/scripts/ontap-audit-setup.sh) |
+
+**Delivery options**
+
+| Method | Architecture | Cost Estimate | Link |
+|--------|-------------|---------------|------|
+| S3 AP + EventBridge + Lambda | AWS-native (this repo) | $2-8/month | [Prerequisites](prerequisites.md) |
+| AWS DataSync | Periodic sync (5 min interval) | $5-15/month | [AWS DataSync docs](https://docs.aws.amazon.com/datasync/) |
+| Kinesis Data Firehose | High-throughput delivery | Volume-dependent | [Vendor Comparison](vendor-comparison.md#architecture-pattern-comparison) |
+
+### Quota (Capacity Limit) Configuration
+
+| Approach | Tool/Service | Benefit | Link |
+|----------|-------------|---------|------|
+| System Manager GUI | Via NetApp Console | Intuitive Qtree/quota management | This guide Section 3 |
+| ONTAP CLI | `quota policy rule create` | Scriptable | [NetApp Docs — Qtree Quotas](https://docs.netapp.com/us-en/ontap/volumes/manage-volumes-task.html) |
+| ONTAP REST API | `POST /storage/quota/rules` | IaC integration, CI/CD pipeline | [ONTAP REST API Reference](ontap-rest-api-reference.md), [Quota setup script](../../shared/scripts/ontap-quota-setup.sh) |
+
+### Capacity Monitoring and Alerting
+
+| Approach | Granularity | Timeliness | Link |
+|----------|------------|------------|------|
+| **CloudWatch Alarms** | Volume level | 5 min interval | This guide Section 4.3 |
+| **EMS Webhook → Lambda → SNS** | Qtree level (quota exceeded) | Real-time | This guide Section 4.2, [EMS Detection](ems-detection-capabilities.md) |
+| **CloudWatch Events (EventBridge)** | Select EMS events | Minutes | This guide Section 4.4 |
+| **NetApp Harvest + Grafana** | All metrics (300+) | 60 sec | [Metrics Collection Comparison](#10-metrics-collection-tools-comparison) |
+| **OTel Collector** | Custom configuration | Configurable | [OTel Collector integration](../../integrations/otel-collector/) |
+| **Datadog / Splunk / Elastic** | Audit logs + metrics | Vendor-dependent | [Vendor Comparison — Dashboard Integration](vendor-comparison.md#dashboard-integration--how-events-appear-in-each-vendor) |
+
+### File Access Analysis (FSA Explorer Alternatives)
+
+| Approach | Analysis Scope | Long-term Analysis | Link |
+|----------|---------------|-------------------|------|
+| **FSA Explorer (System Manager)** | Point-in-time file list, size, access date | ❌ | This guide Section 5.1 |
+| **Audit logs + Amazon Athena** | Full access history (who/what/when) | ✅ | [Management/Monitoring Decision Tree](decision-tree-management-monitoring.md) |
+| **S3 Inventory (via S3 AP)** | Object list, size | ✅ (daily) | [AWS S3 Inventory](https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-inventory.html) |
+| **FPolicy + SIEM** | Real-time file operation tracking | ✅ | [FPolicy Architecture Patterns](fpolicy-production-architecture-patterns.md) |
+| **Amazon Comprehend (PII scan)** | File content classification | ✅ | [Content Classification Scanner](content-classification-scanner.md) |
+
+### Performance Monitoring
+
+| Approach | Metric Scope | Custom Dashboards | Link |
+|----------|-------------|-------------------|------|
+| **System Manager** | Volume IOPS/throughput/latency | ❌ (screen only) | Via NetApp Console |
+| **CloudWatch metrics** | FSx level (volume, FS) | ✅ | [AWS Docs — CloudWatch Metrics](https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/monitoring-cloudwatch.html) |
+| **NetApp Harvest → Prometheus → Grafana** | All ONTAP metrics (300+) | ✅ | [Harvest GitHub](https://github.com/NetApp/harvest) |
+| **OTel Collector → any backend** | Custom configuration | ✅ | [OTel Collector integration](../../integrations/otel-collector/) |
+
+### Ransomware Protection (ARP + Automated Response)
+
+| Approach | Detection | Auto-Containment | Link |
+|----------|-----------|-----------------|------|
+| **ARP/AI + this repo's automated response** | ONTAP ARP/AI (immediate, no learning period) | ✅ Lambda → ONTAP REST API | [Automated Response Guide](automated-response-guide.md) |
+| **DII Storage Workload Security** | Built-in ML (per-user baselines) | ✅ Built-in | [Automated Response Guide — Comparison](automated-response-guide.md#comparison-this-approach-vs-dedicated-storage-security-products) |
+| **CloudWatch Log Alarm → SNS → Lambda** | Log pattern detection | ✅ This repo | [CloudWatch Log Alarm Guide](cloudwatch-log-alarm.md) |
+| **Datadog/Splunk ML + SNS** | SIEM-side ML detection | ✅ This repo | [Vendor Comparison — Auto-Containment](vendor-comparison.md#auto-containment-integration-pattern-all-vendors) |
+
+### Decision Flowchart
+
+```mermaid
+flowchart TD
+    A[What do you want to achieve?] --> B{Want GUI?}
+    B -- Yes --> C[NetApp Console setup<br/>This guide Section 1]
+    B -- No --> D{Want automation?}
+    D -- Yes --> E{AWS-only?}
+    E -- Yes --> F[CloudWatch + Lambda<br/>This repo templates]
+    E -- No --> G[OTel Collector or<br/>Harvest + Grafana]
+    D -- No --> H[ONTAP CLI/REST API<br/>Direct access]
+```
+
+---
+
 ## 6. Verification Checklist
 
 ### Phase 1: System Manager Access
