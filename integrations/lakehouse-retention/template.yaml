@@ -1,0 +1,354 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  FSx for ONTAP Lakehouse Long-Term Retention - Ships audit log records to
+  Amazon S3 in Apache Parquet format via Kinesis Data Firehose (with record
+  format conversion), catalogued in a Glue Data Catalog table, queryable via
+  Amazon Athena. Complements the observability vendor pipelines in this
+  project with a long-term (multi-year) SQL-queryable retention path.
+  Stack name: fsxn-lakehouse-retention
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Storage
+        Parameters:
+          - RetentionBucketName
+          - AthenaResultsBucketName
+      - Label:
+          default: Glue Data Catalog
+        Parameters:
+          - GlueDatabaseName
+          - GlueTableName
+      - Label:
+          default: Firehose Delivery Stream
+        Parameters:
+          - BufferSizeMBs
+          - BufferIntervalSeconds
+      - Label:
+          default: Athena
+        Parameters:
+          - AthenaWorkgroupName
+
+Parameters:
+  RetentionBucketName:
+    Type: String
+    Description: >-
+      Name for the new S3 bucket that stores Parquet-converted audit log
+      records for long-term retention (must be globally unique; this
+      template creates the bucket).
+  AthenaResultsBucketName:
+    Type: String
+    Description: >-
+      Name for the new S3 bucket that stores Athena query results (must be
+      globally unique; this template creates the bucket).
+  GlueDatabaseName:
+    Type: String
+    Default: fsxn_audit_lakehouse
+    Description: Glue Data Catalog database name.
+  GlueTableName:
+    Type: String
+    Default: audit_logs
+    Description: Glue Data Catalog table name for the Parquet audit log records.
+  BufferSizeMBs:
+    Type: Number
+    Default: 64
+    MinValue: 64
+    MaxValue: 128
+    Description: >-
+      Firehose buffering size in MB before flushing to S3. Minimum is 64 MB
+      when record format conversion (Parquet) is enabled.
+  BufferIntervalSeconds:
+    Type: Number
+    Default: 300
+    MinValue: 60
+    MaxValue: 900
+    Description: Firehose buffering interval in seconds before flushing to S3.
+  AthenaWorkgroupName:
+    Type: String
+    Default: fsxn-lakehouse-retention
+    Description: Athena workgroup name (with a 10 GB per-query scan cap).
+
+Resources:
+  # --- S3 buckets ---
+  RetentionBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref RetentionBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: transition-to-infrequent-access
+            Status: Enabled
+            Transitions:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 90
+              - StorageClass: GLACIER_IR
+                TransitionInDays: 365
+
+  AthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref AthenaResultsBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-query-results
+            Status: Enabled
+            ExpirationInDays: 30
+
+  # --- Glue Data Catalog ---
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Ref GlueDatabaseName
+        Description: FSx for ONTAP audit log long-term retention database (Parquet, partitioned by date)
+
+  # Schema-on-write table: Firehose's DataFormatConversionConfiguration reads
+  # this table's column definitions to build the Parquet schema. Partition
+  # columns use Partition Projection so no Glue Crawler is required to
+  # discover new year/month/day partitions (lower cost, no crawl lag).
+  GlueTable:
+    Type: AWS::Glue::Table
+    DependsOn: GlueDatabase
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref GlueDatabaseName
+      TableInput:
+        Name: !Ref GlueTableName
+        Description: FSx for ONTAP audit log records (Parquet, partitioned by year/month/day)
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          classification: parquet
+          'projection.enabled': 'true'
+          'projection.year.type': 'integer'
+          'projection.year.range': '2025,2035'
+          'projection.month.type': 'integer'
+          'projection.month.range': '1,12'
+          'projection.month.digits': '2'
+          'projection.day.type': 'integer'
+          'projection.day.range': '1,31'
+          'projection.day.digits': '2'
+          'storage.location.template': !Sub 's3://${RetentionBucketName}/audit-logs/year=${!year}/month=${!month}/day=${!day}'
+        StorageDescriptor:
+          Location: !Sub 's3://${RetentionBucketName}/audit-logs/'
+          InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
+          SerdeInfo:
+            SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
+          Columns:
+            - Name: timestamp
+              Type: string
+            - Name: eventid
+              Type: string
+            - Name: svmname
+              Type: string
+            - Name: username
+              Type: string
+            - Name: clientip
+              Type: string
+            - Name: operation
+              Type: string
+            - Name: objectname
+              Type: string
+            - Name: result
+              Type: string
+        PartitionKeys:
+          - Name: year
+            Type: string
+          - Name: month
+            Type: string
+          - Name: day
+            Type: string
+
+  # --- IAM: Firehose delivery role ---
+  FirehoseDeliveryRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-firehose-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref AWS::AccountId
+      Policies:
+        - PolicyName: S3Write
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:AbortMultipartUpload
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:PutObject
+                Resource:
+                  - !GetAtt RetentionBucket.Arn
+                  - !Sub '${RetentionBucket.Arn}/*'
+        - PolicyName: GlueSchemaRead
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - glue:GetTable
+                  - glue:GetTableVersion
+                  - glue:GetTableVersions
+                Resource:
+                  - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+                  - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabaseName}'
+                  - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabaseName}/${GlueTableName}'
+        - PolicyName: Logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/kinesisfirehose/${AWS::StackName}*:*'
+
+  # --- Lake Formation: grant the Firehose role catalog access ---
+  # Required in Lake Formation-managed accounts even when the IAM policy
+  # above already allows glue:GetTable — Lake Formation permissions are
+  # evaluated in addition to (not instead of) IAM.
+  FirehoseLakeFormationDatabasePermission:
+    Type: AWS::LakeFormation::PrincipalPermissions
+    Properties:
+      Principal:
+        DataLakePrincipalIdentifier: !GetAtt FirehoseDeliveryRole.Arn
+      Resource:
+        Database:
+          CatalogId: !Ref AWS::AccountId
+          Name: !Ref GlueDatabaseName
+      Permissions:
+        - DESCRIBE
+      PermissionsWithGrantOption: []
+
+  FirehoseLakeFormationTablePermission:
+    Type: AWS::LakeFormation::PrincipalPermissions
+    DependsOn: GlueTable
+    Properties:
+      Principal:
+        DataLakePrincipalIdentifier: !GetAtt FirehoseDeliveryRole.Arn
+      Resource:
+        Table:
+          CatalogId: !Ref AWS::AccountId
+          DatabaseName: !Ref GlueDatabaseName
+          Name: !Ref GlueTableName
+      Permissions:
+        - DESCRIBE
+        - SELECT
+        - ALTER
+        - INSERT
+      PermissionsWithGrantOption: []
+
+  FirehoseLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/kinesisfirehose/${AWS::StackName}'
+      RetentionInDays: 30
+
+  FirehoseLogStream:
+    Type: AWS::Logs::LogStream
+    Properties:
+      LogGroupName: !Ref FirehoseLogGroup
+      LogStreamName: S3Delivery
+
+  # --- Firehose Delivery Stream (JSON -> Parquet, partitioned by date) ---
+  DeliveryStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    DependsOn:
+      - FirehoseLakeFormationDatabasePermission
+      - FirehoseLakeFormationTablePermission
+    Properties:
+      DeliveryStreamName: !Sub '${AWS::StackName}-audit-logs'
+      DeliveryStreamType: DirectPut
+      ExtendedS3DestinationConfiguration:
+        RoleARN: !GetAtt FirehoseDeliveryRole.Arn
+        BucketARN: !GetAtt RetentionBucket.Arn
+        Prefix: 'audit-logs/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/'
+        ErrorOutputPrefix: 'errors/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/'
+        BufferingHints:
+          SizeInMBs: !Ref BufferSizeMBs
+          IntervalInSeconds: !Ref BufferIntervalSeconds
+        CompressionFormat: UNCOMPRESSED
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName: !Ref FirehoseLogGroup
+          LogStreamName: !Ref FirehoseLogStream
+        DataFormatConversionConfiguration:
+          Enabled: true
+          InputFormatConfiguration:
+            Deserializer:
+              OpenXJsonSerDe: {}
+          OutputFormatConfiguration:
+            Serializer:
+              ParquetSerDe:
+                Compression: SNAPPY
+          SchemaConfiguration:
+            CatalogId: !Ref AWS::AccountId
+            DatabaseName: !Ref GlueDatabaseName
+            TableName: !Ref GlueTableName
+            Region: !Ref AWS::Region
+            RoleARN: !GetAtt FirehoseDeliveryRole.Arn
+
+  # --- Athena workgroup ---
+  AthenaWorkgroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Ref AthenaWorkgroupName
+      Description: FSx for ONTAP audit log lakehouse retention workgroup (10 GB scan cap per query)
+      State: ENABLED
+      WorkGroupConfiguration:
+        ResultConfiguration:
+          OutputLocation: !Sub 's3://${AthenaResultsBucketName}/athena-results/'
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        BytesScannedCutoffPerQuery: 10737418240 # 10 GB
+
+Outputs:
+  RetentionBucketName:
+    Value: !Ref RetentionBucket
+  AthenaResultsBucketName:
+    Value: !Ref AthenaResultsBucket
+  GlueDatabaseName:
+    Value: !Ref GlueDatabaseName
+  GlueTableName:
+    Value: !Ref GlueTableName
+  DeliveryStreamName:
+    Value: !Ref DeliveryStream
+  DeliveryStreamArn:
+    Value: !GetAtt DeliveryStream.Arn
+  AthenaWorkgroupName:
+    Value: !Ref AthenaWorkgroup
+  FirehoseDeliveryRoleArn:
+    Value: !GetAtt FirehoseDeliveryRole.Arn

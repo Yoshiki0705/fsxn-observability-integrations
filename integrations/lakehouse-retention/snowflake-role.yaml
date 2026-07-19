@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  IAM Role for Snowflake Storage Integration to access the FSx for ONTAP
+  audit log Parquet lakehouse retention bucket (integrations/lakehouse-retention/
+  template.yaml). Two-phase trust setup, reusing the pattern from
+  fsxn-lakehouse-integrations/integrations/snowflake/template.yaml, adapted
+  for a standard S3 bucket target instead of an FSx for ONTAP S3 Access Point.
+  Stack name: fsxn-lakehouse-retention-snowflake
+
+Parameters:
+  RetentionBucketName:
+    Type: String
+    Description: Name of the existing S3 bucket created by template.yaml (RetentionBucketName parameter value).
+  SnowflakeAccountId:
+    Type: String
+    Default: ''
+    Description: >-
+      Snowflake's AWS Account ID for cross-account trust. Leave empty for
+      Phase 1 (uses own account as placeholder). After DESCRIBE INTEGRATION,
+      set to the account portion of STORAGE_AWS_IAM_USER_ARN.
+  SnowflakeExternalId:
+    Type: String
+    Default: 'snowflake-placeholder'
+    Description: >-
+      External ID for IAM role trust. Phase 1: placeholder (own-account
+      trust, ExternalId ignored). Phase 2: set to STORAGE_AWS_EXTERNAL_ID
+      from DESCRIBE INTEGRATION output.
+
+Conditions:
+  HasSnowflakeAccount: !Not [!Equals [!Ref SnowflakeAccountId, '']]
+
+Resources:
+  SnowflakeS3Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: fsxn-lakehouse-retention-snowflake-role
+      Description: >-
+        IAM Role assumed by Snowflake Storage Integration to access the FSx
+        for ONTAP audit log Parquet retention bucket. Trust policy updated
+        after DESCRIBE INTEGRATION provides Snowflake's account info.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowSnowflakeAssumeRole
+            Effect: Allow
+            Principal:
+              AWS: !If
+                - HasSnowflakeAccount
+                - !Sub 'arn:aws:iam::${SnowflakeAccountId}:root'
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'sts:AssumeRole'
+            Condition: !If
+              - HasSnowflakeAccount
+              - StringEquals:
+                  'sts:ExternalId': !Ref SnowflakeExternalId
+              - !Ref 'AWS::NoValue'
+      Policies:
+        - PolicyName: S3ReadAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: AllowS3Read
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource: !Sub 'arn:aws:s3:::${RetentionBucketName}/*'
+              - Sid: AllowS3List
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource: !Sub 'arn:aws:s3:::${RetentionBucketName}'
+
+Outputs:
+  IAMRoleArn:
+    Description: >-
+      IAM Role ARN for Snowflake Storage Integration.
+      Use in: CREATE STORAGE INTEGRATION ... STORAGE_AWS_ROLE_ARN = '<this value>'
+    Value: !GetAtt SnowflakeS3Role.Arn
+  StorageAllowedLocation:
+    Description: STORAGE_ALLOWED_LOCATIONS value for the Snowflake Storage Integration.
+    Value: !Sub 's3://${RetentionBucketName}/audit-logs/'
+  TrustPolicyPhase:
+    Value: !If
+      - HasSnowflakeAccount
+      - 'Phase 2: Snowflake cross-account trust (production)'
+      - 'Phase 1: Own-account trust (placeholder) — run DESCRIBE INTEGRATION, then redeploy with SnowflakeAccountId/SnowflakeExternalId set'
