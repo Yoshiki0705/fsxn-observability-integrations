@@ -2,11 +2,11 @@
 
 🌐 **日本語**（このページ） | [English](../en/partner-solution-brief.md)
 
-## 顧客の課題
+## 組織の課題
 
-Amazon FSx for NetApp ONTAP を運用するエンタープライズ顧客は、ファイルアクセス監査ログを既存の SIEM/Observability プラットフォームに配信する必要があります。現在のアプローチでは、syslog-ng やベンダー固有のフォワーダーを実行する EC2 インスタンスが必要であり、運用オーバーヘッド、パッチ適用負荷、固定月額コストが発生します。
+Amazon FSx for NetApp ONTAP を運用する組織は、ファイルアクセス監査ログを既存の SIEM/Observability プラットフォームに配信する必要があります。現在のアプローチでは、syslog-ng やベンダー固有のフォワーダーを実行する EC2 インスタンスが必要であり、運用オーバーヘッド、パッチ適用負荷、固定月額コストが発生します。
 
-**よくある顧客の質問**:
+**よくある質問**:
 - 「EC2 を管理せずに FSx for ONTAP 監査ログを Splunk/Datadog/Grafana に送るには？」
 - 「ファイル共有上のランサムウェア活動をリアルタイムで検知できるか？」
 - 「ファイルアクセス監査のコンプライアンス要件をどう満たすか？」
@@ -35,7 +35,7 @@ FSx for ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Vendo
 | 初回ログ取得までの時間 | 数時間（プロビジョニング + 設定） | 30 分（CloudFormation デプロイ） |
 | ベンダー切り替えコスト | 高（フォワーダー設定の書き直し） | 低（Lambda ターゲット変更または OTel Collector 使用） |
 
-## ターゲット顧客プロファイル
+## ターゲットユーザープロファイル
 
 ### プロファイル A: Splunk モダナイゼーション
 - **現状** — EC2 Universal Forwarder で FSx for ONTAP ログを Splunk に配信
@@ -148,7 +148,7 @@ FSx for ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Vendo
 
 ## パートナー向け次のステップ
 
-1. FSx for ONTAP + Observability ニーズを持つ顧客を特定
+1. FSx for ONTAP + Observability ニーズを持つ組織を特定
 2. 初回会話でこのソリューション概要を使用
 3. 上記モデルを使用した 1 週間の PoC エンゲージメントを提案
 4. CloudFormation テンプレートを使用してデプロイ（30 分クイックスタート）
@@ -166,4 +166,4 @@ FSx for ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Vendo
 
 > **注意**
 >
-> NetApp Console アカウント作成には Customer Level アクセス承認に 1 営業日が必要です。GUI ベースの管理デモを含む PoC エンゲージメントのスケジュール時に考慮してください。
+> NetApp Console アカウント作成にはエンドユーザーレベルのアクセス承認に 1 営業日が必要です（NetApp の登録 UI ではこの階層を「Customer/End User」と表記しています。詳細は [system-manager-gui-guide.md](system-manager-gui-guide.md) を参照）。GUI ベースの管理デモを含む PoC エンゲージメントのスケジュール時に考慮してください。

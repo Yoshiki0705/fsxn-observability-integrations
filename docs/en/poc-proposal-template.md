@@ -2,13 +2,13 @@
 
 🌐 [日本語](../ja/poc-proposal-template.md) | **English** (this page)
 
-> Copy this template and fill in customer-specific details for each engagement.
+> Copy this template and fill in organization-specific details for each engagement.
 
 ---
 
 ## 1. Executive Summary
 
-**Customer**: [Customer Name]
+**Organization**: [Organization Name]
 **Date**: [YYYY-MM-DD]
 **Prepared by**: [Partner/SA Name]
 
@@ -20,8 +20,8 @@
 
 ## 2. Business Context
 
-### Customer Challenge
-[Describe the specific customer pain point in 2-3 sentences]
+### Organization Challenge
+[Describe the specific organization pain point in 2-3 sentences]
 
 ### Expected Business Value
 | Metric | Current State | Target State | Measurement Method |
@@ -86,7 +86,7 @@
 
 ## 6. RACI Matrix
 
-| Activity | Customer | Partner/SA | Vendor |
+| Activity | Organization | Partner/SA | Vendor |
 |----------|----------|-----------|--------|
 | Provide AWS account access | **R/A** | C | — |
 | FSx for ONTAP audit logging config | C | **R** | — |
@@ -105,7 +105,7 @@
 
 ## 7. Prerequisites
 
-### Customer Provides
+### Organization Provides
 - [ ] AWS account with FSx for ONTAP file system
 - [ ] IAM permissions for CloudFormation deployment
 - [ ] Audit logging enabled on target SVM (or permission to enable)

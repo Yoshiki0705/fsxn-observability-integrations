@@ -193,7 +193,7 @@ If you're already using Workload Factory, consider leveraging the Journal table 
 
 ## Service Feedback Summary
 
-### Observed Customer Need
+### Observed User Need
 
 - Near-real-time audit log shipping from FSx for ONTAP S3 Access Points
 - Lower latency than CloudTrail data event delivery (observed 5–15 min in validation)

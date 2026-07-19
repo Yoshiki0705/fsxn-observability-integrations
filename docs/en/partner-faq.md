@@ -4,7 +4,7 @@
 
 ## For Partner SAs and Delivery Teams
 
-Common questions from customer conversations, with recommended answers.
+Common questions from engagement conversations, with recommended answers.
 
 ---
 
@@ -40,9 +40,9 @@ No changes to NFS/SMB data paths, no performance impact on production workloads,
 
 ---
 
-## Customer Fit
+## Fit Assessment
 
-### Q: Which customers should I propose this to?
+### Q: Which organizations should I propose this to?
 
 **A**: Best fit:
 - Already using FSx for ONTAP (or planning to migrate)
@@ -57,7 +57,7 @@ Specific scenarios:
 - Design/engineering repositories
 - Compliance-driven audit requirements (FISC, ISMAP, J-SOX)
 
-### Q: What if the customer doesn't have FSx for ONTAP yet?
+### Q: What if the organization does not have FSx for ONTAP yet?
 
 **A**: Two options:
 1. **Sample data mode**: Deploy with synthetic audit logs to demonstrate the pipeline and vendor integration
@@ -130,7 +130,7 @@ Free tier options:
 
 **A**: MIT license. Free to use, modify, and distribute. No attribution required in production deployments.
 
-### Q: Can we white-label this for customer delivery?
+### Q: Can we white-label this for delivery to end users?
 
 **A**: Yes (MIT license). You can fork, customize, and deliver under your own branding. We recommend maintaining a link back to the upstream repository for updates.
 
@@ -145,16 +145,16 @@ Free tier options:
 - **Full PoC with real data**: 1-2 weeks (includes FSx audit setup, vendor configuration, dashboard creation, SLO validation)
 - **Production deployment**: 2-4 weeks (adds security review, runbook testing, Go/No-Go)
 
-### Q: What's the handoff to the customer?
+### Q: What is the handoff to the organization?
 
 **A**: Deliverables:
-1. Deployed CloudFormation stacks (customer-owned)
+1. Deployed CloudFormation stacks (organization-owned)
 2. Operational runbooks (DLQ replay, Lambda errors, checkpoint staleness)
 3. Pipeline SLO document (customized thresholds)
 4. Dashboard + alert configuration
 5. Go/No-Go checklist (signed off)
 
-### Q: What if the customer wants a vendor we don't support?
+### Q: What if the organization wants a vendor we do not support?
 
 **A**: The architecture is vendor-agnostic. Adding a new vendor requires:
 1. A Lambda handler (~200 lines of Python)

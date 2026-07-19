@@ -2,11 +2,11 @@
 
 🌐 [日本語](../ja/partner-solution-brief.md) | **English** (this page)
 
-## Customer Challenge
+## Organization Challenge
 
-Enterprise customers running Amazon FSx for NetApp ONTAP need to ship file access audit logs to their existing SIEM/Observability platform. The current approach requires EC2 instances running syslog-ng and vendor-specific forwarders — adding operational overhead, patching burden, and fixed monthly costs.
+Organizations running Amazon FSx for NetApp ONTAP need to ship file access audit logs to their existing SIEM/Observability platform. The current approach requires EC2 instances running syslog-ng and vendor-specific forwarders — adding operational overhead, patching burden, and fixed monthly costs.
 
-**Common customer questions**:
+**Common questions**:
 - "How do I get FSx for ONTAP audit logs into Splunk/Datadog/Grafana without managing EC2?"
 - "Can I detect ransomware activity on my file shares in real-time?"
 - "How do I meet compliance requirements for file access auditing?"
@@ -35,7 +35,7 @@ FSx for ONTAP → S3 Access Point → EventBridge Scheduler → Lambda → Vendo
 | Time to first log | Hours (provision + configure) | 30 minutes (CloudFormation deploy) |
 | Vendor switching cost | High (rewrite forwarder config) | Low (change Lambda target or use OTel Collector) |
 
-## Target Customer Profiles
+## Target User Profiles
 
 ### Profile A: Splunk Modernization
 - **Current state**: EC2 Universal Forwarder shipping FSx for ONTAP logs to Splunk
@@ -148,7 +148,7 @@ This solution does not aim to replace these options; it offers a serverless alte
 
 ## Next Steps for Partners
 
-1. Identify a customer with FSx for ONTAP + observability need
+1. Identify an organization with FSx for ONTAP + observability need
 2. Use this Solution Brief in the initial conversation
 3. Propose a 1-week PoC engagement using the model above
 4. Deploy using the CloudFormation templates (30-minute Quick Start)
@@ -164,4 +164,4 @@ This solution does not aim to replace these options; it offers a serverless alte
 | FPolicy (real-time file ops) | 2-4 hours | VPC networking, ECS Fargate, ONTAP CLI |
 | Full PoC (pipeline + dashboard + alerts) | 1 week | All above + vendor account |
 
-> **Note**: NetApp Console account creation requires 1 business day for Customer Level access approval. Plan accordingly when scheduling PoC engagements that include GUI-based management demonstrations.
+> **Note**: NetApp Console account creation requires 1 business day for end-user-level access approval (the NetApp registration UI labels this tier "Customer/End User" — see [system-manager-gui-guide.md](system-manager-gui-guide.md) for details). Plan accordingly when scheduling PoC engagements that include GUI-based management demonstrations.

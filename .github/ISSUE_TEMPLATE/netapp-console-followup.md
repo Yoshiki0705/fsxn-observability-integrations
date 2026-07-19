@@ -14,7 +14,7 @@ Follow-up items from the NetApp Console / System Manager / FSA verification (May
 ### 1. VPC-external Lambda Link behavior
 - **Finding**: "Create automatically" created the Lambda function outside the VPC (SubnetIds/SecurityGroupIds = null)
 - **Question**: How does a VPC-external Lambda access the ONTAP management endpoint (private IP)? Does NetApp SaaS proxy the requests?
-- **Impact**: Data residency implications for regulated customers
+- **Impact**: Data residency implications for regulated organizations
 - **Reference**: [classmethod article](https://dev.classmethod.jp/articles/amazon-fsx-for-netapp-ontap-netapp-console/) shows VPC-internal Lambda with "Create manually"
 
 ### 2. Lambda 30-minute periodic execution

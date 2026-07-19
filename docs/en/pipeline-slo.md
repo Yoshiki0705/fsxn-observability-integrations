@@ -143,7 +143,7 @@ Observability pipelines can generate unbounded costs if telemetry volume is not 
 | Component | Monthly Budget | Alarm Threshold | Action on Breach |
 |-----------|---------------|-----------------|-----------------|
 | AWS infrastructure (Lambda, EventBridge, S3, SQS) | < $50 | > $40 (80% of budget) | Review schedule interval, filter unnecessary events |
-| Vendor ingestion (Datadog, Grafana, etc.) | Customer-defined | > 80% of budget | Reduce log verbosity, increase sampling, filter at source |
+| Vendor ingestion (Datadog, Grafana, etc.) | User-defined | > 80% of budget | Reduce log verbosity, increase sampling, filter at source |
 | NAT Gateway (if VPC Lambda) | < $50 | > $40 | Consider VPC-external Lambda placement |
 | Total pipeline cost | < $150 | > $120 | Escalate to FinOps review |
 

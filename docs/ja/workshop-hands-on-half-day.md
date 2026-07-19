@@ -5,7 +5,7 @@
 ## 対象者
 
 - FSx for ONTAP Observability PoC を提供するパートナー
-- AWS SA 主導の顧客ワークショップ
+- AWS SA 主導の組織向けワークショップ
 - 技術意思決定者向けセルフペースハンズオン
 
 ## 前提条件

@@ -5,7 +5,7 @@
 ## Target Audience
 
 - Partners delivering FSx for ONTAP observability PoCs
-- AWS SA-led customer workshops
+- AWS SA-led organization workshops
 - Self-paced hands-on for technical decision-makers
 
 ## Prerequisites
