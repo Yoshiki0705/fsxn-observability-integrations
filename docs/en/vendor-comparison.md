@@ -100,6 +100,18 @@ S3 AP → Lambda (OTLP) → OTel Collector → Multiple Backends
 - ❌ Requires Collector infrastructure (ECS Fargate recommended)
 - ❌ Additional operational complexity
 
+## Emerging / Beta Vendors Under Evaluation
+
+The vendors below are **not yet part of the "Supported Vendors" table above** — no real end-to-end send has been confirmed against a live account for them yet, even where code and config already exist in this repo. They are tracked here because their platform has recently added a relevant capability, and a documentation-first feasibility assessment (at minimum) has been completed.
+
+| Vendor | Delivery Method | Auth Method | Status |
+|--------|-----------------|-------------|--------|
+| [Mackerel](../../integrations/mackerel/) | OTLP/HTTP only (`https://otlp-vaxila.mackerelio.com`) | `Mackerel-Api-Key` header (Write scope) | ✅ E2E verified (2026-07-18) against a live Mackerel organization — Mackerel's log feature is itself still an **open beta** (opened 2026-07-16; GA planned for fall 2026 with ingest-volume pricing already published), so this listing remains separate from "Supported Vendors" above. |
+
+**Why Mackerel is listed separately, not in the main table**: a real end-to-end send has now been confirmed against a live Mackerel organization (Free plan), so that readiness gate is cleared. What remains is that Mackerel's own log feature needs to reach GA with a stated data-retention SLA before it can be treated on equal footing with the 9 GA-verified vendors above. Until GA, treat Mackerel as **defense-in-depth alongside**, not a replacement for, one of those 9 vendors — particularly for ransomware-detection alerting or other production security use cases where Mackerel's current "no data retention guarantee" beta caveat is unacceptable.
+
+See [integrations/mackerel/README.md](../../integrations/mackerel/README.md) for the full beta-constraint list and implementation roadmap.
+
 ## Trial & Verification Notes
 
 ### Splunk Cloud Platform

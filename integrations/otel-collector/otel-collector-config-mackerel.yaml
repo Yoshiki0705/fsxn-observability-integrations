@@ -1,0 +1,62 @@
+# OTel Collector Configuration — Mackerel (log feature, open beta)
+#
+# ✅ E2E verified (2026-07-18): a sample FSx audit log payload sent through
+# this Collector config was confirmed present in Mackerel's log search
+# (via the findLogs GraphQL query) with all attributes intact. Mackerel's
+# own log feature itself remains an open beta (GA'd as beta 2026-07-16; GA
+# date TBD) — see integrations/mackerel/README.md for beta constraints
+# (no data retention guarantee, unscheduled maintenance possible).
+#
+# Mackerel's log feature accepts OTLP/HTTP only — the SAME endpoint and auth
+# header used by Mackerel's tracing (APM) feature.
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1000
+
+exporters:
+  otlphttp/mackerel:
+    endpoint: https://otlp-vaxila.mackerelio.com
+    headers:
+      Accept: "*/*"
+      Mackerel-Api-Key: ${env:MACKEREL_APIKEY}
+    sending_queue:
+      batch:
+        max_size: 3500000
+        sizer: bytes
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  # The metrics block below exposes the Collector's own internal metrics
+  # (e.g. otelcol_exporter_sent_log_records, otelcol_exporter_send_failed_log_records)
+  # on :8888/metrics. This was the fastest way to confirm during verification
+  # that the exporter had actually delivered records with zero failures,
+  # independent of whether Mackerel's log search UI showed results yet (search
+  # indexing can lag behind actual delivery — see setup-guide.md Step 3.3's
+  # "stale sample timestamps" troubleshooting entry). Requires exposing port
+  # 8888 in docker-compose-mackerel.yaml (already done) or your ECS task
+  # definition if running on Fargate.
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  extensions: [health_check]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/mackerel]

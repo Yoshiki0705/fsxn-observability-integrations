@@ -1,0 +1,32 @@
+# ✅ E2E verified (2026-07-18) — see otel-collector-config-mackerel.yaml header
+# comment and integrations/mackerel/README.md for full status and beta
+# constraints (Mackerel's log feature itself remains an open beta).
+#
+# The explicit `dns:` override below works around a Docker Desktop issue
+# observed during verification: the default embedded DNS resolver
+# (127.0.0.11) intermittently failed to resolve otlp-vaxila.mackerelio.com
+# with a "server misbehaving" error inside this container, even though the
+# host machine resolved the same hostname without issue. If you hit the same
+# symptom, an explicit public DNS server list is a working mitigation.
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.152.0
+    ports:
+      - "4318:4318"   # OTLP HTTP
+      - "13133:13133" # Health check
+      - "8888:8888"   # Internal metrics (see otel-collector-config-mackerel.yaml's telemetry block)
+    volumes:
+      - ./otel-collector-config-mackerel.yaml:/etc/otelcol-contrib/config.yaml
+    environment:
+      - MACKEREL_APIKEY=${MACKEREL_APIKEY}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:13133/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped

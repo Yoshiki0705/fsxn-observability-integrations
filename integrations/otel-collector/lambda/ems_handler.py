@@ -6,6 +6,11 @@ forwards to the configured OTel Collector endpoint.
 
 Supports ARP (Anti-Ransomware Protection) events, quota exceeded
 events, and all other EMS event types.
+
+Auth supports "bearer", "basic", or "header" (custom header name/value,
+via AUTH_HEADER_NAME) plus optional EXTRA_HEADERS_JSON for static
+non-secret headers a vendor's OTLP endpoint requires. No vendor-specific
+branching exists in this file — only generic, vendor-agnostic primitives.
 """
 
 from __future__ import annotations
@@ -21,6 +26,8 @@ from typing import Any, Optional
 
 import boto3
 import urllib3
+
+from otlp_protobuf import encode_logs_data
 
 # Conditionally import ems_parser (available as Lambda Layer)
 try:
@@ -66,7 +73,20 @@ OTLP_ENDPOINT = os.environ.get("OTLP_ENDPOINT", "http://localhost:4318")
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 SERVICE_NAME = os.environ.get("SERVICE_NAME", "fsxn-ems")
 API_KEY_SECRET_ARN = os.environ.get("API_KEY_SECRET_ARN", "")
-AUTH_MODE = os.environ.get("AUTH_MODE", "none")  # "none", "bearer", or "basic"
+AUTH_MODE = os.environ.get("AUTH_MODE", "none")  # "none", "bearer", "basic", or "header"
+# Used only when AUTH_MODE="header": the header name to send the secret value
+# under, verbatim (no "Bearer "/"Basic " prefix). Needed for vendors with a
+# custom auth header, e.g. Mackerel's "Mackerel-Api-Key".
+AUTH_HEADER_NAME = os.environ.get("AUTH_HEADER_NAME", "Authorization")
+# Optional static (non-secret) extra headers as a JSON object string, e.g.
+# '{"Accept": "*/*"}' — needed for Mackerel's OTLP endpoint.
+EXTRA_HEADERS_JSON = os.environ.get("EXTRA_HEADERS_JSON", "")
+# "json" (default) or "protobuf". Some vendors' OTLP/HTTP endpoints only
+# accept Protobuf and reject OTLP/JSON (confirmed for Mackerel's log-feature
+# endpoint). Set to "protobuf" for those vendors when sending directly to
+# the vendor's endpoint (not through an OTel Collector, which already
+# sends Protobuf by default).
+OTLP_CONTENT_TYPE = os.environ.get("OTLP_CONTENT_TYPE", "json")
 
 # ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -249,28 +269,40 @@ def build_ems_otlp_payload(normalized: dict[str, Any]) -> dict[str, Any]:
 # ─── OTLP delivery ────────────────────────────────────────────────────────
 
 
-def _send_otlp_payload(payload: dict[str, Any], auth_headers: Optional[dict[str, str]] = None) -> bool:
+def _send_otlp_payload(
+    payload: dict[str, Any],
+    auth_headers: Optional[dict[str, str]] = None,
+    content_type: str = "json",
+) -> bool:
     """Send OTLP payload to the configured endpoint with retry.
 
     Args:
-        payload: OTLP JSON payload dict.
+        payload: OTLP-JSON-style payload dict.
         auth_headers: Optional additional headers for authentication.
+        content_type: "json" (default) or "protobuf" — see handler.py's
+            _send_otlp_payload docstring for the vendor-compatibility reason.
 
     Returns:
         True if successfully sent, False otherwise.
     """
     url = f"{OTLP_ENDPOINT}/v1/logs"
-    headers = {"Content-Type": "application/json"}
+
+    if content_type == "protobuf":
+        headers = {"Content-Type": "application/x-protobuf"}
+        body = encode_logs_data(payload)
+    else:
+        headers = {"Content-Type": "application/json"}
+        body = json.dumps(payload).encode("utf-8")
+
     if auth_headers:
         headers.update(auth_headers)
-    json_body = json.dumps(payload).encode("utf-8")
 
     for attempt in range(MAX_RETRIES):
         try:
             response = http.request(
                 "POST",
                 url,
-                body=json_body,
+                body=body,
                 headers=headers,
                 timeout=30.0,
             )
@@ -334,10 +366,22 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 if AUTH_MODE == "basic":
                     encoded = base64.b64encode(token.encode("utf-8")).decode("utf-8")
                     auth_headers = {"Authorization": f"Basic {encoded}"}
+                elif AUTH_MODE == "header":
+                    auth_headers = {AUTH_HEADER_NAME: token}
                 else:
                     auth_headers = {"Authorization": f"Bearer {token}"}
         except Exception as e:
             logger.warning("Could not retrieve auth token: %s", str(e))
+
+    if EXTRA_HEADERS_JSON:
+        try:
+            extra_headers = json.loads(EXTRA_HEADERS_JSON)
+            auth_headers = {**(auth_headers or {}), **extra_headers}
+        except json.JSONDecodeError:
+            logger.warning(
+                "EXTRA_HEADERS_JSON is not valid JSON, ignoring: %s",
+                EXTRA_HEADERS_JSON[:100],
+            )
 
     try:
         # Parse EMS event using shared layer
@@ -353,7 +397,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         payload = build_ems_otlp_payload(normalized)
 
         # Forward to OTel Collector
-        success = _send_otlp_payload(payload, auth_headers)
+        success = _send_otlp_payload(payload, auth_headers, OTLP_CONTENT_TYPE)
 
         if success:
             return {

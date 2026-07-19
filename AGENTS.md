@@ -349,6 +349,7 @@ Current state: 50 English files, 56 Japanese files (fully synced + 6 verificatio
 | Sumo Logic | `https://endpoint<N>.collection.sumologic.com/...` | Embedded in URL | 1MB | ❌ | |
 | Honeycomb | `https://api.honeycomb.io` | `x-honeycomb-team: <hcaik_key>` | 5MB | ❌ | ✅ Verified via otlp_http exporter + x-honeycomb-dataset header |
 | OTel (OTLP) | `http://<collector>:4318/v1/logs` | Configurable | Configurable | ❌ | ✅ Verified: Datadog + Grafana + Honeycomb multi-backend (0.152.0) |
+| Mackerel | `https://otlp-vaxila.mackerelio.com` (OTLP/HTTP only) | `Mackerel-Api-Key: <key>` header | ~3.5MB (`sending_queue.batch.max_size` bytes) | ❌ | 📋 Planning only — Mackerel's own log feature is open beta (2026-07-16); no Lambda/`template.yaml` in this repo yet. Same endpoint/auth as Mackerel's tracing (APM) feature. See `integrations/mackerel/README.md`. |
 
 Sources: [Datadog Logs API](https://docs.datadoghq.com/api/latest/logs/) | [New Relic Log API](https://docs.newrelic.com/docs/enable-new-relic-logs-http-input/) | [Grafana Loki HTTP API](https://grafana.com/docs/loki/latest/reference/loki-http-api/) | [Splunk HEC](https://docs.splunk.com/Documentation/Splunk/9.4.0/Data/FormateventsforHTTPEventCollector) | [OpenTelemetry Lambda](https://github.com/open-telemetry/opentelemetry-lambda)
 
@@ -659,8 +660,14 @@ Full guide: `docs/ja/prerequisites.md` / `docs/en/prerequisites.md`
 8. Add pytest tests with mocked API responses
 9. Create `scripts/deploy.sh` (env-var driven, no hardcoded values)
 10. Create `scripts/cleanup.sh` as a thin wrapper calling `shared/scripts/cleanup-vendor.sh`
-11. Update root `README.md` vendor table (change 🚧 to ✅)
-12. Update `docs/{ja,en}/vendor-comparison.md`
+11. If the vendor needs a `.env.<vendor>.example` file (e.g. for local Docker Compose
+    validation), it will be silently caught by `.gitignore`'s blanket `.env.*` rule.
+    Force-add it explicitly: `git add -f integrations/otel-collector/.env.<vendor>.example`
+    (or the equivalent path). Do NOT loosen the `.env.*` rule itself — force-add each
+    new example file individually, matching the existing precedent for
+    `.env.example`, `.env.mackerel.example`, and `.env.triple.example`.
+12. Update root `README.md` vendor table (change 🚧 to ✅)
+13. Update `docs/{ja,en}/vendor-comparison.md`
 
 ### Cleanup Script Template
 

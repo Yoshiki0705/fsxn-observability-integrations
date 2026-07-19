@@ -24,6 +24,14 @@ See [Prerequisites Guide](../../docs/en/prerequisites.md) for ONTAP audit loggin
 >
 > Tested with `otel/opentelemetry-collector-contrib:0.152.0`. Lambda code unchanged across all backends.
 
+> **✅ Mackerel (open beta, E2E verified 2026-07-18 — both delivery paths)**
+>
+> | Backend | Status | Path |
+> |---------|--------|------|
+> | Mackerel (log feature) | ✅ Confirmed against a live Mackerel org (Free plan) via the `findLogs` GraphQL query, with all attributes intact | Collector-mediated: `otel-collector-config-mackerel.yaml`. Direct-send: Lambda `AUTH_MODE=header` + `AUTH_HEADER_NAME=Mackerel-Api-Key` + `EXTRA_HEADERS_JSON='{"Accept":"*/*"}'` + `OTLP_CONTENT_TYPE=protobuf` (Mackerel's OTLP endpoint rejects JSON — see `otlp_protobuf.py`) |
+>
+> Mackerel's own log feature is itself still an open beta (public since 2026-07-16, GA date TBD) with no data-retention guarantee, even though this config/code path is now confirmed working end-to-end. See [integrations/mackerel/README.md](../mackerel/README.md) for the full beta constraint list before using this for production alerting. See [Alternative: Mackerel Backend](#alternative-mackerel-backend-open-beta) below for setup steps.
+
 ## Architecture
 
 ```
@@ -124,6 +132,7 @@ bash scripts/test-local-multi-backend.sh
 | OTel Config (default) | `otel-collector-config.yaml` | Grafana Cloud + Honeycomb (otlp_http) |
 | OTel Config (Datadog) | `otel-collector-config-datadog.yaml` | Datadog exporter |
 | OTel Config (Triple) | `otel-collector-config-triple.yaml` | Datadog + Grafana + Honeycomb simultaneous |
+| OTel Config (Mackerel, beta) | `otel-collector-config-mackerel.yaml` | Mackerel exporter — ✅ E2E verified (2026-07-18) |
 | Docker Compose | `docker-compose.yaml` | Local OTel Collector (pinned 0.152.0) |
 | CloudFormation | `template.yaml` | AWS deployment template |
 
@@ -229,6 +238,61 @@ bash scripts/test-local-datadog.sh
 
 This proves the key architectural point: **Lambda code is UNCHANGED** — only the Collector config changes to route logs to Datadog.
 
+## Alternative: Mackerel Backend (Open Beta)
+
+> **✅ E2E verified (2026-07-18).** Mackerel's log feature itself remains an open beta (public since 2026-07-16; GA date TBD). See [integrations/mackerel/README.md](../mackerel/README.md) for the full beta constraint list (no data retention guarantee, unscheduled maintenance possible) before relying on this for production security monitoring.
+
+Mackerel's log feature accepts OTLP/HTTP only, using the **same endpoint and auth header as Mackerel's tracing (APM) feature**. No proprietary REST API exists for direct log ingestion.
+
+```bash
+# 1. Configure Mackerel credentials
+cp .env.mackerel.example .env.mackerel
+# Edit .env.mackerel with your MACKEREL_APIKEY (Write scope required)
+
+# 2. Start OTel Collector with Mackerel config
+# Option A: docker compose (if available)
+docker compose -f docker-compose-mackerel.yaml --env-file .env.mackerel up -d
+
+# Option B: docker run (fallback for Colima or environments without compose plugin)
+docker run -d --name otel-collector-mackerel \
+  -p 4318:4318 -p 13133:13133 \
+  -v $(pwd)/otel-collector-config-mackerel.yaml:/etc/otelcol-contrib/config.yaml \
+  --env-file .env.mackerel \
+  otel/opentelemetry-collector-contrib:0.152.0
+
+# 3. Verify health
+curl -f http://localhost:13133/
+
+# 4. Run automated test
+bash scripts/test-local-mackerel.sh
+```
+
+As with the Datadog path above, **Lambda code is UNCHANGED** — only the Collector config (`otel-collector-config-mackerel.yaml`) determines that logs route to Mackerel. To fan out to Mackerel *and* another backend simultaneously, add `otlphttp/mackerel` to the `exporters` list of an existing multi-backend pipeline (e.g., `otel-collector-config-triple.yaml`) instead of using this standalone config.
+
+**Auth pattern**:
+- Endpoint: `https://otlp-vaxila.mackerelio.com`
+- Auth: `Mackerel-Api-Key: <write-scoped-api-key>` header (not Basic Auth, not a bearer token)
+- The `Accept: */*` header is required per Mackerel's own documentation
+
+### Direct-Send Alternative (Skip the Collector)
+
+> **✅ E2E verified (2026-07-18).** Confirmed by calling `handler.py`'s actual `build_otlp_payload`/`_send_otlp_payload` functions directly against a real Mackerel API key.
+
+To send directly from Lambda to Mackerel's OTLP endpoint without a Collector in between, set these Lambda environment variables (available on `AuditLogShipperFunction`, `EmsShipperFunction`, and `FPolicyShipperFunction` — this required a small, generic addition to `handler.py`/`ems_handler.py`/`fpolicy_handler.py`, since the existing `bearer`/`basic` auth modes can't express a custom header name):
+
+```bash
+OTLP_ENDPOINT=https://otlp-vaxila.mackerelio.com
+AUTH_MODE=header
+AUTH_HEADER_NAME=Mackerel-Api-Key
+EXTRA_HEADERS_JSON={"Accept":"*/*"}
+OTLP_CONTENT_TYPE=protobuf
+API_KEY_SECRET_ARN=<secret ARN containing the write-scoped API key>
+```
+
+Or via `template.yaml` parameters: `AuthMode=header`, `AuthHeaderName=Mackerel-Api-Key`, `ExtraHeadersJson={"Accept":"*/*"}`, `OtlpContentType=protobuf`.
+
+> **`OTLP_CONTENT_TYPE=protobuf` is required for Mackerel.** Mackerel's OTLP endpoint only accepts Protobuf-encoded bodies and rejects OTLP/JSON with `{"code":400,"message":"json is not supported yet"}`. The direct-send Lambda path defaults to OTLP/JSON (`OTLP_CONTENT_TYPE=json`), so without this setting the send fails even with correct auth. A dependency-free hand-rolled Protobuf encoder (`lambda/otlp_protobuf.py`) implements this — no `protobuf`/`opentelemetry-proto` PyPI packages were added to keep the Lambda runtime dependency-free. This setting has no effect on the Collector-mediated path above, since the OTel Collector already sends Protobuf by default.
+
 ## Troubleshooting
 
 ### Timestamp Rejection
@@ -257,6 +321,31 @@ Basic Auth value must be `base64(instanceId:apiToken)` — NOT `instanceId:apiTo
 ### Honeycomb Auth
 
 Ingest API keys start with `hcaik_`. Environment keys (`hcxik_`) will NOT work for data ingestion.
+
+### Docker Desktop DNS Resolution ("server misbehaving")
+
+**Symptom**: The Collector's exporter logs show a DNS failure resolving your OTLP endpoint's hostname, e.g.:
+
+```
+error: "failed to make an HTTP request: Post \"https://<your-otlp-host>/v1/logs\": dial tcp: lookup <your-otlp-host> on 127.0.0.11:53: server misbehaving"
+```
+
+— even though `nslookup <your-otlp-host>` from the host machine (outside the container) resolves it without issue.
+
+**Cause**: this is a Docker Desktop issue with its embedded DNS resolver (`127.0.0.11`), observed while verifying the Mackerel integration. It is not specific to any one vendor's endpoint, and it is not a problem with your credentials or config — any OTLP endpoint hostname can intermittently trigger it.
+
+**Fix**: add an explicit public DNS server list to the `otel-collector` service in your `docker-compose*.yaml`:
+
+```yaml
+services:
+  otel-collector:
+    # ...
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+```
+
+`docker-compose-mackerel.yaml` has this enabled by default (uncommented); `docker-compose.yaml` and `docker-compose-datadog.yaml` include it as a commented-out block — uncomment it if you hit this symptom. If you're running the Collector on ECS Fargate instead of local Docker, this issue does not apply (Fargate tasks use the VPC's DNS resolver, not Docker Desktop's).
 
 ## Enterprise Documentation
 
