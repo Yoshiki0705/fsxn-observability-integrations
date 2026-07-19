@@ -100,6 +100,31 @@ aws cloudformation deploy \
 | First Parquet file to appear in S3 | Up to `BufferIntervalSeconds` (default 300s) after the first record is sent, or when the 64 MB buffer fills, whichever comes first |
 | Snowflake Storage Integration two-phase trust setup | ~5–10 minutes (create integration → `DESCRIBE INTEGRATION` → redeploy IAM role with Snowflake's account/external ID → re-verify) |
 
+### Full Parameter Reference
+
+**`template.yaml`** (`fsxn-lakehouse-retention` stack):
+
+| Parameter | Required | Default | Allowed values | Description |
+|---|---|---|---|---|
+| `RetentionBucketName` | ✅ | — | Valid S3 bucket name (3–63 chars, lowercase/digits/hyphens/periods) | Globally-unique new bucket for Parquet-converted audit logs. Must not already exist. |
+| `AthenaResultsBucketName` | ✅ | — | Valid S3 bucket name | Globally-unique new bucket for Athena query results. Must not already exist. |
+| `GlueDatabaseName` | ❌ | `fsxn_audit_lakehouse` | Any valid Glue database name | Change to avoid colliding with an existing database, or to namespace environments. |
+| `GlueTableName` | ❌ | `audit_logs` | Any valid Glue table name | — |
+| `BufferSizeMBs` | ❌ | `64` | `64`–`128` | 64 MB is the Firehose-enforced minimum once Parquet conversion is enabled. Larger = fewer, bigger Parquet files (better scan efficiency) at the cost of delivery latency. |
+| `BufferIntervalSeconds` | ❌ | `300` | `60`–`900` | Lower for fresher data in Athena/Snowflake sooner, at the cost of more, smaller Parquet files. |
+| `AthenaWorkgroupName` | ❌ | `fsxn-lakehouse-retention` | Any unique workgroup name in this account/region | — |
+| `AthenaScanLimitGB` | ❌ | `10` | `1`/`5`/`10`/`20`/`50`/`100`/`200`/`500` | Per-query scan cap (Athena bills per TB scanned). Fixed set of values because CloudFormation has no arithmetic intrinsic to convert an arbitrary GB figure to bytes — see the `AthenaScanLimitBytes` mapping in the template. Raise for production queries that legitimately scan more (e.g. a full-table scan across several years). |
+
+**`snowflake-role.yaml`** (`fsxn-lakehouse-retention-snowflake` stack, optional):
+
+| Parameter | Required | Default | Allowed values | Description |
+|---|---|---|---|---|
+| `RetentionBucketName` | ✅ | — | Must match the bucket created by `template.yaml` | The existing retention bucket to grant Snowflake read access to. |
+| `SnowflakeAccountId` | ❌ (Phase 1) / ✅ (Phase 2) | `''` (empty) | Empty, or exactly 12 digits | Leave empty for Phase 1 (own-account placeholder trust). Set to the 12-digit account ID portion of `STORAGE_AWS_IAM_USER_ARN` (from `DESCRIBE INTEGRATION`) for Phase 2. |
+| `SnowflakeExternalId` | ❌ (Phase 1) / ✅ (Phase 2) | `'snowflake-placeholder'` | Any string | Phase 1: leave at default (ignored, since own-account trust doesn't check it). Phase 2: set to the exact `STORAGE_AWS_EXTERNAL_ID` value from `DESCRIBE INTEGRATION`, copied verbatim including trailing `=` characters. |
+
+Every parameter above also has an inline description and `ParameterLabels` entry in the templates themselves, visible in the CloudFormation console's parameter form — the tables here are a quick-reference copy, not the sole source of truth.
+
 ### Caveat Discovered During Validation: Lake Formation
 
 If your AWS account has Lake Formation enabled (common in accounts that have ever used Lake Formation for any other Glue table), the Firehose delivery role's IAM policy granting `glue:GetTable` is **not sufficient by itself**. Firehose's `DataFormatConversionConfiguration` also requires Lake Formation permissions on the same principal, or the delivery stream creation fails with:
@@ -204,6 +229,82 @@ SELECT COUNT(*) AS total_records FROM audit_logs_ext;
 
 Because this pipeline's data lands in a **standard S3 bucket** rather than an FSx for ONTAP S3 Access Point, real Snowpipe auto-ingest (triggered by S3 Event Notifications) is expected to work directly — the `fsxn-lakehouse-integrations` project's Snowflake integration could not use auto-ingest against FSx for ONTAP S3 APs for exactly this reason (S3 Event Notifications are not supported on FSx for ONTAP S3 APs) and had to fall back to FPolicy + Lambda + SNS + Snowpipe REST API, or scheduled `COPY INTO`. This guide's architecture removes that constraint, since the standard S3 destination bucket supports S3 Event Notifications natively. (Snowpipe auto-ingest itself was not exercised in this verification — the External Table path above was — but the underlying S3 Event Notification capability this would depend on is a standard S3 bucket feature, unlike the FSx S3 AP case.)
 
+## Verified Deployment Paths
+
+Two deployment paths were run end-to-end during validation (2026-07-19/20, ap-northeast-1). Both started from a clean AWS account state (no pre-existing stacks) and both are safe to run in either order relative to each other, since `snowflake-role.yaml` only depends on `template.yaml`'s bucket, not the reverse.
+
+**Path A — Athena only** (no Snowflake):
+1. Run `bash integrations/lakehouse-retention/scripts/preflight-check.sh --region <your-region>` — confirms AWS credentials and reports whether Lake Formation is active in the account.
+2. `aws cloudformation deploy --template-file integrations/lakehouse-retention/template.yaml ...` (see [Deploying the Pipeline](#deploying-the-pipeline)).
+3. Send audit log JSON records into the same S3 bucket the vendor pipelines already write to (or, for a smoke test, `PutRecord`/`PutRecordBatch` directly to the Firehose delivery stream named in the `DeliveryStreamName` output).
+4. Wait up to `BufferIntervalSeconds` for the first Parquet file, then query with Athena using the `AthenaWorkgroupName` output.
+
+**Path B — Athena + Snowflake**:
+1. Steps 1–4 above (Path A), confirming Athena results are correct first — this isolates any Firehose/Glue issue from any Snowflake-specific issue.
+2. Deploy `snowflake-role.yaml` Phase 1 (own-account placeholder trust).
+3. In Snowflake, run the Phase 1 statements of `sql/01_storage_integration_and_stage.sql`, then `DESCRIBE INTEGRATION`.
+4. Redeploy `snowflake-role.yaml` Phase 2 with `SnowflakeAccountId`/`SnowflakeExternalId` set from the `DESCRIBE INTEGRATION` output.
+5. Run the remaining statements in `sql/01_storage_integration_and_stage.sql` (`CREATE STAGE`, `LIST`, `CREATE EXTERNAL TABLE`, `REFRESH`).
+6. Compare `SELECT COUNT(*)` between Athena and the Snowflake External Table against the same underlying Parquet data — they should match exactly, since both read the same S3 objects.
+
+## Day 2 Operations
+
+- **Verify new partitions are queryable**: Partition Projection means new `year=/month=/day=` partitions do not need a Glue Crawler run or `MSCK REPAIR TABLE` — they become queryable in Athena as soon as the corresponding S3 prefix has at least one Parquet object. Confirm this periodically (e.g. `SELECT COUNT(*) WHERE year='<current year>' AND month='<current month>'`) rather than assuming it silently.
+- **Monitor Firehose delivery health**: Check the `FirehoseLogGroup` (`/aws/kinesisfirehose/<stack-name>`) for `DataFormatConversionConfiguration` failures — malformed source JSON records that don't match the Glue table's column definitions land in the `errors/` S3 prefix (`ErrorOutputPrefix`) rather than failing silently. Review that prefix periodically; a growing error count usually indicates a schema drift in the upstream audit log format.
+- **Review the Athena scan cap periodically**: If legitimate queries start hitting `AthenaScanLimitGB`'s `BytesScannedCutoffPerQuery` limit (query fails with an Athena `QUERY_TIMEOUT`/scan-limit error) as the dataset grows across years, raise `AthenaScanLimitGB` to the next allowed value and redeploy — this is an expected operational adjustment, not a failure to plan for.
+- **Confirm lifecycle transitions are happening**: The retention bucket's lifecycle policy moves objects to S3 Standard-IA at 90 days and S3 Glacier Instant Retrieval at 365 days. Check `aws s3api list-objects-v2 --bucket <RetentionBucketName> --query "Contents[].StorageClass"` periodically (e.g. quarterly) to confirm older partitions have actually transitioned, since a lifecycle policy misconfiguration would otherwise only surface as an unexpectedly high storage bill.
+- **Snowflake External Table freshness** (if used): `AUTO_REFRESH = FALSE` in this guide's example means the External Table's metadata must be refreshed manually (`ALTER EXTERNAL TABLE audit_logs_ext REFRESH;`) or on a schedule (a Snowflake Task, or an external scheduler calling the same statement) to pick up newly-arrived Parquet files. This is a deliberate choice to avoid depending on Snowpipe auto-ingest infrastructure for this initial guide; see [Architectural Difference from the FSx S3 AP Snowflake Path](#architectural-difference-from-the-fsx-s3-ap-snowflake-path) for the auto-ingest option.
+- **Periodic access review**: Since this pipeline exposes potentially sensitive fields (`username`, `clientip`, `objectname`) to anyone with Athena/Snowflake query access to this table, periodically review who has that access against your organization's data classification policy (see [Data Classification Guide](data-classification.md)).
+
+## Rollback and Cleanup
+
+Cleanup order matters — deleting resources out of order produces avoidable CloudFormation `DELETE_FAILED` states.
+
+```bash
+# 1. Delete the Athena workgroup FIRST if any queries were ever run against it.
+#    AWS::Athena::WorkGroup deletion through CloudFormation fails with query
+#    history still attached; --recursive-delete-option is a CLI-only flag,
+#    not available as a CloudFormation stack-level setting, so this step
+#    must be run manually before stack deletion.
+aws athena delete-work-group \
+  --work-group <AthenaWorkgroupName> \
+  --recursive-delete-option \
+  --region <your-region>
+
+# 2. Empty both S3 buckets. RetentionBucket has versioning enabled, so a
+#    plain `aws s3 rm --recursive` deletes current objects but leaves old
+#    versions and delete markers behind — CloudFormation stack deletion of a
+#    non-empty (even if "logically empty") versioned bucket fails.
+aws s3api list-object-versions --bucket <RetentionBucketName> --output json | \
+  python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+objs = [{'Key': v['Key'], 'VersionId': v['VersionId']}
+        for v in d.get('Versions', []) + d.get('DeleteMarkers', [])]
+print(json.dumps({'Objects': objs}))
+" > /tmp/lakehouse-versions.json
+aws s3api delete-objects --bucket <RetentionBucketName> --delete file:///tmp/lakehouse-versions.json
+rm -f /tmp/lakehouse-versions.json
+
+aws s3 rm s3://<AthenaResultsBucketName> --recursive --region <your-region>
+
+# 3. Delete the Snowflake role stack (if deployed) and the main stack. Order
+#    between these two does not matter -- snowflake-role.yaml has no
+#    CloudFormation-level dependency on template.yaml (it only references
+#    the bucket NAME as a parameter string, not a cross-stack !ImportValue),
+#    so either can be deleted first or independently of the other.
+aws cloudformation delete-stack --stack-name fsxn-lakehouse-retention-snowflake --region <your-region>
+aws cloudformation delete-stack --stack-name fsxn-lakehouse-retention --region <your-region>
+
+# 4. (Snowflake side, if used) Drop the Snowflake-side objects independently
+#    -- they are not managed by CloudFormation and will not be cleaned up by
+#    deleting the AWS stacks above.
+#    In Snowflake: DROP EXTERNAL TABLE audit_logs_ext; DROP STAGE audit_logs_stage;
+#    DROP STORAGE INTEGRATION fsxn_lakehouse_retention_integration;
+```
+
+If a stack deletion still fails after following the above (e.g. a `DELETE_FAILED` state persists), check the specific resource named in the CloudFormation console's "Status reason" column before retrying — retrying a `delete-stack` without addressing the underlying resource-in-use condition (an S3 bucket that still has objects, a Lake Formation permission that was independently revoked out-of-band, etc.) will fail again with the same error.
+
 ## Cost Comparison
 
 | Component | Approximate monthly cost driver | Notes |
@@ -217,6 +318,7 @@ Because this pipeline's data lands in a **standard S3 bucket** rather than an FS
 
 ## Related Documents
 
+- [integrations/lakehouse-retention/README.md](../../integrations/lakehouse-retention/README.md) — quick-start pointer, deployment time estimates, and the pre-flight check script
 - [Vendor Comparison](vendor-comparison.md)
 - [Data Classification Guide](data-classification.md)
 - [Pipeline SLO Definitions](pipeline-slo.md)

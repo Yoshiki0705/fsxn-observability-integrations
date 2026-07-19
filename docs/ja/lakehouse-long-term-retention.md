@@ -99,6 +99,31 @@ aws cloudformation deploy \
 | 最初のParquetファイルがS3に出現するまで | 最初のレコード送信後、`BufferIntervalSeconds`（デフォルト300秒）経過時、または64MBバッファが満杯になった時点のいずれか早い方 |
 | Snowflake Storage Integration の2段階トラスト設定 | 約5〜10分（Integration作成 → `DESCRIBE INTEGRATION` → SnowflakeのアカウントID/External IDでIAMロール再デプロイ → 再確認） |
 
+### パラメーター完全リファレンス
+
+**`template.yaml`**（`fsxn-lakehouse-retention` スタック）:
+
+| パラメーター | 必須 | デフォルト | 許可される値 | 説明 |
+|---|---|---|---|---|
+| `RetentionBucketName` | ✅ | — | 有効なS3バケット名（3〜63文字、小文字/数字/ハイフン/ピリオド） | Parquet変換済み監査ログ用の、グローバルに一意な新規バケット。既存であってはならない。 |
+| `AthenaResultsBucketName` | ✅ | — | 有効なS3バケット名 | Athenaクエリ結果用の、グローバルに一意な新規バケット。既存であってはならない。 |
+| `GlueDatabaseName` | ❌ | `fsxn_audit_lakehouse` | 有効なGlueデータベース名 | 既存データベースとの衝突回避、または環境の名前空間分けに変更。 |
+| `GlueTableName` | ❌ | `audit_logs` | 有効なGlueテーブル名 | — |
+| `BufferSizeMBs` | ❌ | `64` | `64`〜`128` | Parquet変換有効時、64 MBがFirehoseの最小強制値。大きくするほどParquetファイルが少数・大サイズになり（バイトあたりのクエリ効率が向上）、配信レイテンシとのトレードオフ。 |
+| `BufferIntervalSeconds` | ❌ | `300` | `60`〜`900` | Athena/Snowflakeでより新しいデータが必要な場合は小さくする。ファイル数増加・サイズ縮小とのトレードオフ。 |
+| `AthenaWorkgroupName` | ❌ | `fsxn-lakehouse-retention` | このアカウント/リージョンで一意なワークグループ名 | — |
+| `AthenaScanLimitGB` | ❌ | `10` | `1`/`5`/`10`/`20`/`50`/`100`/`200`/`500` | クエリごとのスキャン上限（AthenaはスキャンTBあたり課金）。CloudFormationにはGBをバイトに変換する算術組み込み関数がないため、固定の値セットに限定（テンプレート内の `AthenaScanLimitBytes` マッピングを参照）。数年分のフルテーブルスキャンなど、正当に多くスキャンする本番クエリでは値を上げる。 |
+
+**`snowflake-role.yaml`**（`fsxn-lakehouse-retention-snowflake` スタック、任意）:
+
+| パラメーター | 必須 | デフォルト | 許可される値 | 説明 |
+|---|---|---|---|---|
+| `RetentionBucketName` | ✅ | — | `template.yaml` が作成したバケット名と一致する必要あり | Snowflakeに読み取りアクセスを許可する既存の保管用バケット。 |
+| `SnowflakeAccountId` | ❌（Phase 1） / ✅（Phase 2） | `''`（空） | 空、または正確に12桁の数字 | Phase 1では空のままにする（自アカウントのプレースホルダートラスト）。Phase 2では `DESCRIBE INTEGRATION` の `STORAGE_AWS_IAM_USER_ARN` から12桁のアカウントID部分を設定。 |
+| `SnowflakeExternalId` | ❌（Phase 1） / ✅（Phase 2） | `'snowflake-placeholder'` | 任意の文字列 | Phase 1: デフォルトのままにする（自アカウントトラストではこの値はチェックされない）。Phase 2: `DESCRIBE INTEGRATION` の `STORAGE_AWS_EXTERNAL_ID` の値を、末尾の `=` を含めてそのままコピーして設定。 |
+
+上記の各パラメーターには、テンプレート自体にもインラインの説明と `ParameterLabels` エントリがあり、CloudFormationコンソールのパラメーター入力フォームで確認できます。ここの表はクイックリファレンスであり、唯一の情報源ではありません。
+
 ### 検証時に判明した注意点: Lake Formation
 
 アカウントで Lake Formation が有効な場合（他のGlueテーブルで一度でも Lake Formation を使ったことがあるアカウントでは一般的）、Firehose 配信ロールの IAM ポリシーで `glue:GetTable` を許可しているだけでは**不十分**です。Firehose の `DataFormatConversionConfiguration` は同じプリンシパルに対する Lake Formation 権限も別途要求し、なければ配信ストリームの作成が以下のエラーで失敗します。
@@ -203,6 +228,81 @@ SELECT COUNT(*) AS total_records FROM audit_logs_ext;
 
 本パイプラインのデータは FSx for ONTAP S3 Access Point ではなく**通常のS3バケット**に着地するため、S3イベント通知によってトリガーされる実際の Snowpipe 自動取り込みが直接動作すると予想されます。`fsxn-lakehouse-integrations` プロジェクトの Snowflake 統合は、まさにこの理由（FSx for ONTAP S3 AP は S3イベント通知非対応）で FSx for ONTAP S3 AP に対して自動取り込みを使えず、FPolicy + Lambda + SNS + Snowpipe REST API、またはスケジュール実行の `COPY INTO` にフォールバックする必要がありました。本ガイドのアーキテクチャは、保管先の標準S3バケットがS3イベント通知をネイティブにサポートするため、この制約を取り除いています（本検証では Snowpipe 自動取り込み自体は実施しておらず、上記External Tableパスを検証しました。ただし自動取り込みが依存するS3イベント通知機能自体は、FSx S3 APとは異なり通常のS3バケットの標準機能です）。
 
+## 検証済みデプロイパス
+
+検証時（2026年7月19日/20日、ap-northeast-1）に、2つのデプロイパスをE2Eで実行しました。いずれもクリーンなAWSアカウント状態（既存スタックなし）から開始し、`snowflake-role.yaml` は `template.yaml` のバケットにのみ依存するため（逆方向の依存はなし）、どちらを先にデプロイしても問題ありません。
+
+**パスA — Athenaのみ**（Snowflakeなし）:
+1. `bash integrations/lakehouse-retention/scripts/preflight-check.sh --region <対象リージョン>` を実行 — AWS認証情報を確認し、アカウントでLake Formationが有効かどうかを報告します。
+2. `aws cloudformation deploy --template-file integrations/lakehouse-retention/template.yaml ...`（[パイプラインのデプロイ](#パイプラインのデプロイ) 参照）。
+3. ベンダーパイプラインが既に書き込んでいる同じS3バケットに監査ログJSONレコードを送信する（あるいはスモークテストとして、`DeliveryStreamName` 出力にあるFirehose配信ストリームに直接 `PutRecord`/`PutRecordBatch` する）。
+4. 最初のParquetファイルが出現するまで `BufferIntervalSeconds` 分待ち、`AthenaWorkgroupName` 出力を使ってAthenaでクエリする。
+
+**パスB — Athena + Snowflake**:
+1. 上記パスAの手順1〜4（先にAthenaの結果が正しいことを確認する — これによりFirehose/Glue側の問題とSnowflake固有の問題を分離できる）。
+2. `snowflake-role.yaml` のPhase 1（自アカウントのプレースホルダートラスト）をデプロイ。
+3. Snowflakeで `sql/01_storage_integration_and_stage.sql` のPhase 1ステートメントを実行し、`DESCRIBE INTEGRATION` を実行。
+4. `DESCRIBE INTEGRATION` の出力から `SnowflakeAccountId`/`SnowflakeExternalId` を設定して `snowflake-role.yaml` のPhase 2を再デプロイ。
+5. `sql/01_storage_integration_and_stage.sql` の残りのステートメント（`CREATE STAGE`、`LIST`、`CREATE EXTERNAL TABLE`、`REFRESH`）を実行。
+6. 同じ元のParquetデータに対して、AthenaとSnowflake External Tableの `SELECT COUNT(*)` を比較する — 両方が同じS3オブジェクトを読み取るため、完全に一致するはずです。
+
+## Day 2 運用
+
+- **新しいパーティションがクエリ可能か確認**: Partition Projectionでは、新しい `year=/month=/day=` パーティションに対してGlueクローラーの実行や `MSCK REPAIR TABLE` は不要です — 対応するS3プレフィックスに1件でもParquetオブジェクトがあれば即座にAthenaでクエリ可能になります。これを暗黙に信頼せず、定期的に確認してください（例: `SELECT COUNT(*) WHERE year='<現在の年>' AND month='<現在の月>'`）。
+- **Firehose配信の健全性を監視**: `FirehoseLogGroup`（`/aws/kinesisfirehose/<スタック名>`）で `DataFormatConversionConfiguration` の失敗を確認してください — Glueテーブルのカラム定義と一致しない不正な形式のソースJSONレコードは、サイレントに失敗するのではなく `errors/` S3プレフィックス（`ErrorOutputPrefix`）に配置されます。このプレフィックスを定期的に確認してください。エラー件数の増加は通常、上流の監査ログ形式のスキーマドリフトを示します。
+- **Athenaスキャン上限を定期的に見直す**: データセットが数年分に増えるにつれ、正当なクエリが `AthenaScanLimitGB` の `BytesScannedCutoffPerQuery` 制限に達し始めた場合（Athenaのスキャン上限エラーでクエリが失敗）、`AthenaScanLimitGB` を次に許可された値に上げて再デプロイしてください — これは想定される運用上の調整であり、計画不足を示すものではありません。
+- **ライフサイクル移行が実際に発生しているか確認**: 保管バケットのライフサイクルポリシーは、90日でS3標準低頻度アクセスへ、365日でS3 Glacier Instant Retrievalへオブジェクトを移行します。`aws s3api list-objects-v2 --bucket <RetentionBucketName> --query "Contents[].StorageClass"` を定期的に（例: 四半期ごとに）確認し、古いパーティションが実際に移行しているかを確認してください。ライフサイクルポリシーの設定ミスは、そうしないと予想外に高いストレージ料金としてしか表面化しません。
+- **Snowflake External Tableの鮮度**（利用する場合）: 本ガイドの例では `AUTO_REFRESH = FALSE` のため、新しく到着したParquetファイルを取り込むには External Table のメタデータを手動で更新（`ALTER EXTERNAL TABLE audit_logs_ext REFRESH;`）するか、スケジュール実行する（Snowflake Task、または同じステートメントを呼ぶ外部スケジューラー）必要があります。これは、本ガイドの最初の段階でSnowpipe自動取り込みのインフラに依存しないための意図的な選択です。自動取り込みの選択肢については [FSx S3 AP 版 Snowflake パスとの構成上の違い](#fsx-s3-ap-版-snowflake-パスとの構成上の違い) を参照してください。
+- **定期的なアクセスレビュー**: このパイプラインは機密性を持ちうるフィールド（`username`・`clientip`・`objectname`）をこのテーブルへのAthena/Snowflakeクエリアクセス権を持つ全員に公開するため、そのアクセス権を持つ人を組織のデータ分類ポリシーに照らして定期的にレビューしてください（[データ分類ガイド](data-classification.md) 参照）。
+
+## ロールバックとクリーンアップ
+
+クリーンアップの順序は重要です — 順序を誤ると、回避可能なCloudFormationの `DELETE_FAILED` 状態が発生します。
+
+```bash
+# 1. クエリを一度でも実行したことがある場合、Athenaワークグループを最初に削除する。
+#    CloudFormation経由の AWS::Athena::WorkGroup 削除は、クエリ履歴が残っていると失敗する。
+#    --recursive-delete-option はCLI専用のフラグであり、CloudFormationスタックレベルの
+#    設定としては利用できないため、スタック削除前に手動で実行する必要がある。
+aws athena delete-work-group \
+  --work-group <AthenaWorkgroupName> \
+  --recursive-delete-option \
+  --region <対象リージョン>
+
+# 2. 両方のS3バケットを空にする。RetentionBucketはバージョニングが有効なため、
+#    単純な `aws s3 rm --recursive` では現行オブジェクトは削除されるが、
+#    古いバージョンと削除マーカーが残る -- 論理的に空でもバージョン管理された
+#    バケットが空でないと、CloudFormationのスタック削除は失敗する。
+aws s3api list-object-versions --bucket <RetentionBucketName> --output json | \
+  python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+objs = [{'Key': v['Key'], 'VersionId': v['VersionId']}
+        for v in d.get('Versions', []) + d.get('DeleteMarkers', [])]
+print(json.dumps({'Objects': objs}))
+" > /tmp/lakehouse-versions.json
+aws s3api delete-objects --bucket <RetentionBucketName> --delete file:///tmp/lakehouse-versions.json
+rm -f /tmp/lakehouse-versions.json
+
+aws s3 rm s3://<AthenaResultsBucketName> --recursive --region <対象リージョン>
+
+# 3. Snowflakeロールスタック（デプロイした場合）とメインスタックを削除する。
+#    両者の削除順序は関係ない -- snowflake-role.yaml は template.yaml に対する
+#    CloudFormationレベルの依存関係を持たない（バケット名をパラメーター文字列として
+#    参照するのみで、クロススタックの !ImportValue ではない）ため、
+#    どちらを先に、あるいは独立して削除しても構わない。
+aws cloudformation delete-stack --stack-name fsxn-lakehouse-retention-snowflake --region <対象リージョン>
+aws cloudformation delete-stack --stack-name fsxn-lakehouse-retention --region <対象リージョン>
+
+# 4. （Snowflake側、利用した場合）Snowflake側のオブジェクトは個別にドロップする
+#    -- これらはCloudFormationで管理されておらず、上記AWSスタック削除では
+#    クリーンアップされない。
+#    Snowflakeで: DROP EXTERNAL TABLE audit_logs_ext; DROP STAGE audit_logs_stage;
+#    DROP STORAGE INTEGRATION fsxn_lakehouse_retention_integration;
+```
+
+上記の手順を実行してもスタック削除が失敗する場合（`DELETE_FAILED` 状態が続く場合）、再試行の前にCloudFormationコンソールの「ステータスの理由」列に記載されている具体的なリソースを確認してください。根本原因（オブジェクトが残っているS3バケット、アウトオブバンドで個別に取り消されたLake Formation権限など）に対処せずに `delete-stack` を再試行しても、同じエラーで再度失敗します。
+
 ## コスト比較
 
 | コンポーネント | 月額コストの主な要因 | 補足 |
@@ -216,6 +316,7 @@ SELECT COUNT(*) AS total_records FROM audit_logs_ext;
 
 ## 関連ドキュメント
 
+- [integrations/lakehouse-retention/README.md](../../integrations/lakehouse-retention/README.md) — クイックスタートの参照先、デプロイ時間の見積もり、事前チェックスクリプト
 - [ベンダー比較](vendor-comparison.md)
 - [データ分類ガイド](data-classification.md)
 - [パイプライン SLO 定義](pipeline-slo.md)
