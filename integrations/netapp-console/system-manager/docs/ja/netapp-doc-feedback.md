@@ -133,7 +133,7 @@ FSx for ONTAP で System Manager / NetApp Console を利用する際に、ドキ
 
 **問題**: Link（Lambda）を作成して NetApp Console から System Manager にアクセスする際、どのデータが NetApp の SaaS 基盤（`console.netapp.com`）に送信されるかがドキュメントに明記されていない。
 
-**影響**: データレジデンシー要件がある顧客（金融、公共、医療）が、NetApp Console の利用可否を判断できない。
+**影響**: データレジデンシー要件がある組織（金融、公共、医療）が、NetApp Console の利用可否を判断できない。
 
 **確認すべき項目**:
 - ONTAP REST API のレスポンスデータは NetApp SaaS を経由するのか、ブラウザに直接返されるのか
@@ -144,5 +144,5 @@ FSx for ONTAP で System Manager / NetApp Console を利用する際に、ドキ
 
 **提案**:
 - NetApp Console のデータフロー図（どのデータがどこを通るか）をドキュメントに追加
-- 「NetApp SaaS に保存されるデータ」と「顧客 VPC 内に留まるデータ」の明確な区別
-- データレジデンシー要件がある顧客向けの代替構成（セルフホスト管理コンソール等）の案内
+- 「NetApp SaaS に保存されるデータ」と「ユーザーの VPC 内に留まるデータ」の明確な区別
+- データレジデンシー要件がある組織向けの代替構成（セルフホスト管理コンソール等）の案内

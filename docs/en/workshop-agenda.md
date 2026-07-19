@@ -37,7 +37,7 @@
 
 ## Pre-Workshop Checklist (Facilitator)
 
-- [ ] AWS sandbox account provisioned (or customer provides)
+- [ ] AWS sandbox account provisioned (or organization provides)
 - [ ] FSx for ONTAP file system running with audit logging enabled
 - [ ] S3 bucket + Access Point deployed (prerequisites stack)
 - [ ] Vendor account created (free tier recommended)
@@ -108,8 +108,8 @@ aws cloudformation delete-stack --stack-name fsxn-observability-prerequisites
 | Deliverable | Owner | Due |
 |-------------|-------|-----|
 | Workshop feedback form | Facilitator | Same day |
-| PoC Report (if customer engagement) | Partner/SA | +3 days |
-| Go/No-Go recommendation | Customer + Partner | +1 week |
+| PoC Report (if organization engagement) | Partner/SA | +3 days |
+| Go/No-Go recommendation | Organization + Partner | +1 week |
 | Production deployment plan (if Go) | Platform team | +2 weeks |
 
 ## Customization Notes

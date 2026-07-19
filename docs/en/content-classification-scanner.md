@@ -27,7 +27,7 @@ This guide implements that content-level scan using Amazon Comprehend's managed 
 - Against a [FlexClone verification access point](verified-recovery-point-guide.md) immediately after ransomware verification, combining both scans against the same isolated clone
 - Before onboarding a volume to a new observability/SIEM destination, to confirm what a forensics dashboard or exported log sample might expose
 
-> **Customer-facing positioning note**: The accurate positioning here is "content-level PII discovery for plain-text/structured-data formats," not "PII discovery" unqualified — the [Remaining Limitations](#remaining-limitations) section below is explicit that Office/PDF content is out of scope today. In a customer conversation, especially one where the customer's data is dominated by Office documents, lead with the schema-level [Data Classification Guide](data-classification.md) as the complete-coverage layer and this scanner as the content-level complement for the formats it does cover, rather than implying this scanner alone provides comprehensive content-level PII coverage across all file types.
+> **Positioning note**: The accurate positioning here is "content-level PII discovery for plain-text/structured-data formats," not "PII discovery" unqualified — the [Remaining Limitations](#remaining-limitations) section below is explicit that Office/PDF content is out of scope today. In an engagement conversation, especially one where the organization's data is dominated by Office documents, lead with the schema-level [Data Classification Guide](data-classification.md) as the complete-coverage layer and this scanner as the content-level complement for the formats it does cover, rather than implying this scanner alone provides comprehensive content-level PII coverage across all file types.
 
 ---
 
@@ -264,7 +264,7 @@ Before pointing this scanner at real data, confirm it works end-to-end against a
 # 1. Create a synthetic PII file — no real personal data, safe to commit
 #    to a scratch location or delete immediately after the test
 cat > /tmp/pii-test-sample.txt <<'EOF'
-Customer Support Ticket #48213
+Support Ticket #48213
 Name: John Sample Doe
 Email: john.sample.doe@example.com
 Phone: 555-0142-9981

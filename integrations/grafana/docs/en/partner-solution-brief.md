@@ -2,15 +2,15 @@
 
 🌐 [日本語](../ja/partner-solution-brief.md) | **English** (this page)
 
-## Target Customers
+## Target Users
 
 - FSx for ONTAP users running enterprise file services (NAS consolidation, home directories, shared drives)
 - SAP / Oracle / SQL Server / business-critical application workloads on EC2 with FSx for ONTAP storage
 - VDI / EUC environments with FSx for ONTAP user profile or data storage
-- Customers needing file access visibility, ransomware-related alerting, or audit compliance
+- Organizations needing file access visibility, ransomware-related alerting, or audit compliance
 - Organizations evaluating Grafana Cloud as their observability platform
 
-## Customer Pains Addressed
+## Problems Addressed
 
 | Pain | How This Solution Helps |
 |------|------------------------|
@@ -68,7 +68,7 @@ After PoC, evaluate these for production readiness:
 
 ## Responsibility Split
 
-| Area | Partner / SI | Customer | AWS |
+| Area | Partner / SI | Organization | AWS |
 |------|-------------|----------|-----|
 | CloudFormation deployment | Lead | Approve | Support |
 | ONTAP audit/EMS/FPolicy config | Advise | Execute | — |

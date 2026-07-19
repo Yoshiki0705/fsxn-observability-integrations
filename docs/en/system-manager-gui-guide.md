@@ -40,9 +40,9 @@ To use System Manager with FSx for ONTAP, the following setup is required:
 #### Step 1: Create a NetApp Account (NSS)
 
 1. Go to [NetApp User Registration](https://mysupport.netapp.com/site/user/registration)
-2. Select **NetApp Customer/End User** access level
+2. Select the **NetApp Customer/End User** access level (this is the literal label of the UI option — the underlying access tier is end-user/standard, not vendor-support)
 3. Enter your FSx for ONTAP **File System ID** in the **SERIAL NUMBER** field
-4. After registration, Customer Level access is granted within 1 business day
+4. After registration, end-user-level access is granted within 1 business day
 
 > **Note**: Account creation is free. Support case filing requires a paid support contract, but this is NOT needed for System Manager usage.
 

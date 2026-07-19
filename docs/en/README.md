@@ -95,7 +95,7 @@ This project provides an **EC2-free** alternative using Lambda + ECS Fargate.
 
 This project helps partners modernize EC2-based FSx for ONTAP audit log collectors into an EC2-free, vendor-neutral observability pipeline.
 
-Common customer scenarios:
+Common usage scenarios:
 - Replacing Splunk Universal Forwarder on EC2
 - Modernizing audit visibility for enterprise file shares
 - Integrating FSx for ONTAP with existing SIEM / observability platforms

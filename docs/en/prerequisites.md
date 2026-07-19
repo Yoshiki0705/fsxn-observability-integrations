@@ -494,7 +494,7 @@ This project supports multiple deployment patterns:
 |---------|-------------|-------------|
 | Same-account local | FSx + Lambda + vendor integration in one account | Single workload, simplest setup |
 | Centralized logging | Workload accounts expose telemetry to a central observability account | Enterprise with shared security/logging account |
-| Partner/MSP managed | Customer workload account + partner-operated integration | Managed service offerings |
+| Partner/MSP managed | User workload account + partner-operated integration | Managed service offerings |
 
 For multi-account deployments, cross-account S3 Access Point access and IAM trust relationships are required. See the [operational guide](operational-guide.md) for details.
 

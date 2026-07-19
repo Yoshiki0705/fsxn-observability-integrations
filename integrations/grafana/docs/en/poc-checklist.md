@@ -42,7 +42,7 @@ Use this checklist to validate a Proof of Concept deployment before presenting r
 | Logs arrive in Grafana within schedule interval | | |
 | Alerts fire on test events | | |
 | DLQ replay procedure documented | | |
-| Production gaps accepted by customer | | |
+| Production gaps accepted by organization | | |
 | Cost estimate reviewed (Lambda + Grafana ingest) | | |
 | Webhook auth mode agreed | | |
 
@@ -99,4 +99,4 @@ Track these KPIs to demonstrate PoC value:
 | Mean poller duration | < 60% of schedule interval | CloudWatch Lambda Duration p95 |
 | Scheduler DLQ count | 0 | SQS metric |
 | Security owner approval | Signed off | Webhook auth mode agreed |
-| Customer sign-off | Documented | At-least-once semantics accepted |
+| Organization sign-off | Documented | At-least-once semantics accepted |

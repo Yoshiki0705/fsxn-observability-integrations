@@ -128,7 +128,7 @@ ONTAP System Manager is the built-in GUI management tool for ONTAP. **System Man
 
 - Operations staff familiar with Windows File Resource Manager
 - Teams that need storage management without CLI expertise
-- Customers requesting GUI-based audit log and quota configuration
+- Users/organizations requesting GUI-based audit log and quota configuration
 
 ### Verified Operations
 

@@ -110,7 +110,7 @@ aws dynamodb query \
 
 ```bash
 cat > /tmp/pii-test-sample.txt <<'EOF'
-Customer Support Ticket #48213
+Support Ticket #48213
 Name: John Sample Doe
 Email: john.sample.doe@example.com
 Phone: 555-0142-9981
