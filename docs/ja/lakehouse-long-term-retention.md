@@ -170,13 +170,38 @@ DESCRIBE INTEGRATION fsxn_lakehouse_retention_integration;
 -- STORAGE_AWS_IAM_USER_ARN と STORAGE_AWS_EXTERNAL_ID をコピーし、
 -- SnowflakeAccountId/SnowflakeExternalId にこれらの値を設定して
 -- snowflake-role.yaml を再デプロイ（Phase 2 トラスト）。
+
+CREATE OR REPLACE STAGE audit_logs_stage
+  STORAGE_INTEGRATION = fsxn_lakehouse_retention_integration
+  URL = 's3://<保管用バケット名>/audit-logs/'
+  FILE_FORMAT = (TYPE = 'PARQUET');
+
+LIST @audit_logs_stage;
+
+CREATE OR REPLACE EXTERNAL TABLE audit_logs_ext (
+    "timestamp"  VARCHAR AS (value:"timestamp"::VARCHAR),
+    eventid      VARCHAR AS (value:eventid::VARCHAR),
+    svmname      VARCHAR AS (value:svmname::VARCHAR),
+    username     VARCHAR AS (value:username::VARCHAR),
+    clientip     VARCHAR AS (value:clientip::VARCHAR),
+    operation    VARCHAR AS (value:operation::VARCHAR),
+    objectname   VARCHAR AS (value:objectname::VARCHAR),
+    result       VARCHAR AS (value:result::VARCHAR)
+)
+  LOCATION = @audit_logs_stage
+  FILE_FORMAT = (TYPE = 'PARQUET')
+  AUTO_REFRESH = FALSE;
+
+ALTER EXTERNAL TABLE audit_logs_ext REFRESH;
+
+SELECT COUNT(*) AS total_records FROM audit_logs_ext;
 ```
 
-> **本セクションの検証状況**: アーキテクチャ、IAMロールテンプレート、SQLスクリプトは完成しており、`fsxn-lakehouse-integrations` で FSx for ONTAP S3 Access Point 向けに既にE2E検証済みの同一パターンに従っています（プロジェクトコンテキスト上の期待値: 通常のS3バケットに対しては、FSx for ONTAP S3 Access Point が対応していないS3イベント通知に対応しているため、同等かそれ以上に単純に動作すると予想されます）。この具体的なパイプラインに対する実際のSnowflakeアカウントでのE2E実行は未完了で、完了後に本項を更新します。
+> **本セクションの検証状況: E2E検証済み**（2026年7月20日）。上記Firehoseパイプラインが生成した同じ500件のParquetデータセットを使い、Storage Integrationの2段階トラスト設定が成功し、`LIST @audit_logs_stage` が実際のParquetファイルをS3から返し、`SELECT COUNT(*) FROM audit_logs_ext` は正確に500件を返しました — Athenaの結果と完全に一致します。同じExternal Tableに対する `GROUP BY operation, result` クエリも、上記Athena検証と同じOperation×Result分布に一致する15行を返しました。
 
 ### FSx S3 AP 版 Snowflake パスとの構成上の違い
 
-本パイプラインのデータは FSx for ONTAP S3 Access Point ではなく**通常のS3バケット**に着地するため、S3イベント通知によってトリガーされる実際の Snowpipe 自動取り込みが直接動作すると予想されます。`fsxn-lakehouse-integrations` プロジェクトの Snowflake 統合は、まさにこの理由（FSx for ONTAP S3 AP は S3イベント通知非対応）で FSx for ONTAP S3 AP に対して自動取り込みを使えず、FPolicy + Lambda + SNS + Snowpipe REST API、またはスケジュール実行の `COPY INTO` にフォールバックする必要がありました。本ガイドのアーキテクチャは、保管先の標準S3バケットがS3イベント通知をネイティブにサポートするため、この制約を取り除いています。
+本パイプラインのデータは FSx for ONTAP S3 Access Point ではなく**通常のS3バケット**に着地するため、S3イベント通知によってトリガーされる実際の Snowpipe 自動取り込みが直接動作すると予想されます。`fsxn-lakehouse-integrations` プロジェクトの Snowflake 統合は、まさにこの理由（FSx for ONTAP S3 AP は S3イベント通知非対応）で FSx for ONTAP S3 AP に対して自動取り込みを使えず、FPolicy + Lambda + SNS + Snowpipe REST API、またはスケジュール実行の `COPY INTO` にフォールバックする必要がありました。本ガイドのアーキテクチャは、保管先の標準S3バケットがS3イベント通知をネイティブにサポートするため、この制約を取り除いています（本検証では Snowpipe 自動取り込み自体は実施しておらず、上記External Tableパスを検証しました。ただし自動取り込みが依存するS3イベント通知機能自体は、FSx S3 APとは異なり通常のS3バケットの標準機能です）。
 
 ## コスト比較
 

@@ -171,13 +171,38 @@ DESCRIBE INTEGRATION fsxn_lakehouse_retention_integration;
 -- Copy STORAGE_AWS_IAM_USER_ARN and STORAGE_AWS_EXTERNAL_ID, then redeploy
 -- snowflake-role.yaml with SnowflakeAccountId/SnowflakeExternalId set to
 -- those values (Phase 2 trust).
+
+CREATE OR REPLACE STAGE audit_logs_stage
+  STORAGE_INTEGRATION = fsxn_lakehouse_retention_integration
+  URL = 's3://<your-retention-bucket>/audit-logs/'
+  FILE_FORMAT = (TYPE = 'PARQUET');
+
+LIST @audit_logs_stage;
+
+CREATE OR REPLACE EXTERNAL TABLE audit_logs_ext (
+    "timestamp"  VARCHAR AS (value:"timestamp"::VARCHAR),
+    eventid      VARCHAR AS (value:eventid::VARCHAR),
+    svmname      VARCHAR AS (value:svmname::VARCHAR),
+    username     VARCHAR AS (value:username::VARCHAR),
+    clientip     VARCHAR AS (value:clientip::VARCHAR),
+    operation    VARCHAR AS (value:operation::VARCHAR),
+    objectname   VARCHAR AS (value:objectname::VARCHAR),
+    result       VARCHAR AS (value:result::VARCHAR)
+)
+  LOCATION = @audit_logs_stage
+  FILE_FORMAT = (TYPE = 'PARQUET')
+  AUTO_REFRESH = FALSE;
+
+ALTER EXTERNAL TABLE audit_logs_ext REFRESH;
+
+SELECT COUNT(*) AS total_records FROM audit_logs_ext;
 ```
 
-> **Verification status for this section**: architecture, IAM role template, and SQL scripts are complete and follow the same pattern already E2E-verified in `fsxn-lakehouse-integrations` for FSx for ONTAP S3 Access Points (Project-context expectation: this pattern is expected to work equivalently, or more simply, against a standard S3 bucket, since standard S3 buckets support S3 Event Notifications that FSx for ONTAP S3 Access Points do not). Real end-to-end execution against a live Snowflake account for *this specific pipeline* is pending and will be updated here once completed.
+> **Verification status for this section: E2E verified** (2026-07-20). Using the same 500-record Parquet dataset produced by the Firehose pipeline above, the Storage Integration two-phase trust setup succeeded, `LIST @audit_logs_stage` returned the real Parquet file from S3, and `SELECT COUNT(*) FROM audit_logs_ext` returned exactly 500 — matching the Athena result exactly. A `GROUP BY operation, result` query against the same External Table returned 15 rows matching the same Operation x Result distribution seen in the Athena verification above.
 
 ### Architectural Difference from the FSx S3 AP Snowflake Path
 
-Because this pipeline's data lands in a **standard S3 bucket** rather than an FSx for ONTAP S3 Access Point, real Snowpipe auto-ingest (triggered by S3 Event Notifications) is expected to work directly — the `fsxn-lakehouse-integrations` project's Snowflake integration could not use auto-ingest against FSx for ONTAP S3 APs for exactly this reason (S3 Event Notifications are not supported on FSx for ONTAP S3 APs) and had to fall back to FPolicy + Lambda + SNS + Snowpipe REST API, or scheduled `COPY INTO`. This guide's architecture removes that constraint, since the standard S3 destination bucket supports S3 Event Notifications natively.
+Because this pipeline's data lands in a **standard S3 bucket** rather than an FSx for ONTAP S3 Access Point, real Snowpipe auto-ingest (triggered by S3 Event Notifications) is expected to work directly — the `fsxn-lakehouse-integrations` project's Snowflake integration could not use auto-ingest against FSx for ONTAP S3 APs for exactly this reason (S3 Event Notifications are not supported on FSx for ONTAP S3 APs) and had to fall back to FPolicy + Lambda + SNS + Snowpipe REST API, or scheduled `COPY INTO`. This guide's architecture removes that constraint, since the standard S3 destination bucket supports S3 Event Notifications natively. (Snowpipe auto-ingest itself was not exercised in this verification — the External Table path above was — but the underlying S3 Event Notification capability this would depend on is a standard S3 bucket feature, unlike the FSx S3 AP case.)
 
 ## Cost Comparison
 

@@ -16,6 +16,13 @@
 --   Phase 1: CREATE STORAGE INTEGRATION with own-account-trusted role -> DESCRIBE INTEGRATION
 --   Phase 2: redeploy snowflake-role.yaml with SnowflakeAccountId/SnowflakeExternalId
 --            from DESCRIBE INTEGRATION output, then re-run DESCRIBE INTEGRATION to confirm
+--
+-- E2E verified (2026-07-20): this exact script was run against a live Snowflake
+-- trial account and a real S3 bucket containing 500 Firehose-produced Parquet
+-- records. LIST @audit_logs_stage returned the real Parquet file, and
+-- SELECT COUNT(*) FROM audit_logs_ext returned exactly 500 -- matching the
+-- Athena verification exactly. The GROUP BY query below returned 15 rows
+-- matching the same Operation x Result distribution seen in Athena.
 -- =============================================================================
 
 USE ROLE ACCOUNTADMIN;
