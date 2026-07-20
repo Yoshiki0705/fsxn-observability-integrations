@@ -27,6 +27,7 @@ from typing import Any, Optional
 import boto3
 import urllib3
 
+from otlp_auth import build_auth_headers, validate_auth_mode_header, validate_extra_headers_json
 from otlp_protobuf import encode_logs_data
 
 # Conditionally import ems_parser (available as Lambda Layer)
@@ -109,6 +110,11 @@ EMS_SEVERITY_MAP = {
 
 logger = logging.getLogger()
 logger.setLevel(getattr(logging, LOG_LEVEL))
+
+# ─── Startup validation (shared module) ────────────────────────────────────
+
+validate_auth_mode_header(AUTH_MODE, AUTH_HEADER_NAME, logger)
+EXTRA_HEADERS_JSON = validate_extra_headers_json(EXTRA_HEADERS_JSON, logger)
 
 # HTTP client
 http = urllib3.PoolManager(

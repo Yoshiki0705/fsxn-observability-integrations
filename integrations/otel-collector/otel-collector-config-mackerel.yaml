@@ -1,14 +1,20 @@
 # OTel Collector Configuration — Mackerel (log feature, open beta)
 #
 # ✅ E2E verified (2026-07-18): a sample FSx audit log payload sent through
-# this Collector config was confirmed present in Mackerel's log search
-# (via the findLogs GraphQL query) with all attributes intact. Mackerel's
+# this Collector config was confirmed present in Mackerel's log search UI
+# with this repository's generated audit attributes searchable. Mackerel's
 # own log feature itself remains an open beta (GA'd as beta 2026-07-16; GA
 # date TBD) — see integrations/mackerel/README.md for beta constraints
 # (no data retention guarantee, unscheduled maintenance possible).
 #
 # Mackerel's log feature accepts OTLP/HTTP only — the SAME endpoint and auth
 # header used by Mackerel's tracing (APM) feature.
+#
+# EXPORTER NAMING: This config uses otlp_http (underscore), the current
+# canonical name in OpenTelemetry Collector. Older Collector versions used
+# "otlphttp" (no underscore) which is now a deprecated alias. If you see
+# "exporter not found" errors, your Collector version may be too old for
+# otlp_http — use otlphttp instead, or upgrade your Collector.
 
 receivers:
   otlp:
@@ -22,7 +28,7 @@ processors:
     send_batch_size: 1000
 
 exporters:
-  otlphttp/mackerel:
+  otlp_http/mackerel:
     endpoint: https://otlp-vaxila.mackerelio.com
     headers:
       Accept: "*/*"
@@ -37,15 +43,6 @@ extensions:
     endpoint: 0.0.0.0:13133
 
 service:
-  # The metrics block below exposes the Collector's own internal metrics
-  # (e.g. otelcol_exporter_sent_log_records, otelcol_exporter_send_failed_log_records)
-  # on :8888/metrics. This was the fastest way to confirm during verification
-  # that the exporter had actually delivered records with zero failures,
-  # independent of whether Mackerel's log search UI showed results yet (search
-  # indexing can lag behind actual delivery — see setup-guide.md Step 3.3's
-  # "stale sample timestamps" troubleshooting entry). Requires exposing port
-  # 8888 in docker-compose-mackerel.yaml (already done) or your ECS task
-  # definition if running on Fargate.
   telemetry:
     metrics:
       readers:
@@ -59,4 +56,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlphttp/mackerel]
+      exporters: [otlp_http/mackerel]

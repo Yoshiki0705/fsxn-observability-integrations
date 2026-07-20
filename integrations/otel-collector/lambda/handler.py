@@ -31,6 +31,7 @@ from typing import Any, Optional
 import boto3
 import urllib3
 
+from otlp_auth import build_auth_headers, validate_auth_mode_header, validate_extra_headers_json
 from otlp_protobuf import encode_logs_data
 
 # ─── Configuration from environment ────────────────────────────────────────
@@ -81,6 +82,11 @@ WARN_KEYWORDS = ("fail", "denied", "error")
 
 logger = logging.getLogger()
 logger.setLevel(getattr(logging, LOG_LEVEL))
+
+# ─── Startup validation (uses shared module, after logger init) ─────────────
+
+validate_auth_mode_header(AUTH_MODE, AUTH_HEADER_NAME, logger)
+EXTRA_HEADERS_JSON = validate_extra_headers_json(EXTRA_HEADERS_JSON, logger)
 
 # ─── AWS clients (initialized outside handler for connection reuse) ─────────
 
