@@ -21,10 +21,39 @@ definitions (Apache License 2.0):
 - https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/resource/v1/resource.proto
 
 This module only encodes the fields already used by this repo's OTLP/JSON
-payload builders (service.name/cloud.* resource attributes, one
-InstrumentationScope name+version, and LogRecord time_unix_nano/
-severity_number/severity_text/body(string)/attributes(string-valued)). It
-does not attempt to be a general-purpose OTLP Protobuf library.
+payload builders. It does NOT attempt to be a general-purpose OTLP Protobuf
+library and is NOT intended for reuse outside this project.
+
+SUPPORTED FIELDS (exhaustive list):
+  LogRecord:
+    - timeUnixNano       (field 1, fixed64)
+    - severityNumber     (field 2, varint/enum)
+    - severityText       (field 3, string)
+    - body.stringValue   (field 5, AnyValue with string_value only)
+    - attributes         (field 6, repeated KeyValue — stringValue only)
+  Resource:
+    - attributes         (field 1, repeated KeyValue — stringValue only)
+  InstrumentationScope:
+    - name               (field 1, string)
+    - version            (field 2, string)
+
+NOT SUPPORTED (will raise or silently omit — do NOT rely on):
+  - AnyValue types: bytes, int, double, bool, array, kvlist
+  - LogRecord fields: observedTimeUnixNano, traceId, spanId, flags,
+    droppedAttributesCount
+  - Resource: droppedAttributesCount, schemaUrl
+  - ScopeLogs/ResourceLogs: schemaUrl
+  - Any field not listed above
+
+PROTO SOURCE VERSION:
+  Field numbers taken from opentelemetry-proto as of 2026-07 (v1.3.x line).
+  CI runs a golden-test comparison against the official opentelemetry-proto
+  generated Python classes to detect upstream field-number changes.
+
+LICENSE ATTRIBUTION:
+  Field numbers are derived from the OpenTelemetry Protocol specification,
+  licensed under Apache License 2.0.
+  https://github.com/open-telemetry/opentelemetry-proto/blob/main/LICENSE
 """
 
 from __future__ import annotations
