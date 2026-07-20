@@ -202,6 +202,14 @@ curl -s -X POST "http://localhost:4318/v1/logs" \
 3. 送信した `service.namespace` / `service.name` の組（例: `fsxn` / `fsxn-audit-poc`）で識別されるサービスを選択
 4. サンプルログレコードが、`operation` と `svm` の属性が構造化フィールドとして見える状態で表示されることを確認
 
+以下は実際の E2E 検証時のスクリーンショットです（メールアドレス等の個人情報はマスキング済み）。
+
+![Mackerel ログ検索結果](../../../docs/screenshots/mackerel/mackerel-logs-search-results.png)
+*ログ検索結果: fsxn-audit サービスに送信された FSx for ONTAP 監査ログが表示されている。スクリーンショット中の IP アドレス（203.0.113.x）は RFC 5737 TEST-NET-3 のドキュメント用アドレスであり、実在する環境のアドレスではない*
+
+![Mackerel ログ詳細](../../../docs/screenshots/mackerel/mackerel-logs-detail.png)
+*ログ詳細: 操作種別、結果、SVM名、ファイルパス、ユーザー情報、クライアントIP、タイムスタンプなどの属性が検索可能な状態で保持されている*
+
 > **ヒント**: 数分待っても表示されない場合は、まず Step 3.3 のトラブルシューティング表を再確認してください。多くの失敗は Mackerel 自体ではなく、Collector → Mackerel 間のホップで発生します。
 
 > **検証時の注意点 — サンプルペイロードのタイムスタンプが古い場合**: Step 3.1 のサンプルペイロードは `timeUnixNano` が固定値です。このペイロードを保存して後日（例: 翌日）再送信すると、タイムスタンプが Mackerel のデフォルトのログ検索期間の範囲外になり、実際には送信が成功していても「届いていない」ように見えることがあります。検索 UI に依存せず配信を確認するには、Collector 自身のエクスポートメトリクスを確認してください（`curl http://localhost:8888/metrics | grep otelcol_exporter_sent_log_records` — このエンドポイントの有効化方法は `otel-collector-config-mackerel.yaml` の `telemetry` ブロックを参照）。または Mackerel の UI 側で検索期間をペイロードの実際のタイムスタンプを含む範囲まで広げてください。固定サンプルの代わりに `scripts/generate-otlp-payload.sh` で生成したペイロードを使う場合、常に現在時刻のタイムスタンプが生成されるため、この問題は発生しません。
